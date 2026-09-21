@@ -4,4 +4,6 @@ import com.proyecto.servicios.model.CatalogoProductosResponse;
 
 public interface ProductoService {
     CatalogoProductosResponse obtenerProductos();
+
+    void sincronizarCatalogo();
 }
