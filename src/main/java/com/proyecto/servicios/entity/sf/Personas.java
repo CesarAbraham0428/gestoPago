@@ -19,4 +19,8 @@ public class Personas {
     private String apellidoP;
     @Column(name="apellido_materno")
    private String apellidoMaterno;
+    @Column(name="correo")
+    private String correo;
+    @Column(name="telefono")
+    private String telefono;
 }
