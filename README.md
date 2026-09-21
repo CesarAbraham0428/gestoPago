@@ -1,6 +1,6 @@
 # GestoAPI
 
-API REST con Spring Boot que expone el catálogo de GestoPago y una aplicación Flutter de escritorio para registro, inicio de sesión y consulta de productos.
+API REST con Spring Boot que expone el catálogo de GestoPago y una aplicación Flutte para registro, inicio de sesión y consulta de productos.
 
 ## Arquitectura
 
@@ -33,7 +33,7 @@ La API escucha en `http://localhost:8080`. Flyway crea o actualiza las tablas al
 - `GET /productos`: devuelve el catálogo; requiere `Authorization: Bearer <token>`.
 - `/swagger-ui/**` y `/v3/api-docs/**`: documentación OpenAPI.
 
-Los detalles de las solicitudes y respuestas están en [docs/autenticacion.md](docs/autenticacion.md). Las reglas funcionales completas están en [especificacion-reglas-negocio-gestoapi.md](especificacion-reglas-negocio-gestoapi.md).
+Los detalles de las solicitudes y respuestas están en [docs/autenticacion.md](docs/autenticacion.md).
 
 ## Cliente Flutter
 
