@@ -6,7 +6,7 @@ import java.util.Optional;
 
 public interface GestoPagoTokenService {
 
-    void renovarToken();
+    GestoPagoToken renovarToken();
 
     Optional<GestoPagoToken> obtenerTokenActivo(Integer idDistribuidor, String codigoDispositivo);
 }

@@ -1,6 +1,7 @@
 package com.proyecto.servicios.security;
 
 import com.auth0.jwt.exceptions.JWTVerificationException;
+import lombok.extern.slf4j.Slf4j;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,6 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+@Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenService tokenService;
 
@@ -33,6 +35,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } catch (JWTVerificationException | IllegalArgumentException exception) {
                 SecurityContextHolder.clearContext();
+                log.warn("Se rechazó un JWT inválido o vencido para {} {}",
+                        request.getMethod(), request.getRequestURI());
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                 response.getWriter().write("{\"codigo\":1,\"mensaje\":\"Token inválido o vencido\"}");

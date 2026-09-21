@@ -8,6 +8,7 @@ import com.proyecto.servicios.model.RegistroRequest;
 import com.proyecto.servicios.repositorys.sf.PersonasRepository;
 import com.proyecto.servicios.repositorys.sf.RegistroRepository;
 import com.proyecto.servicios.security.JwtTokenService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Locale;
 
 @Service
+@Slf4j
 public class AutenticacionService {
     private final RegistroRepository registroRepository;
     private final PersonasRepository personasRepository;
@@ -34,6 +36,7 @@ public class AutenticacionService {
     public AuthResponse registrar(RegistroRequest request) {
         String usuario = request.usuario().trim().toLowerCase(Locale.ROOT);
         if (registroRepository.existsByUsuarioIgnoreCase(usuario)) {
+            log.warn("Se rechazó un registro por usuario duplicado");
             throw new UsuarioDuplicadoException();
         }
 
@@ -53,22 +56,30 @@ public class AutenticacionService {
         try {
             registroRepository.save(registro);
         } catch (DataIntegrityViolationException exception) {
+            log.warn("Se rechazó un registro por una restricción de unicidad");
             throw new UsuarioDuplicadoException();
         }
+        log.info("Cuenta registrada correctamente");
         return crearRespuesta(registro);
     }
 
     @Transactional(readOnly = true)
     public AuthResponse iniciarSesion(LoginRequest request) {
         Registro registro = registroRepository.findByUsuarioIgnoreCase(request.usuario().trim())
-                .orElseThrow(CredencialesInvalidasException::new);
+                .orElseThrow(() -> {
+                    log.warn("Intento de inicio de sesión con credenciales inválidas");
+                    return new CredencialesInvalidasException();
+                });
         if (!registro.isActivo()) {
+            log.warn("Se rechazó el inicio de sesión de una cuenta inactiva");
             throw new CuentaInactivaException();
         }
         if (!passwordEncoder.matches(request.password(), registro.getPasswordHash())) {
+            log.warn("Intento de inicio de sesión con credenciales inválidas");
             throw new CredencialesInvalidasException();
         }
         registro.getPersona().getNombre();
+        log.info("Inicio de sesión correcto");
         return crearRespuesta(registro);
     }
 

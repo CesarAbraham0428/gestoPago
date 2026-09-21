@@ -2,6 +2,7 @@ package com.proyecto.servicios.service.Impl;
 
 import com.proyecto.servicios.cache.CatalogoProductosCache;
 import com.proyecto.servicios.cache.CatalogoProductosCache.ResultadoLectura;
+import com.proyecto.servicios.client.GestoPagoAuthException;
 import com.proyecto.servicios.client.GestoPagoCatalogClient;
 import com.proyecto.servicios.client.GestoPagoCatalogException;
 import com.proyecto.servicios.entity.gestopago.GestoPagoToken;
@@ -11,6 +12,7 @@ import com.proyecto.servicios.model.gestopago.GestoPagoCatalogResponse;
 import com.proyecto.servicios.model.gestopago.GestoPagoProduct;
 import com.proyecto.servicios.service.CatalogoProductosPersistenceService;
 import com.proyecto.servicios.service.CatalogoProductosPersistenceService.ResultadoActualizacion;
+import com.proyecto.servicios.service.CatalogoPersistenciaException;
 import com.proyecto.servicios.service.GestoPagoTokenService;
 import com.proyecto.servicios.service.ProductoService;
 import lombok.extern.slf4j.Slf4j;
@@ -57,6 +59,17 @@ public class ProductoServiceImpl implements ProductoService {
 
     @Override
     public CatalogoProductosResponse obtenerProductos() {
+        long startedAt = System.nanoTime();
+        log.info("Inicia resolución del catálogo para la petición del cliente");
+        try {
+            return obtenerProductosInterno();
+        } finally {
+            log.info("Finaliza resolución del catálogo para la petición del cliente: duraciónMs={}",
+                    java.time.Duration.ofNanos(System.nanoTime() - startedAt).toMillis());
+        }
+    }
+
+    private CatalogoProductosResponse obtenerProductosInterno() {
         ResultadoLectura lecturaRedis = catalogoCache.obtener();
         if (lecturaRedis.catalogo().isPresent()) {
             CatalogoProductosResponse catalogo = lecturaRedis.catalogo().get();
@@ -68,7 +81,7 @@ public class ProductoServiceImpl implements ProductoService {
         Optional<CatalogoProductosResponse> catalogoPostgres;
         try {
             catalogoPostgres = persistencia.obtenerCatalogo();
-        } catch (DataAccessException | TransactionException exception) {
+        } catch (CatalogoPersistenciaException | DataAccessException | TransactionException exception) {
             log.warn("No se pudo consultar PostgreSQL; se continuará con GestoPago ({})",
                     exception.getClass().getSimpleName());
             catalogoPostgres = Optional.empty();
@@ -84,13 +97,10 @@ public class ProductoServiceImpl implements ProductoService {
         }
 
         try {
-            ResultadoActualizacion resultado = persistencia.actualizarSiHayMasProductos(
+            CatalogoProductosResponse persistido = persistencia.persistirCatalogoRecuperado(
                     catalogoGestoPago.getProductos());
-            if (resultado.catalogoPersistido() == null) {
-                return crearRespuesta(2, MENSAJE_ERROR_POSTGRES, List.of());
-            }
-            return responderDesdePostgres(resultado.catalogoPersistido(), lecturaRedis.redisDisponible());
-        } catch (DataAccessException | TransactionException exception) {
+            return responderDesdePostgres(persistido, lecturaRedis.redisDisponible());
+        } catch (CatalogoPersistenciaException | DataAccessException | TransactionException exception) {
             log.error("GestoPago devolvió un catálogo válido, pero PostgreSQL no pudo guardarlo ({})",
                     exception.getClass().getSimpleName());
             // No se escribe en Redis: PostgreSQL es el respaldo persistente obligatorio.
@@ -100,6 +110,7 @@ public class ProductoServiceImpl implements ProductoService {
 
     @Override
     public void sincronizarCatalogo() {
+        long startedAt = System.nanoTime();
         log.info("Inicia sincronización diaria del catálogo de GestoPago");
         try {
             CatalogoProductosResponse catalogoNuevo = consultarCatalogoGestoPago();
@@ -123,11 +134,12 @@ public class ProductoServiceImpl implements ProductoService {
             boolean redisActualizado = catalogoCache.guardar(resultado.catalogoPersistido());
             log.info("Catálogo actualizado en PostgreSQL: {} → {} productos; Redis actualizado={}",
                     resultado.cantidadAnterior(), catalogoNuevo.getTotal(), redisActualizado);
-        } catch (DataAccessException | TransactionException exception) {
+        } catch (CatalogoPersistenciaException | DataAccessException | TransactionException exception) {
             log.error("Falló la sincronización del catálogo en PostgreSQL ({})",
                     exception.getClass().getSimpleName());
         } finally {
-            log.info("Finaliza sincronización diaria del catálogo de GestoPago");
+            log.info("Finaliza sincronización diaria del catálogo de GestoPago: duraciónMs={}",
+                    java.time.Duration.ofNanos(System.nanoTime() - startedAt).toMillis());
         }
     }
 
@@ -145,6 +157,10 @@ public class ProductoServiceImpl implements ProductoService {
         Optional<GestoPagoToken> token;
         try {
             token = tokenService.obtenerTokenActivo(idDistribuidor, codigoDispositivo);
+        } catch (GestoPagoAuthException exception) {
+            log.error("No se pudo obtener un token válido de GestoPago: tipo={}, statusHttp={}",
+                    exception.getTipo(), exception.getStatusHttp());
+            return crearRespuesta(1, mensajeErrorAutenticacion(exception.getTipo()), List.of());
         } catch (DataAccessException | TransactionException exception) {
             log.error("No fue posible consultar el token de GestoPago en PostgreSQL ({})",
                     exception.getClass().getSimpleName());
@@ -160,8 +176,34 @@ public class ProductoServiceImpl implements ProductoService {
         try {
             catalogo = catalogClient.consultarCatalogo(token.get().getToken());
         } catch (GestoPagoCatalogException exception) {
-            log.error("Falló la consulta del catálogo de GestoPago ({})", exception.getClass().getSimpleName());
-            return crearRespuesta(1, "No fue posible obtener el catálogo de GestoPago", List.of());
+            if (exception.getTipo() != GestoPagoCatalogException.Tipo.AUTENTICACION) {
+                log.error("Falló la consulta del catálogo de GestoPago: tipo={}, statusHttp={}",
+                        exception.getTipo(), exception.getStatusHttp());
+                return crearRespuesta(1, mensajeErrorCatalogo(exception.getTipo()), List.of());
+            }
+
+            log.warn("GestoPago rechazó el token actual; se renovará y se reintentará una vez");
+            try {
+                GestoPagoToken tokenRenovado = tokenService.renovarToken();
+                if (tokenRenovado == null || tokenRenovado.getToken() == null
+                        || tokenRenovado.getToken().isBlank()) {
+                    return crearRespuesta(1, "No fue posible renovar la autenticación de GestoPago", List.of());
+                }
+                catalogo = catalogClient.consultarCatalogo(tokenRenovado.getToken());
+                log.info("Consulta de catálogo recuperada después de renovar el token de GestoPago");
+            } catch (GestoPagoAuthException authException) {
+                log.error("Falló la renovación del token tras el rechazo de GestoPago: tipo={}, statusHttp={}",
+                        authException.getTipo(), authException.getStatusHttp());
+                return crearRespuesta(1, mensajeErrorAutenticacion(authException.getTipo()), List.of());
+            } catch (GestoPagoCatalogException retryException) {
+                log.error("Falló el reintento del catálogo de GestoPago: tipo={}, statusHttp={}",
+                        retryException.getTipo(), retryException.getStatusHttp());
+                return crearRespuesta(1, mensajeErrorCatalogo(retryException.getTipo()), List.of());
+            } catch (DataAccessException | TransactionException persistenceException) {
+                log.error("No se pudo persistir el token renovado de GestoPago ({})",
+                        persistenceException.getClass().getSimpleName());
+                return crearRespuesta(2, MENSAJE_ERROR_POSTGRES, List.of());
+            }
         }
 
         if (catalogo == null
@@ -179,6 +221,28 @@ public class ProductoServiceImpl implements ProductoService {
                 .toList();
         log.info("Catálogo válido recibido desde GestoPago: {} productos", productos.size());
         return crearRespuesta(0, "Catálogo obtenido correctamente desde GestoPago", productos);
+    }
+
+    private String mensajeErrorCatalogo(GestoPagoCatalogException.Tipo tipo) {
+        return switch (tipo) {
+            case AUTENTICACION -> "GestoPago rechazó la autenticación del catálogo";
+            case TIMEOUT -> "Se agotó el tiempo de espera al consultar GestoPago";
+            case HTTP -> "GestoPago devolvió una respuesta HTTP no exitosa";
+            case COMUNICACION -> "No hay conexión al servicio de GestoPago";
+            case XML -> "La respuesta XML de GestoPago no es válida";
+            case RESPUESTA_VACIA -> "GestoPago devolvió una respuesta vacía";
+            case RESPUESTA_INVALIDA -> "GestoPago no devolvió un catálogo válido";
+        };
+    }
+
+    private String mensajeErrorAutenticacion(GestoPagoAuthException.Tipo tipo) {
+        return switch (tipo) {
+            case AUTENTICACION -> "GestoPago rechazó las credenciales de autenticación";
+            case TIMEOUT -> "Se agotó el tiempo de espera al autenticar con GestoPago";
+            case HTTP -> "GestoPago devolvió un error HTTP durante la autenticación";
+            case COMUNICACION -> "No hay conexión al servicio de autenticación de GestoPago";
+            case RESPUESTA_INVALIDA -> "GestoPago no devolvió un token válido";
+        };
     }
 
     private boolean productoValido(GestoPagoProduct producto) {

@@ -56,7 +56,9 @@ Sin token válido la respuesta es 401. Todas las rutas existentes requieren aute
 
 ## Configuración local
 
-La API escucha en el puerto 8080 por defecto. Se puede cambiar con SERVER_PORT. Define APP_JWT_SECRET con una clave aleatoria de al menos 32 bytes antes de usar la app fuera del entorno local; el valor incluido en application.properties solo permite desarrollo local. El token dura 8 horas por defecto y se puede cambiar con APP_JWT_EXPIRATION_MS.
+La API escucha en el puerto 8080 por defecto. Se puede cambiar con SERVER_PORT. Define APP_JWT_SECRET con una clave aleatoria de al menos 32 bytes; la aplicación no tiene una clave secreta integrada y no inicia si falta esta variable. El token dura 8 horas por defecto y se puede cambiar con APP_JWT_EXPIRATION_MS.
+
+La URL, los timeouts y el ritmo de renovación de GestoPago se configuran mediante las variables `GESTOPAGO_AUTH_URL`, `GESTOPAGO_AUTH_CONNECT_TIMEOUT_MS`, `GESTOPAGO_AUTH_READ_TIMEOUT_MS`, `GESTOPAGO_AUTH_REFRESH_RATE_MS` y `GESTOPAGO_AUTH_RENEWAL_CHECK_MS`. La API revisa el vencimiento indicado por `expires_in` y, si el catálogo responde 401/403, renueva el token y reintenta la consulta una vez. Los fallos de autenticación, HTTP, timeout y comunicación se registran por categoría sin incluir el token ni la contraseña en logs o respuestas.
 
 Inicia el backend desde la raíz del repositorio después de configurar PostgreSQL, Redis y los valores de GestoPago en el archivo .env:
 

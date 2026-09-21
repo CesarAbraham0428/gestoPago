@@ -80,6 +80,7 @@ dependencies {
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testImplementation 'org.mockito:mockito-inline:5.1.1'
     testImplementation 'com.h2database:h2:2.2.220'
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
