@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
@@ -19,6 +18,7 @@ class AuthService {
 
   static const _offlineUserKey = 'offline_user_v1';
   static const _offlineSecretKey = 'offline_secret_v1';
+  static const _offlineProductsKey = 'offline_products_v1';
   static const _offlinePeriod = Duration(days: 7);
   static const _requestTimeout = Duration(seconds: 8);
 
@@ -259,11 +259,20 @@ class AuthService {
     return difference == 0;
   }
 
-  bool _isConnectivityError(Object error) =>
-      error is SocketException ||
-      error is HandshakeException ||
-      error is TimeoutException ||
-      error is http.ClientException;
+  bool _isConnectivityError(Object error) {
+    if (error is TimeoutException || error is http.ClientException) {
+      return true;
+    }
+    final message = error.toString().toLowerCase();
+    return message.contains('socket') ||
+        message.contains('handshake') ||
+        message.contains('network') ||
+        message.contains('connection refused') ||
+        message.contains('connection reset') ||
+        message.contains('failed host lookup') ||
+        message.contains('xmlhttprequest') ||
+        message.contains('failed to fetch');
+  }
 
   String _messageFrom(String body, String fallback) {
     try {
@@ -275,10 +284,10 @@ class AuthService {
   }
 
   Future<List<Product>> _readCachedProducts() async {
-    final file = await _productsCacheFile();
-    if (!await file.exists()) return const [];
+    final rawJson = await _secureStorage.read(key: _offlineProductsKey);
+    if (rawJson == null || rawJson.isEmpty) return const [];
     try {
-      final json = jsonDecode(await file.readAsString()) as List<dynamic>;
+      final json = jsonDecode(rawJson) as List<dynamic>;
       return json
           .whereType<Map<String, dynamic>>()
           .map(Product.fromJson)
@@ -289,20 +298,10 @@ class AuthService {
   }
 
   Future<void> _writeCachedProducts(List<Product> products) async {
-    final file = await _productsCacheFile();
-    await file.writeAsString(
-      jsonEncode(products.map((product) => product.toJson()).toList()),
+    await _secureStorage.write(
+      key: _offlineProductsKey,
+      value: jsonEncode(products.map((product) => product.toJson()).toList()),
     );
-  }
-
-  Future<File> _productsCacheFile() async {
-    final localAppData = Platform.environment['LOCALAPPDATA'];
-    final root = localAppData == null || localAppData.isEmpty
-        ? Directory.systemTemp.path
-        : localAppData;
-    final directory = Directory('$root${Platform.pathSeparator}GestoPago');
-    await directory.create(recursive: true);
-    return File('${directory.path}${Platform.pathSeparator}productos.json');
   }
 
   AuthPayload _parseAuthResponse(String body) {
