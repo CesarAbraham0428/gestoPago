@@ -142,7 +142,7 @@ class ProductoServiceImplTest {
         service = new ProductoServiceImpl(
                 catalogClient,
                 cache,
-                new CatalogoProductosPersistenceService(productoRepository, productoMapper),
+                new CatalogoProductosPersistenceServiceImpl(productoRepository, productoMapper),
                 tokenService,
                 productoMapper,
                 42,

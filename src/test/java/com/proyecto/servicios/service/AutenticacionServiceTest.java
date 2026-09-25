@@ -8,6 +8,8 @@ import com.proyecto.servicios.model.RegistroRequest;
 import com.proyecto.servicios.repositorys.sf.PersonasRepository;
 import com.proyecto.servicios.repositorys.sf.RegistroRepository;
 import com.proyecto.servicios.security.JwtTokenService;
+import com.proyecto.servicios.service.Impl.AutenticacionServiceImpl;
+import com.proyecto.servicios.service.exception.AutenticacionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,7 +46,7 @@ class AutenticacionServiceTest {
     @BeforeEach
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
-        service = new AutenticacionService(registroRepository, personasRepository, passwordEncoder, jwtTokenService);
+        service = new AutenticacionServiceImpl(registroRepository, personasRepository, passwordEncoder, jwtTokenService);
     }
 
     @Test
@@ -86,9 +88,10 @@ class AutenticacionServiceTest {
     void registrar_usuarioDuplicadoLanzaExcepcionSinCrearPersona() {
         when(registroRepository.existsByUsuarioIgnoreCase("alice.user")).thenReturn(true);
 
-        assertThrows(
-                AutenticacionService.UsuarioDuplicadoException.class,
+        AutenticacionException exception = assertThrows(
+                AutenticacionException.class,
                 () -> service.registrar(registrationRequest(" Alice.User ", "Ana", "Perez", "Ruiz")));
+        assertEquals(AutenticacionException.Tipo.USUARIO_DUPLICADO, exception.getTipo());
 
         verifyNoInteractions(personasRepository, jwtTokenService);
         verify(registroRepository, never()).save(any(Registro.class));
@@ -117,9 +120,10 @@ class AutenticacionServiceTest {
         Registro registro = activeRegistration("alice.user", "correct-horse-battery");
         when(registroRepository.findByUsuarioIgnoreCase("alice.user")).thenReturn(Optional.of(registro));
 
-        assertThrows(
-                AutenticacionService.CredencialesInvalidasException.class,
+        AutenticacionException exception = assertThrows(
+                AutenticacionException.class,
                 () -> service.iniciarSesion(new LoginRequest("alice.user", "wrong-password")));
+        assertEquals(AutenticacionException.Tipo.CREDENCIALES_INVALIDAS, exception.getTipo());
 
         verifyNoInteractions(jwtTokenService);
     }
@@ -130,9 +134,10 @@ class AutenticacionServiceTest {
         registro.setActivo(false);
         when(registroRepository.findByUsuarioIgnoreCase("alice.user")).thenReturn(Optional.of(registro));
 
-        assertThrows(
-                AutenticacionService.CuentaInactivaException.class,
+        AutenticacionException exception = assertThrows(
+                AutenticacionException.class,
                 () -> service.iniciarSesion(new LoginRequest("alice.user", "correct-horse-battery")));
+        assertEquals(AutenticacionException.Tipo.CUENTA_INACTIVA, exception.getTipo());
 
         verifyNoInteractions(jwtTokenService);
     }

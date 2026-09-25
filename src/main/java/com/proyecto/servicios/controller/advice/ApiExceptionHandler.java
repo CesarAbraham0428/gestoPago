@@ -1,10 +1,10 @@
-package com.proyecto.servicios.controller;
+package com.proyecto.servicios.controller.advice;
 
 import com.proyecto.servicios.model.GenericResponse;
 import com.proyecto.servicios.client.GestoPagoAuthException;
 import com.proyecto.servicios.client.GestoPagoCatalogException;
-import com.proyecto.servicios.service.CatalogoPersistenciaException;
-import com.proyecto.servicios.service.AutenticacionService;
+import com.proyecto.servicios.service.exception.AutenticacionException;
+import com.proyecto.servicios.service.exception.CatalogoPersistenciaException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
@@ -17,19 +17,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 @Slf4j
 public class ApiExceptionHandler {
-    @ExceptionHandler(AutenticacionService.UsuarioDuplicadoException.class)
-    ResponseEntity<GenericResponse> usuarioDuplicado() {
-        return respuesta(HttpStatus.CONFLICT, 1, "El usuario ya está registrado");
-    }
-
-    @ExceptionHandler(AutenticacionService.CredencialesInvalidasException.class)
-    ResponseEntity<GenericResponse> credencialesInvalidas() {
-        return respuesta(HttpStatus.UNAUTHORIZED, 1, "Usuario o contraseña incorrectos");
-    }
-
-    @ExceptionHandler(AutenticacionService.CuentaInactivaException.class)
-    ResponseEntity<GenericResponse> cuentaInactiva() {
-        return respuesta(HttpStatus.FORBIDDEN, 1, "La cuenta está inactiva");
+    @ExceptionHandler(AutenticacionException.class)
+    ResponseEntity<GenericResponse> errorAutenticacion(AutenticacionException exception) {
+        return switch (exception.getTipo()) {
+            case USUARIO_DUPLICADO -> respuesta(HttpStatus.CONFLICT, 1, "El usuario ya est\u00e1 registrado");
+            case CREDENCIALES_INVALIDAS -> respuesta(HttpStatus.UNAUTHORIZED, 1, "Usuario o contrase\u00f1a incorrectos");
+            case CUENTA_INACTIVA -> respuesta(HttpStatus.FORBIDDEN, 1, "La cuenta est\u00e1 inactiva");
+        };
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

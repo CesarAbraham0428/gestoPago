@@ -5,6 +5,7 @@ import com.proyecto.servicios.mapper.ProductoMapper;
 import com.proyecto.servicios.model.CatalogoProductosResponse;
 import com.proyecto.servicios.model.ProductoResponse;
 import com.proyecto.servicios.repositorys.gestopago.ProductoRepository;
+import com.proyecto.servicios.service.Impl.CatalogoProductosPersistenceServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,7 +35,7 @@ class CatalogoProductosPersistenceServiceTest {
 
     @BeforeEach
     void setUp() {
-        persistence = new CatalogoProductosPersistenceService(repository, Mappers.getMapper(ProductoMapper.class));
+        persistence = new CatalogoProductosPersistenceServiceImpl(repository, Mappers.getMapper(ProductoMapper.class));
     }
 
     @Test
