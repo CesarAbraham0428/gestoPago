@@ -16,13 +16,16 @@ import com.proyecto.servicios.service.GestoPagoTokenService;
 import com.proyecto.servicios.service.ProductoService;
 import com.proyecto.servicios.service.exception.CatalogoPersistenciaException;
 import com.proyecto.servicios.validation.CatalogoProductosValidator;
+
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
@@ -71,7 +74,7 @@ public class ProductoServiceImpl implements ProductoService {
             return obtenerProductosInterno();
         } finally {
             log.info("Finaliza resolución del catálogo para la petición del cliente: duraciónMs={}",
-                    java.time.Duration.ofNanos(System.nanoTime() - startedAt).toMillis());
+                    duracionMs(startedAt));
         }
     }
 
@@ -145,7 +148,7 @@ public class ProductoServiceImpl implements ProductoService {
                     e.getClass().getSimpleName(), origen(e));
         } finally {
             log.info("Finaliza sincronización diaria del catálogo de GestoPago: duraciónMs={}",
-                    java.time.Duration.ofNanos(System.nanoTime() - startedAt).toMillis());
+                    duracionMs(startedAt));
         }
     }
 
@@ -168,13 +171,9 @@ public class ProductoServiceImpl implements ProductoService {
             }
             return crearRespuestaCatalogo(consultarConRenovacion(token.get().getToken()));
         } catch (GestoPagoAuthException e) {
-            log.error("Falló la autenticación de GestoPago: tipo={}, statusHttp={}, origen={}",
-                    e.getTipo(), e.getStatusHttp(), origen(e));
-            return crearRespuesta(1, mensajeErrorAutenticacion(e.getTipo()), List.of());
+            return crearRespuesta(1, e.getMessage(), List.of());
         } catch (GestoPagoCatalogException e) {
-            log.error("Falló la consulta del catálogo de GestoPago: tipo={}, statusHttp={}, origen={}",
-                    e.getTipo(), e.getStatusHttp(), origen(e));
-            return crearRespuesta(1, mensajeErrorCatalogo(e.getTipo()), List.of());
+            return crearRespuesta(1, e.getMessage(), List.of());
         } catch (DataAccessException | TransactionException e) {
             log.error("Falló PostgreSQL al consultar o renovar el token de GestoPago: tipo={}, origen={}",
                     e.getClass().getSimpleName(), origen(e));
@@ -207,14 +206,12 @@ public class ProductoServiceImpl implements ProductoService {
                 || catalogo.getMensaje() == null
                 || !"01".equals(catalogo.getMensaje().getCodigo())
                 || catalogo.getProductos() == null) {
-            log.error("GestoPago devolvió un catálogo vacío o con datos incompletos");
-            return crearRespuesta(1, "GestoPago no devolvió un catálogo válido", List.of());
+            return respuestaCatalogoInvalido();
         }
 
         List<ProductoResponse> productos = productoMapper.toResponses(catalogo.getProductos());
         if (!CatalogoProductosValidator.esValido(productos)) {
-            log.error("GestoPago devolvió un catálogo vacío o con datos incompletos");
-            return crearRespuesta(1, "GestoPago no devolvió un catálogo válido", List.of());
+            return respuestaCatalogoInvalido();
         }
         log.info("Catálogo válido recibido desde GestoPago: {} productos", productos.size());
         return crearRespuesta(0, "Catálogo obtenido correctamente desde GestoPago", productos);
@@ -225,26 +222,9 @@ public class ProductoServiceImpl implements ProductoService {
         return traza.length == 0 ? "desconocido" : traza[0].getClassName() + ":" + traza[0].getLineNumber();
     }
 
-    private String mensajeErrorCatalogo(GestoPagoCatalogException.Tipo tipo) {
-        return switch (tipo) {
-            case AUTENTICACION -> "GestoPago rechazó la autenticación del catálogo";
-            case TIMEOUT -> "Se agotó el tiempo de espera al consultar GestoPago";
-            case HTTP -> "GestoPago devolvió una respuesta HTTP no exitosa";
-            case COMUNICACION -> "No hay conexión al servicio de GestoPago";
-            case XML -> "La respuesta XML de GestoPago no es válida";
-            case RESPUESTA_VACIA -> "GestoPago devolvió una respuesta vacía";
-            case RESPUESTA_INVALIDA -> "GestoPago no devolvió un catálogo válido";
-        };
-    }
-
-    private String mensajeErrorAutenticacion(GestoPagoAuthException.Tipo tipo) {
-        return switch (tipo) {
-            case AUTENTICACION -> "GestoPago rechazó las credenciales de autenticación";
-            case TIMEOUT -> "Se agotó el tiempo de espera al autenticar con GestoPago";
-            case HTTP -> "GestoPago devolvió un error HTTP durante la autenticación";
-            case COMUNICACION -> "No hay conexión al servicio de autenticación de GestoPago";
-            case RESPUESTA_INVALIDA -> "GestoPago no devolvió un token válido";
-        };
+    private CatalogoProductosResponse respuestaCatalogoInvalido() {
+        log.error("GestoPago devolvió un catálogo vacío o con datos incompletos");
+        return crearRespuesta(1, "GestoPago no devolvió un catálogo válido", List.of());
     }
 
     private CatalogoProductosResponse crearRespuesta(
@@ -255,6 +235,10 @@ public class ProductoServiceImpl implements ProductoService {
         response.setProductos(productos);
         response.setTotal(productos.size());
         return response;
+    }
+
+    private long duracionMs(long startedAt) {
+        return Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
     }
 
 }

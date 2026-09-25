@@ -36,16 +36,12 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(GestoPagoCatalogException.class)
     ResponseEntity<GenericResponse> errorCatalogoGestoPago(GestoPagoCatalogException exception) {
-        log.error("Error no recuperable del catálogo GestoPago: tipo={}, statusHttp={}",
-                exception.getTipo(), exception.getStatusHttp());
-        return respuesta(HttpStatus.BAD_GATEWAY, 1, mensajeCatalogo(exception.getTipo()));
+        return respuesta(HttpStatus.BAD_GATEWAY, 1, exception.getMessage());
     }
 
     @ExceptionHandler(GestoPagoAuthException.class)
     ResponseEntity<GenericResponse> errorAutenticacionGestoPago(GestoPagoAuthException exception) {
-        log.error("Error no recuperable al autenticar con GestoPago: tipo={}, statusHttp={}",
-                exception.getTipo(), exception.getStatusHttp());
-        return respuesta(HttpStatus.BAD_GATEWAY, 1, mensajeAutenticacion(exception.getTipo()));
+        return respuesta(HttpStatus.BAD_GATEWAY, 1, exception.getMessage());
     }
 
     @ExceptionHandler({DataAccessException.class, TransactionException.class, CatalogoPersistenciaException.class})
@@ -59,28 +55,6 @@ public class ApiExceptionHandler {
     ResponseEntity<GenericResponse> errorInterno(Exception exception) {
         log.error("Error no controlado en la API ({})", exception.getClass().getSimpleName());
         return respuesta(HttpStatus.INTERNAL_SERVER_ERROR, null, "Ocurrió un error interno en la API");
-    }
-
-    private String mensajeCatalogo(GestoPagoCatalogException.Tipo tipo) {
-        return switch (tipo) {
-            case AUTENTICACION -> "GestoPago rechazó la autenticación del catálogo";
-            case TIMEOUT -> "Se agotó el tiempo de espera al consultar GestoPago";
-            case HTTP -> "GestoPago devolvió una respuesta HTTP no exitosa";
-            case COMUNICACION -> "No hay conexión al servicio de GestoPago";
-            case XML -> "La respuesta XML de GestoPago no es válida";
-            case RESPUESTA_VACIA -> "GestoPago devolvió una respuesta vacía";
-            case RESPUESTA_INVALIDA -> "GestoPago no devolvió un catálogo válido";
-        };
-    }
-
-    private String mensajeAutenticacion(GestoPagoAuthException.Tipo tipo) {
-        return switch (tipo) {
-            case AUTENTICACION -> "GestoPago rechazó las credenciales de autenticación";
-            case TIMEOUT -> "Se agotó el tiempo de espera al autenticar con GestoPago";
-            case HTTP -> "GestoPago devolvió un error HTTP durante la autenticación";
-            case COMUNICACION -> "No hay conexión al servicio de autenticación de GestoPago";
-            case RESPUESTA_INVALIDA -> "GestoPago no devolvió un token válido";
-        };
     }
 
     private ResponseEntity<GenericResponse> respuesta(HttpStatus status, Integer codigo, String mensaje) {
