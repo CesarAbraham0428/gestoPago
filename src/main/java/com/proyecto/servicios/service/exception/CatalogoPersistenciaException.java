@@ -1,4 +1,4 @@
-package com.proyecto.servicios.service;
+package com.proyecto.servicios.service.exception;
 
 public class CatalogoPersistenciaException extends RuntimeException {
 

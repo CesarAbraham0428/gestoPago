@@ -1,6 +1,5 @@
 package com.proyecto.servicios.model;
 
-import jakarta.persistence.Column;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
