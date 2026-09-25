@@ -1,11 +1,13 @@
 package com.proyecto.servicios.service;
 
 import com.proyecto.servicios.entity.gestopago.Producto;
+import com.proyecto.servicios.mapper.ProductoMapper;
 import com.proyecto.servicios.model.CatalogoProductosResponse;
 import com.proyecto.servicios.model.ProductoResponse;
 import com.proyecto.servicios.repositorys.gestopago.ProductoRepository;
 import com.proyecto.servicios.validation.CatalogoProductosValidator;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,35 +15,38 @@ import org.springframework.transaction.TransactionException;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @Slf4j
 public class CatalogoProductosPersistenceService {
 
-    private final ProductoRepository productoRepository;
+    private ProductoRepository productoRepository;
+    private ProductoMapper productoMapper;
 
-    public CatalogoProductosPersistenceService(ProductoRepository productoRepository) {
+    @Autowired
+    public CatalogoProductosPersistenceService(ProductoRepository productoRepository, ProductoMapper productoMapper) {
         this.productoRepository = productoRepository;
+        this.productoMapper = productoMapper;
     }
 
     @Transactional(readOnly = true, transactionManager = "sfTransactionManager")
-    public Optional<CatalogoProductosResponse> obtenerCatalogo() {
+
+    public CatalogoProductosResponse obtenerCatalogo() {
         long startedAt = System.nanoTime();
         log.info("Inicia lectura del catálogo en PostgreSQL");
         try {
             List<Producto> productos = productoRepository.findAllByOrderByIdAsc();
             if (productos.isEmpty()) {
                 log.info("PostgreSQL no contiene productos");
-                return Optional.empty();
+                return null;
             }
             CatalogoProductosResponse catalogo = crearRespuesta(productos);
             if (!CatalogoProductosValidator.esValido(catalogo.getProductos())) {
                 log.error("PostgreSQL contiene un catálogo incompleto; se intentará la fuente externa");
-                return Optional.empty();
+                return null;
             }
             log.info("PostgreSQL devolvió un catálogo válido: {} productos", productos.size());
-            return Optional.of(catalogo);
+            return catalogo;
         } catch (DataAccessException | TransactionException exception) {
             log.error("Falló la consulta del catálogo en PostgreSQL ({})",
                     exception.getClass().getSimpleName());
@@ -52,6 +57,7 @@ public class CatalogoProductosPersistenceService {
     }
 
     @Transactional(transactionManager = "sfTransactionManager")
+    
     public ResultadoActualizacion actualizarSiHayMasProductos(List<ProductoResponse> productosNuevos) {
         long startedAt = System.nanoTime();
         int cantidadNueva = productosNuevos == null ? 0 : productosNuevos.size();
@@ -115,9 +121,7 @@ public class CatalogoProductosPersistenceService {
     }
 
     private CatalogoProductosResponse reemplazarCatalogo(List<ProductoResponse> productos) {
-        List<Producto> entidadesNuevas = productos.stream()
-                .map(this::crearEntidad)
-                .toList();
+        List<Producto> entidadesNuevas = productoMapper.toEntities(productos);
 
         // El borrado y la inserción forman una sola transacción; un fallo revierte ambos pasos.
         productoRepository.deleteAllInBatch();
@@ -134,44 +138,12 @@ public class CatalogoProductosPersistenceService {
         return respuesta;
     }
 
-    private Producto crearEntidad(ProductoResponse response) {
-        Producto producto = new Producto();
-        producto.setProducto(response.getProducto());
-        producto.setServicio(response.getServicio());
-        producto.setIdServicio(response.getIdServicio());
-        producto.setIdProducto(response.getIdProducto());
-        producto.setIdCatTipoServicio(response.getIdCatTipoServicio());
-        producto.setTipoFront(response.getTipoFront());
-        producto.setHasDigitoVerificador(response.getHasDigitoVerificador());
-        producto.setTipoReferencia(response.getTipoReferencia());
-        producto.setPrecio(response.getPrecio());
-        producto.setShowAyuda(response.getShowAyuda());
-        producto.setLegend(response.getLegend());
-        return producto;
-    }
-
     private CatalogoProductosResponse crearRespuesta(List<Producto> entidades) {
         CatalogoProductosResponse response = new CatalogoProductosResponse();
         response.setCodigo(0);
         response.setMensaje("Catálogo obtenido correctamente desde PostgreSQL");
-        response.setProductos(entidades.stream().map(this::crearResponse).toList());
+        response.setProductos(entidades.stream().map(productoMapper::toResponse).toList());
         response.setTotal(response.getProductos().size());
-        return response;
-    }
-
-    private ProductoResponse crearResponse(Producto entidad) {
-        ProductoResponse response = new ProductoResponse();
-        response.setProducto(entidad.getProducto());
-        response.setServicio(entidad.getServicio());
-        response.setIdServicio(entidad.getIdServicio());
-        response.setIdProducto(entidad.getIdProducto());
-        response.setIdCatTipoServicio(entidad.getIdCatTipoServicio());
-        response.setTipoFront(entidad.getTipoFront());
-        response.setHasDigitoVerificador(entidad.getHasDigitoVerificador());
-        response.setTipoReferencia(entidad.getTipoReferencia());
-        response.setPrecio(entidad.getPrecio());
-        response.setShowAyuda(entidad.getShowAyuda());
-        response.setLegend(entidad.getLegend());
         return response;
     }
 

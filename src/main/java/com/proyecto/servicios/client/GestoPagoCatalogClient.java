@@ -1,187 +1,177 @@
 package com.proyecto.servicios.client;
 
 import com.proyecto.servicios.model.gestopago.GestoPagoCatalogResponse;
+import feign.FeignException;
+import feign.Response;
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Unmarshaller;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpStatusCodeException;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
-import java.io.StringReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PushbackInputStream;
 import java.net.SocketTimeoutException;
-import java.net.URI;
 import java.time.Duration;
 import java.util.Locale;
-import java.util.List;
 
 @Component
 @Slf4j
 public class GestoPagoCatalogClient {
 
-    private final RestTemplate restTemplate;
-    private final URI endpoint;
-    private final JAXBContext jaxbContext;
+    private GestoPagoCatalogFeignClient feignClient;
+    private JAXBContext jaxbContext;
 
-    public GestoPagoCatalogClient(
-            RestTemplateBuilder restTemplateBuilder,
-            @Value("${gestopago.auth.url}") String baseUrl,
-            @Value("${gestopago.catalog.path:/sistema/service/getProductList.do}") String catalogPath,
-            @Value("${gestopago.catalog.connect-timeout-ms:5000}") long connectTimeoutMs,
-            @Value("${gestopago.catalog.read-timeout-ms:15000}") long readTimeoutMs) {
-        this.restTemplate = restTemplateBuilder
-                .setConnectTimeout(Duration.ofMillis(connectTimeoutMs))
-                .setReadTimeout(Duration.ofMillis(readTimeoutMs))
-                .build();
-
-        String normalizedBaseUrl = baseUrl.replaceAll("/+$", "");
-        String normalizedPath = catalogPath.replaceAll("^/+", "");
-        this.endpoint = URI.create(normalizedBaseUrl + "/" + normalizedPath);
-
+    @Autowired
+    public GestoPagoCatalogClient(GestoPagoCatalogFeignClient feignClient) {
+        this.feignClient = feignClient;
         try {
-            this.jaxbContext = JAXBContext.newInstance(GestoPagoCatalogResponse.class);
-        } catch (JAXBException exception) {
-            throw new IllegalStateException("No se pudo configurar el lector XML de GestoPago", exception);
+            jaxbContext = JAXBContext.newInstance(GestoPagoCatalogResponse.class);
+        } catch (JAXBException e) {
+            throw new IllegalStateException("No se pudo configurar el lector XML de GestoPago", e);
         }
     }
 
     public GestoPagoCatalogResponse consultarCatalogo(String token) {
-        long startedAt = System.nanoTime();
+        long inicio = System.nanoTime();
         Integer statusHttp = null;
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(token);
-        headers.setAccept(List.of(MediaType.APPLICATION_XML, MediaType.TEXT_XML));
-
         log.info("Inicia consulta del catálogo en GestoPago");
         try {
-            ResponseEntity<String> response = restTemplate.exchange(
-                    endpoint,
-                    HttpMethod.GET,
-                    new HttpEntity<>(headers),
-                    String.class
-            );
-
-            statusHttp = response.getStatusCode().value();
-            String xml = response.getBody();
-            if (xml == null || xml.isBlank()) {
-                throw new GestoPagoCatalogException(
-                        "GestoPago devolvió una respuesta vacía",
-                        GestoPagoCatalogException.Tipo.RESPUESTA_VACIA,
-                        statusHttp,
-                        null);
+            Response response = feignClient.consultarCatalogo("Bearer " + token);
+            if (response == null) {
+                throw new GestoPagoCatalogException("GestoPago devolvió una respuesta vacía",
+                        GestoPagoCatalogException.Tipo.RESPUESTA_VACIA, null);
             }
-
-            return deserializar(xml);
-        } catch (RestClientException exception) {
-            GestoPagoCatalogException translated = traducirErrorHttp(exception);
-            statusHttp = translated.getStatusHttp();
-            log.error("Falló la consulta del catálogo en GestoPago: tipo={}, statusHttp={}, duraciónMs={}",
-                    translated.getTipo(), translated.getStatusHttp(), duracionMs(startedAt));
-            throw translated;
-        } catch (GestoPagoCatalogException exception) {
-            log.error("Respuesta de GestoPago inválida: tipo={}, statusHttp={}, duraciónMs={}",
-                    exception.getTipo(), exception.getStatusHttp(), duracionMs(startedAt));
-            throw exception;
+            statusHttp = response.status();
+            try (response) {
+                if (statusHttp != 200) {
+                    throw errorHttp(statusHttp, null);
+                }
+                if (response.body() == null) {
+                    throw new GestoPagoCatalogException("GestoPago devolvió una respuesta vacía",
+                            GestoPagoCatalogException.Tipo.RESPUESTA_VACIA, statusHttp, null);
+                }
+                PushbackInputStream xml = new PushbackInputStream(response.body().asInputStream());
+                int primerByte = xml.read();
+                if (primerByte == -1) {
+                    throw new GestoPagoCatalogException("GestoPago devolvió una respuesta vacía",
+                            GestoPagoCatalogException.Tipo.RESPUESTA_VACIA, statusHttp, null);
+                }
+                xml.unread(primerByte);
+                return deserializar(xml);
+            }
+        } catch (FeignException e) {
+            GestoPagoCatalogException error = traducirFeign(e);
+            statusHttp = error.getStatusHttp();
+            registrarError(error, inicio);
+            throw error;
+        } catch (IOException e) {
+            GestoPagoCatalogException error = new GestoPagoCatalogException(
+                    "No se pudo leer la respuesta de GestoPago",
+                    GestoPagoCatalogException.Tipo.COMUNICACION, statusHttp, e);
+            registrarError(error, inicio);
+            throw error;
+        } catch (GestoPagoCatalogException e) {
+            registrarError(e, inicio);
+            throw e;
         } finally {
             log.info("Finaliza consulta del catálogo en GestoPago: statusHttp={}, duraciónMs={}",
-                    statusHttp, duracionMs(startedAt));
+                    statusHttp, duracionMs(inicio));
         }
     }
 
-    private GestoPagoCatalogException traducirErrorHttp(RestClientException exception) {
-        if (exception instanceof HttpStatusCodeException httpException) {
-            int status = httpException.getStatusCode().value();
-            GestoPagoCatalogException.Tipo tipo = status == 401 || status == 403
-                    ? GestoPagoCatalogException.Tipo.AUTENTICACION
-                    : GestoPagoCatalogException.Tipo.HTTP;
-            return new GestoPagoCatalogException(
-                    tipo == GestoPagoCatalogException.Tipo.AUTENTICACION
-                            ? "GestoPago rechazó la autenticación del catálogo"
-                            : "GestoPago devolvió una respuesta HTTP no exitosa",
-                    tipo,
-                    status,
-                    exception);
+    private GestoPagoCatalogResponse deserializar(InputStream xml) {
+        XMLStreamReader lector = null;
+        try {
+            XMLInputFactory factory = XMLInputFactory.newFactory();
+            factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+            factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+            lector = factory.createXMLStreamReader(xml);
+            Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
+            GestoPagoCatalogResponse catalogo = (GestoPagoCatalogResponse) unmarshaller.unmarshal(lector);
+            while (lector.hasNext()) {
+                int evento = lector.next();
+                if (evento == XMLStreamConstants.START_ELEMENT
+                        || (evento == XMLStreamConstants.CHARACTERS && !lector.isWhiteSpace())) {
+                    throw new XMLStreamException("Contenido adicional después del elemento raíz");
+                }
+            }
+            return catalogo;
+        } catch (JAXBException | XMLStreamException | ClassCastException e) {
+            throw errorXml(e);
+        } finally {
+            if (lector != null) {
+                try {
+                    lector.close();
+                } catch (XMLStreamException e) {
+                    log.debug("No se pudo cerrar el lector XML de GestoPago: origen={}", origen(e));
+                }
+            }
         }
-
-        GestoPagoCatalogException.Tipo tipo = contieneTimeout(exception)
-                ? GestoPagoCatalogException.Tipo.TIMEOUT
-                : GestoPagoCatalogException.Tipo.COMUNICACION;
-        String mensaje = tipo == GestoPagoCatalogException.Tipo.TIMEOUT
-                ? "Se agotó el tiempo de espera al consultar GestoPago"
-                : "No se pudo establecer comunicación con GestoPago";
-        return new GestoPagoCatalogException(mensaje, tipo, exception);
     }
 
-    private boolean contieneTimeout(Throwable exception) {
-        Throwable actual = exception;
+    private GestoPagoCatalogException errorXml(Exception e) {
+        return new GestoPagoCatalogException("La respuesta XML de GestoPago no es válida",
+                GestoPagoCatalogException.Tipo.XML, 200, e);
+    }
+
+    private GestoPagoCatalogException traducirFeign(FeignException e) {
+        if (e.status() >= 0) {
+            return errorHttp(e.status(), e);
+        }
+        boolean timeout = contieneTimeout(e);
+        return new GestoPagoCatalogException(
+                timeout ? "Se agotó el tiempo de espera al consultar GestoPago"
+                        : "No se pudo establecer comunicación con GestoPago",
+                timeout ? GestoPagoCatalogException.Tipo.TIMEOUT
+                        : GestoPagoCatalogException.Tipo.COMUNICACION,
+                null, e);
+    }
+
+    private GestoPagoCatalogException errorHttp(int status, Throwable e) {
+        boolean autenticacion = status == 401 || status == 403;
+        return new GestoPagoCatalogException(
+                autenticacion ? "GestoPago rechazó la autenticación del catálogo"
+                        : "GestoPago devolvió una respuesta HTTP no exitosa",
+                autenticacion ? GestoPagoCatalogException.Tipo.AUTENTICACION
+                        : GestoPagoCatalogException.Tipo.HTTP,
+                status, e);
+    }
+
+    private boolean contieneTimeout(Throwable e) {
+        Throwable actual = e;
         while (actual != null) {
             if (actual instanceof SocketTimeoutException
                     || actual.getClass().getSimpleName().toLowerCase(Locale.ROOT).contains("timeout")) {
                 return true;
-            }
-            String message = actual.getMessage();
-            if (message != null) {
-                String normalized = message.toLowerCase(Locale.ROOT);
-                if (normalized.contains("timed out") || normalized.contains("timeout")) {
-                    return true;
-                }
             }
             actual = actual.getCause();
         }
         return false;
     }
 
-    private long duracionMs(long startedAt) {
-        return Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
+    private void registrarError(GestoPagoCatalogException e, long inicio) {
+        // El mensaje y la causa de Feign pueden incluir cabeceras o el cuerpo remoto.
+        log.error("Falló la consulta del catálogo: tipo={}, statusHttp={}, origen={}, duraciónMs={}",
+                e.getTipo(), e.getStatusHttp(), origen(e), duracionMs(inicio));
     }
 
-    private GestoPagoCatalogResponse deserializar(String xml) {
-        StringReader stringReader = new StringReader(xml);
-        XMLStreamReader xmlReader = null;
-
-        try {
-            XMLInputFactory inputFactory = XMLInputFactory.newFactory();
-            inputFactory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
-            inputFactory.setProperty("javax.xml.stream.isSupportingExternalEntities", false);
-            xmlReader = inputFactory.createXMLStreamReader(stringReader);
-
-            Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
-            GestoPagoCatalogResponse response = (GestoPagoCatalogResponse) unmarshaller.unmarshal(xmlReader);
-            while (xmlReader.hasNext()) {
-                int event = xmlReader.next();
-                if (event == XMLStreamConstants.START_ELEMENT
-                        || (event == XMLStreamConstants.CHARACTERS && !xmlReader.isWhiteSpace())) {
-                    throw new XMLStreamException("Contenido adicional después del elemento raíz");
-                }
-            }
-            return response;
-        } catch (JAXBException | XMLStreamException | ClassCastException exception) {
-            throw new GestoPagoCatalogException(
-                    "La respuesta XML de GestoPago no es válida",
-                    GestoPagoCatalogException.Tipo.XML,
-                    exception);
-        } finally {
-            if (xmlReader != null) {
-                try {
-                    xmlReader.close();
-                } catch (XMLStreamException exception) {
-                    log.debug("No se pudo cerrar el lector XML de GestoPago", exception);
-                }
-            }
-            stringReader.close();
+    private String origen(Throwable e) {
+        Throwable causa = e;
+        while (causa.getCause() != null) {
+            causa = causa.getCause();
         }
+        StackTraceElement[] traza = causa.getStackTrace();
+        return traza.length == 0 ? "desconocido" : traza[0].getClassName() + ":" + traza[0].getLineNumber();
+    }
+
+    private long duracionMs(long inicio) {
+        return Duration.ofNanos(System.nanoTime() - inicio).toMillis();
     }
 }

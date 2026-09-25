@@ -5,6 +5,7 @@ import com.proyecto.servicios.client.GestoPagoCatalogClient;
 import com.proyecto.servicios.client.GestoPagoCatalogException;
 import com.proyecto.servicios.entity.gestopago.Producto;
 import com.proyecto.servicios.entity.gestopago.GestoPagoToken;
+import com.proyecto.servicios.mapper.ProductoMapper;
 import com.proyecto.servicios.model.CatalogoProductosResponse;
 import com.proyecto.servicios.model.ProductoResponse;
 import com.proyecto.servicios.model.gestopago.GestoPagoCatalogMessage;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mapstruct.factory.Mappers;
 import org.springframework.dao.DataAccessResourceFailureException;
 
 import java.util.List;
@@ -50,16 +52,18 @@ class ProductoServiceImplTest {
     private ProductoRepository productoRepository;
 
     private ProductoServiceImpl service;
+    private ProductoMapper productoMapper = Mappers.getMapper(ProductoMapper.class);
 
     @BeforeEach
     void setUp() {
-        service = new ProductoServiceImpl(catalogClient, cache, persistence, tokenService, 42, "device-test");
+        service = new ProductoServiceImpl(catalogClient, cache, persistence, tokenService,
+                productoMapper, 42, "device-test");
     }
 
     @Test
     void obtenerProductos_respondeDesdeRedisSinConsultarOtrasFuentes() {
         CatalogoProductosResponse redisCatalog = catalog("Redis", 0);
-        when(cache.obtener()).thenReturn(new CatalogoProductosCache.ResultadoLectura(Optional.of(redisCatalog), true));
+        when(cache.obtener()).thenReturn(new CatalogoProductosCache.ResultadoLectura(redisCatalog, true));
 
         CatalogoProductosResponse result = service.obtenerProductos();
 
@@ -73,8 +77,8 @@ class ProductoServiceImplTest {
     @Test
     void obtenerProductos_siCacheInvalidaFueDescartadaContinuaConPostgresYReconstruyeRedis() {
         CatalogoProductosResponse pgCatalog = catalog("Postgres", 0);
-        when(cache.obtener()).thenReturn(new CatalogoProductosCache.ResultadoLectura(Optional.empty(), true));
-        when(persistence.obtenerCatalogo()).thenReturn(Optional.of(pgCatalog));
+        when(cache.obtener()).thenReturn(new CatalogoProductosCache.ResultadoLectura(null, true));
+        when(persistence.obtenerCatalogo()).thenReturn(pgCatalog);
         when(cache.guardar(pgCatalog)).thenReturn(true);
 
         CatalogoProductosResponse result = service.obtenerProductos();
@@ -88,8 +92,8 @@ class ProductoServiceImplTest {
     @Test
     void obtenerProductos_siRedisNoDisponibleRespondeDesdePostgresConCodigoTres() {
         CatalogoProductosResponse pgCatalog = catalog("Postgres", 0);
-        when(cache.obtener()).thenReturn(new CatalogoProductosCache.ResultadoLectura(Optional.empty(), false));
-        when(persistence.obtenerCatalogo()).thenReturn(Optional.of(pgCatalog));
+        when(cache.obtener()).thenReturn(new CatalogoProductosCache.ResultadoLectura(null, false));
+        when(persistence.obtenerCatalogo()).thenReturn(pgCatalog);
         when(cache.guardar(pgCatalog)).thenReturn(false);
 
         CatalogoProductosResponse result = service.obtenerProductos();
@@ -129,7 +133,7 @@ class ProductoServiceImplTest {
         validPersistedProduct.setIdServicio(10);
         validPersistedProduct.setIdProducto(20);
 
-        when(cache.obtener()).thenReturn(new CatalogoProductosCache.ResultadoLectura(Optional.empty(), true));
+        when(cache.obtener()).thenReturn(new CatalogoProductosCache.ResultadoLectura(null, true));
         when(productoRepository.findAllByOrderByIdAsc())
                 .thenReturn(List.of(invalidStoredProduct), List.of(validPersistedProduct));
         when(productoRepository.count()).thenReturn(1L);
@@ -138,8 +142,9 @@ class ProductoServiceImplTest {
         service = new ProductoServiceImpl(
                 catalogClient,
                 cache,
-                new CatalogoProductosPersistenceService(productoRepository),
+                new CatalogoProductosPersistenceService(productoRepository, productoMapper),
                 tokenService,
+                productoMapper,
                 42,
                 "device-test");
 
@@ -351,8 +356,7 @@ class ProductoServiceImplTest {
     }
 
     private void mockEmptySourcesAndToken() {
-        when(cache.obtener()).thenReturn(new CatalogoProductosCache.ResultadoLectura(Optional.empty(), true));
-        when(persistence.obtenerCatalogo()).thenReturn(Optional.empty());
+        when(cache.obtener()).thenReturn(new CatalogoProductosCache.ResultadoLectura(null, true));
         mockToken();
     }
 

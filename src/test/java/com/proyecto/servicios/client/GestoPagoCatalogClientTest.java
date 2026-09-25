@@ -1,151 +1,159 @@
 package com.proyecto.servicios.client;
 
 import com.proyecto.servicios.model.gestopago.GestoPagoCatalogResponse;
+import feign.Request;
+import feign.Response;
+import feign.RetryableException;
+import feign.FeignException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.client.RestTemplate;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.net.SocketTimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class GestoPagoCatalogClientTest {
 
-    private static final String ENDPOINT = "https://gestopago.test/catalog";
     private static final String TOKEN = "token-de-prueba-no-real";
+
+    @Mock
+    private GestoPagoCatalogFeignClient feignClient;
+
+    private GestoPagoCatalogClient client;
+
+    @BeforeEach
+    void setUp() {
+        client = new GestoPagoCatalogClient(feignClient);
+    }
 
     @Test
     void consultarCatalogo_enviaBearerTokenYDeserializaXml() {
-        ClientHarness harness = newClient();
-        harness.server().expect(requestTo(ENDPOINT))
-                .andExpect(method(HttpMethod.GET))
-                .andExpect(header("Authorization", "Bearer " + TOKEN))
-                .andRespond(withSuccess(validXml(), MediaType.APPLICATION_XML));
+        when(feignClient.consultarCatalogo("Bearer " + TOKEN)).thenReturn(respuesta(200, validXml()));
 
-        GestoPagoCatalogResponse result = harness.client().consultarCatalogo(TOKEN);
+        GestoPagoCatalogResponse result = client.consultarCatalogo(TOKEN);
 
         assertEquals("01", result.getMensaje().getCodigo());
         assertEquals(1, result.getProductos().size());
         assertEquals("internet", result.getProductos().get(0).getProducto());
-        harness.server().verify();
     }
 
     @Test
     void consultarCatalogo_xmlInvalidoLanzaExcepcionDeIntegracionConCausa() {
-        ClientHarness harness = newClient();
-        harness.server().expect(requestTo(ENDPOINT))
-                .andRespond(withSuccess("<RESPONSE><PRODUCTOS>", MediaType.APPLICATION_XML));
+        when(feignClient.consultarCatalogo("Bearer " + TOKEN))
+                .thenReturn(respuesta(200, "<RESPONSE><PRODUCTOS>"));
 
-        GestoPagoCatalogException exception = assertThrows(
-                GestoPagoCatalogException.class,
-                () -> harness.client().consultarCatalogo(TOKEN));
+        GestoPagoCatalogException e = assertThrows(GestoPagoCatalogException.class,
+                () -> client.consultarCatalogo(TOKEN));
 
-        assertTrue(exception.getMessage().contains("XML"));
-        assertTrue(exception.getMessage().contains("válida"));
-        assertFalse(exception.getMessage().contains(TOKEN));
-        assertTrue(exception.getCause() != null);
-        assertEquals(GestoPagoCatalogException.Tipo.XML, exception.getTipo());
-        harness.server().verify();
+        assertEquals(GestoPagoCatalogException.Tipo.XML, e.getTipo());
+        assertNotNull(e.getCause());
+        assertFalse(e.getMessage().contains(TOKEN));
+    }
+
+    @Test
+    void consultarCatalogo_respuestaVaciaSeTraduce() {
+        when(feignClient.consultarCatalogo("Bearer " + TOKEN)).thenReturn(respuesta(200, ""));
+
+        GestoPagoCatalogException e = assertThrows(GestoPagoCatalogException.class,
+                () -> client.consultarCatalogo(TOKEN));
+
+        assertEquals(GestoPagoCatalogException.Tipo.RESPUESTA_VACIA, e.getTipo());
     }
 
     @ParameterizedTest
     @ValueSource(ints = {401, 403})
-    void consultarCatalogo_errorDeAutenticacionOAutorizacionSeTraduceAExcepcionDeIntegracion(int status) {
-        ClientHarness harness = newClient();
-        harness.server().expect(requestTo(ENDPOINT))
-                .andExpect(header("Authorization", "Bearer " + TOKEN))
-                .andRespond(withStatus(org.springframework.http.HttpStatus.valueOf(status)));
+    void consultarCatalogo_rechazoDeAutenticacionSeTraduce(int status) {
+        when(feignClient.consultarCatalogo("Bearer " + TOKEN))
+                .thenReturn(respuesta(status, "error"));
 
-        GestoPagoCatalogException exception = assertThrows(
-                GestoPagoCatalogException.class,
-                () -> harness.client().consultarCatalogo(TOKEN));
+        GestoPagoCatalogException e = assertThrows(GestoPagoCatalogException.class,
+                () -> client.consultarCatalogo(TOKEN));
 
-        assertTrue(exception.getCause() instanceof RestClientResponseException);
-        RestClientResponseException cause = (RestClientResponseException) exception.getCause();
-        assertEquals(status, cause.getStatusCode().value());
-        assertEquals(GestoPagoCatalogException.Tipo.AUTENTICACION, exception.getTipo());
-        assertEquals(status, exception.getStatusHttp());
-        assertFalse(exception.getMessage().contains(TOKEN));
-        harness.server().verify();
+        assertEquals(GestoPagoCatalogException.Tipo.AUTENTICACION, e.getTipo());
+        assertEquals(status, e.getStatusHttp());
+        assertFalse(e.getMessage().contains(TOKEN));
     }
 
     @Test
-    void consultarCatalogo_errorHttpNoExitosoSeTraduceAExcepcionDeIntegracion() {
-        ClientHarness harness = newClient();
-        harness.server().expect(requestTo(ENDPOINT))
-                .andRespond(withStatus(org.springframework.http.HttpStatus.BAD_GATEWAY));
+    void consultarCatalogo_errorHttpNoExitosoSeTraduce() {
+        when(feignClient.consultarCatalogo("Bearer " + TOKEN))
+                .thenReturn(respuesta(502, "error"));
 
-        GestoPagoCatalogException exception = assertThrows(
-                GestoPagoCatalogException.class,
-                () -> harness.client().consultarCatalogo(TOKEN));
+        GestoPagoCatalogException e = assertThrows(GestoPagoCatalogException.class,
+                () -> client.consultarCatalogo(TOKEN));
 
-        assertTrue(exception.getCause() instanceof RestClientResponseException);
-        assertEquals(502, ((RestClientResponseException) exception.getCause()).getStatusCode().value());
-        assertEquals(GestoPagoCatalogException.Tipo.HTTP, exception.getTipo());
-        assertEquals(502, exception.getStatusHttp());
-        assertFalse(exception.getMessage().contains(TOKEN));
-        harness.server().verify();
+        assertEquals(GestoPagoCatalogException.Tipo.HTTP, e.getTipo());
+        assertEquals(502, e.getStatusHttp());
     }
 
     @Test
-    void consultarCatalogo_timeoutDeRedSeTraduceAExcepcionDeIntegracionConCausa() {
-        ClientHarness harness = newClient();
-        harness.server().expect(requestTo(ENDPOINT))
-                .andRespond(request -> {
-                    throw new ResourceAccessException(
-                            "Read timed out",
-                            new SocketTimeoutException("Read timed out"));
-                });
+    void consultarCatalogo_errorHttpLanzadoPorFeignSeTraduce() {
+        when(feignClient.consultarCatalogo("Bearer " + TOKEN))
+                .thenThrow(FeignException.errorStatus("consultarCatalogo", respuesta(503, "error")));
 
-        GestoPagoCatalogException exception = assertThrows(
-                GestoPagoCatalogException.class,
-                () -> harness.client().consultarCatalogo(TOKEN));
+        GestoPagoCatalogException e = assertThrows(GestoPagoCatalogException.class,
+                () -> client.consultarCatalogo(TOKEN));
 
-        assertTrue(exception.getCause() instanceof ResourceAccessException);
-        assertTrue(exception.getCause().getCause() instanceof SocketTimeoutException);
-        assertEquals(GestoPagoCatalogException.Tipo.TIMEOUT, exception.getTipo());
-        assertFalse(exception.getMessage().contains(TOKEN));
-        harness.server().verify();
+        assertEquals(GestoPagoCatalogException.Tipo.HTTP, e.getTipo());
+        assertEquals(503, e.getStatusHttp());
+        assertFalse(e.getMessage().contains(TOKEN));
     }
 
-    private static ClientHarness newClient() {
-        AtomicReference<RestTemplate> restTemplateReference = new AtomicReference<>();
-        RestTemplateBuilder builder = new RestTemplateBuilder()
-                .additionalCustomizers(restTemplateReference::set);
-        GestoPagoCatalogClient client = new GestoPagoCatalogClient(
-                builder,
-                "https://gestopago.test",
-                "/catalog",
-                1_000,
-                2_000);
-        RestTemplate restTemplate = restTemplateReference.get();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
-        return new ClientHarness(client, server);
+    @Test
+    void consultarCatalogo_timeoutDeRedSeTraduceConCausa() {
+        when(feignClient.consultarCatalogo("Bearer " + TOKEN))
+                .thenThrow(new RetryableException(-1, "Read timed out", Request.HttpMethod.GET,
+                        new SocketTimeoutException("Read timed out"), (Long) null, request()));
+
+        GestoPagoCatalogException e = assertThrows(GestoPagoCatalogException.class,
+                () -> client.consultarCatalogo(TOKEN));
+
+        assertEquals(GestoPagoCatalogException.Tipo.TIMEOUT, e.getTipo());
+        assertNotNull(e.getCause());
+        assertFalse(e.getMessage().contains(TOKEN));
+    }
+
+    @Test
+    void consultarCatalogo_errorDeComunicacionSeTraduce() {
+        when(feignClient.consultarCatalogo("Bearer " + TOKEN))
+                .thenThrow(new RetryableException(-1, "connection failed", Request.HttpMethod.GET,
+                        new java.io.IOException("connection failed"), (Long) null, request()));
+
+        GestoPagoCatalogException e = assertThrows(GestoPagoCatalogException.class,
+                () -> client.consultarCatalogo(TOKEN));
+
+        assertEquals(GestoPagoCatalogException.Tipo.COMUNICACION, e.getTipo());
+    }
+
+    private static Response respuesta(int status, String body) {
+        return Response.builder()
+                .status(status)
+                .reason("test")
+                .request(request())
+                .body(body, StandardCharsets.UTF_8)
+                .build();
+    }
+
+    private static Request request() {
+        return Request.create(Request.HttpMethod.GET, "https://gestopago.test/catalog",
+                Map.of(), null, StandardCharsets.UTF_8);
     }
 
     private static String validXml() {
-        return "<RESPONSE>"
-                + "<MENSAJE><CODIGO>01</CODIGO><TEXTO>OK</TEXTO></MENSAJE>"
-                + "<PRODUCTOS><producto producto=\"internet\" servicio=\"Internet\" idServicio=\"10\" idProducto=\"20\"/>"
-                + "</PRODUCTOS></RESPONSE>";
-    }
-
-    private record ClientHarness(GestoPagoCatalogClient client, MockRestServiceServer server) {
+        return "<RESPONSE><MENSAJE><CODIGO>01</CODIGO><TEXTO>OK</TEXTO></MENSAJE>"
+                + "<PRODUCTOS><producto producto=\"internet\" servicio=\"Internet\" idServicio=\"10\" "
+                + "idProducto=\"20\"/></PRODUCTOS></RESPONSE>";
     }
 }
