@@ -47,3 +47,6 @@ especificacion-reglas-negocio-gestoapi.md
 # Environment variables
 .env
 .env.local
+
+# JVM crash reports
+hs_err_pid*.log

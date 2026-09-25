@@ -15,6 +15,7 @@ import org.springframework.data.redis.core.ValueOperations;
 import java.time.Duration;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -47,7 +48,7 @@ class CatalogoProductosCacheTest {
 
         CatalogoProductosCache.ResultadoLectura result = cache.obtener();
 
-        assertTrue(result.catalogo().isEmpty());
+        assertNull(result.catalogo());
         assertTrue(result.redisDisponible());
         verify(redisTemplate, never()).delete(anyString());
     }
@@ -60,7 +61,7 @@ class CatalogoProductosCacheTest {
 
         CatalogoProductosCache.ResultadoLectura result = cache.obtener();
 
-        assertTrue(result.catalogo().isEmpty());
+        assertNull(result.catalogo());
         assertTrue(result.redisDisponible());
         verify(redisTemplate).delete(CACHE_KEY);
     }
@@ -75,7 +76,7 @@ class CatalogoProductosCacheTest {
 
         CatalogoProductosCache.ResultadoLectura result = cache.obtener();
 
-        assertTrue(result.catalogo().isEmpty());
+        assertNull(result.catalogo());
         assertTrue(result.redisDisponible());
         verify(redisTemplate).delete(CACHE_KEY);
     }
@@ -88,7 +89,7 @@ class CatalogoProductosCacheTest {
 
         CatalogoProductosCache.ResultadoLectura result = cache.obtener();
 
-        assertTrue(result.catalogo().isEmpty());
+        assertNull(result.catalogo());
         assertFalse(result.redisDisponible());
         verify(redisTemplate, never()).delete(anyString());
     }

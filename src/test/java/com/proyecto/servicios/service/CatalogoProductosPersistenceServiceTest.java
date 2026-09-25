@@ -1,14 +1,17 @@
 package com.proyecto.servicios.service;
 
 import com.proyecto.servicios.entity.gestopago.Producto;
+import com.proyecto.servicios.mapper.ProductoMapper;
 import com.proyecto.servicios.model.CatalogoProductosResponse;
 import com.proyecto.servicios.model.ProductoResponse;
 import com.proyecto.servicios.repositorys.gestopago.ProductoRepository;
+import com.proyecto.servicios.service.Impl.CatalogoProductosPersistenceServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mapstruct.factory.Mappers;
 
 import java.util.List;
 
@@ -32,7 +35,7 @@ class CatalogoProductosPersistenceServiceTest {
 
     @BeforeEach
     void setUp() {
-        persistence = new CatalogoProductosPersistenceService(repository);
+        persistence = new CatalogoProductosPersistenceServiceImpl(repository, Mappers.getMapper(ProductoMapper.class));
     }
 
     @Test
@@ -123,7 +126,7 @@ class CatalogoProductosPersistenceServiceTest {
 
         var result = persistence.obtenerCatalogo();
 
-        assertTrue(result.isEmpty());
+        assertNull(result);
         verify(repository).findAllByOrderByIdAsc();
     }
 

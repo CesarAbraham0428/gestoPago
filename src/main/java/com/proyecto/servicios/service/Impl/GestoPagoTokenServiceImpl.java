@@ -9,6 +9,7 @@ import com.proyecto.servicios.repositorys.gestopago.GestoPagoTokenRepository;
 import com.proyecto.servicios.service.GestoPagoTokenService;
 import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,14 +28,15 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
 
     private static final Duration REFRESH_SKEW = Duration.ofMinutes(1);
 
-    private final GestoPagoAuthClient gestoPagoAuthClient;
-    private final GestoPagoTokenRepository tokenRepository;
-    private final GestoPagoTokenMapper tokenMapper;
-    private final Integer idDistribuidor;
-    private final String codigoDispositivo;
-    private final String password;
-    private final long refreshRateMs;
+    private GestoPagoAuthClient gestoPagoAuthClient;
+    private GestoPagoTokenRepository tokenRepository;
+    private GestoPagoTokenMapper tokenMapper;
+    private Integer idDistribuidor;
+    private String codigoDispositivo;
+    private String password;
+    private long refreshRateMs;
 
+    @Autowired
     public GestoPagoTokenServiceImpl(
             GestoPagoAuthClient gestoPagoAuthClient,
             GestoPagoTokenRepository tokenRepository,

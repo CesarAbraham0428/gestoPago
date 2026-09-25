@@ -5,13 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.proyecto.servicios.model.CatalogoProductosResponse;
 import com.proyecto.servicios.validation.CatalogoProductosValidator;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.Optional;
 
 @Component
 @Slf4j
@@ -19,10 +19,11 @@ public class CatalogoProductosCache {
 
     private static final String CACHE_KEY = "gestopago:catalogo:productos:v1";
 
-    private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
-    private final Duration ttl;
+    private StringRedisTemplate redisTemplate;
+    private ObjectMapper objectMapper;
+    private Duration ttl;
 
+    @Autowired
     public CatalogoProductosCache(
             StringRedisTemplate redisTemplate,
             ObjectMapper objectMapper,
@@ -43,36 +44,36 @@ public class CatalogoProductosCache {
     }
 
     private ResultadoLectura obtenerInterno() {
-        final String json;
+        String json;
         try {
             json = redisTemplate.opsForValue().get(CACHE_KEY);
         } catch (DataAccessException exception) {
             log.error("Falló la consulta del catálogo en Redis; se continuará con PostgreSQL ({})",
                     exception.getClass().getSimpleName());
-            return new ResultadoLectura(Optional.empty(), false);
+            return new ResultadoLectura(null, false);
         }
 
         if (json == null) {
             log.info("Redis no contiene un catálogo; se consultará PostgreSQL");
-            return new ResultadoLectura(Optional.empty(), true);
+            return new ResultadoLectura(null, true);
         }
         if (json.isBlank()) {
             log.warn("Redis contiene un valor vacío; se eliminará antes del fallback");
-            return new ResultadoLectura(Optional.empty(), eliminar());
+            return new ResultadoLectura(null, eliminar());
         }
 
         try {
             CatalogoProductosResponse catalogo = objectMapper.readValue(json, CatalogoProductosResponse.class);
             if (!CatalogoProductosValidator.esValido(catalogo)) {
                 log.warn("Redis contiene productos vacíos o incompletos; se consultará PostgreSQL");
-                return new ResultadoLectura(Optional.empty(), eliminar());
+                return new ResultadoLectura(null, eliminar());
             }
             log.info("Redis devolvió un catálogo válido: {} productos", catalogo.getProductos().size());
-            return new ResultadoLectura(Optional.of(catalogo), true);
+            return new ResultadoLectura(catalogo, true);
         } catch (JsonProcessingException exception) {
             log.warn("Redis contiene JSON inválido; se consultará PostgreSQL ({})",
                     exception.getClass().getSimpleName());
-            return new ResultadoLectura(Optional.empty(), eliminar());
+            return new ResultadoLectura(null, eliminar());
         }
     }
 
@@ -130,7 +131,7 @@ public class CatalogoProductosCache {
     }
 
     public record ResultadoLectura(
-            Optional<CatalogoProductosResponse> catalogo,
+            CatalogoProductosResponse catalogo,
             boolean redisDisponible) {
     }
 }
