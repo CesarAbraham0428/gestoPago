@@ -4,6 +4,10 @@ import com.proyecto.servicios.model.GenericResponse;
 import com.proyecto.servicios.client.GestoPagoAuthException;
 import com.proyecto.servicios.client.GestoPagoCatalogException;
 import com.proyecto.servicios.service.exception.AutenticacionException;
+import com.proyecto.servicios.service.exception.NegocioException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import com.proyecto.servicios.service.exception.CatalogoPersistenciaException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -17,12 +21,43 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 @Slf4j
 public class ApiExceptionHandler {
+    @ExceptionHandler(NegocioException.class)
+    ResponseEntity<GenericResponse> negocio(NegocioException exception) {
+        return respuesta(exception.getStatus(), 1, exception.getMessage());
+    }
+
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
+    ResponseEntity<GenericResponse> formatoInvalido(Exception exception) {
+        return respuesta(HttpStatus.BAD_REQUEST, 1, "Solicitud inválida: revisa los campos, tipos, fechas y valores ENUM permitidos");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<GenericResponse> restriccion(DataIntegrityViolationException exception) {
+        Throwable causa = exception;
+        while (causa != null) {
+            if (causa instanceof org.postgresql.util.PSQLException sql) {
+                String constraint = sql.getServerErrorMessage() == null ? null : sql.getServerErrorMessage().getConstraint();
+                if ("23505".equals(sql.getSQLState())) {
+                    String mensaje = "Registro duplicado";
+                    if (constraint != null && constraint.contains("curp")) mensaje = "CURP duplicada";
+                    else if (constraint != null && constraint.contains("rfc")) mensaje = "RFC duplicado";
+                    else if (constraint != null && constraint.contains("correo")) mensaje = "Correo electrónico duplicado";
+                    return respuesta(HttpStatus.CONFLICT, 1, mensaje);
+                }
+                if ("23514".equals(sql.getSQLState()) || "23502".equals(sql.getSQLState())) {
+                    return respuesta(HttpStatus.BAD_REQUEST, 1, "Los datos incumplen una validación del registro");
+                }
+            }
+            causa = causa.getCause();
+        }
+        return respuesta(HttpStatus.CONFLICT, 1, "La operación incumple una restricción de la base de datos");
+    }
     @ExceptionHandler(AutenticacionException.class)
     ResponseEntity<GenericResponse> errorAutenticacion(AutenticacionException exception) {
         return switch (exception.getTipo()) {
             case USUARIO_DUPLICADO -> respuesta(HttpStatus.CONFLICT, 1, "El usuario ya est\u00e1 registrado");
             case CREDENCIALES_INVALIDAS -> respuesta(HttpStatus.UNAUTHORIZED, 1, "Usuario o contrase\u00f1a incorrectos");
-            case CUENTA_INACTIVA -> respuesta(HttpStatus.FORBIDDEN, 1, "La cuenta est\u00e1 inactiva");
+            case CUENTA_INACTIVA -> respuesta(HttpStatus.FORBIDDEN, 1, "El usuario o cliente está inactivo");
         };
     }
 

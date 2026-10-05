@@ -1,71 +1,125 @@
-# Registro, login y catálogo protegido
+# API de clientes y autenticación
 
-## Datos almacenados
+Backend independiente de Flutter. Usa Swagger en `/swagger-ui/index.html`, Postman o curl.
+Las operaciones de clientes y cuentas requieren autenticación, salvo el registro.
+Los endpoints de usuarios permiten acceder únicamente al usuario identificado por el JWT.
+Para este proyecto académico cualquier usuario autenticado puede consultar y administrar clientes y cuentas;
+no hay una política de administración por rol implementada.
 
-- La tabla registro contiene el usuario, el hash BCrypt de la contraseña y el estado activo.
-- La tabla personas contiene nombre, apellidos, correo y teléfono. registro.persona_id vincula ambas tablas.
-- La migración V3__create_registros_y_datos_personales.sql crea estas tablas o agrega correo y teléfono a una tabla personas existente.
-- Las contraseñas se guardan con BCrypt. Nunca se guarda la contraseña original.
+## 1. Registrar cliente
 
-La aplicación ejecuta Flyway al iniciar. La base configurada en DB_URL, DB_USERNAME y DB_PASSWORD debe ser PostgreSQL y el usuario de base de datos debe poder crear y alterar tablas.
+`POST /clientes` sin token. Devuelve HTTP 201 con cliente, domicilio, cuentas y usuario, sin contraseñas.
 
-Una cuenta puede desactivarse desde la base de datos; los siguientes logins en línea serán rechazados:
-
-~~~sql
-UPDATE registro SET activo = FALSE WHERE usuario = 'ana.lopez';
-~~~
-
-## Endpoints
-
-### Crear cuenta — POST /auth/register
-
-~~~json
+```json
 {
-  "usuario": "ana.lopez",
-  "password": "una-clave-de-8-o-mas",
-  "nombre": "Ana",
-  "apellidoPaterno": "López",
-  "apellidoMaterno": "García",
-  "correo": "ana@example.com",
-  "telefono": "5512345678"
+  "primerNombre": "Ana",
+  "segundoNombre": null,
+  "apellidoPaterno": "Perez",
+  "apellidoMaterno": "Ruiz",
+  "fechaNacimiento": "1990-01-01",
+  "curp": "PERA900101MDFRZN01",
+  "rfc": "PERA900101AB1",
+  "sexo": "Femenino",
+  "nacionalidad": "Mexicana",
+  "estadoCivil": "Soltero",
+  "correoElectronico": "ana@example.com",
+  "telefonoMovil": "5512345678",
+  "telefonoAlternativo": null,
+  "ocupacion": "Ingeniera",
+  "empresa": "Empresa",
+  "ingresoMensual": 12000.50,
+  "domicilio": {
+    "calle": "Reforma",
+    "numeroExterior": "10",
+    "numeroInterior": null,
+    "colonia": "Centro",
+    "municipio": "Cuauhtemoc",
+    "estado": "Ciudad de Mexico",
+    "codigoPostal": "06000",
+    "pais": "Mexico"
+  },
+  "password": "Segura123!"
 }
-~~~
+```
 
-Devuelve HTTP 201 con un token Bearer y el nombre de usuario. El usuario se normaliza a minúsculas. Un usuario duplicado devuelve 409.
+CURP/RFC del ejemplo son datos ficticios que cumplen la estructura; no se valida su existencia ante RENAPO/SAT.
+Nacionalidad: `Mexicana`. Sexo: `Masculino`, `Femenino`.
+Estado civil: `Soltero`, `Casado`, `Divorciado`, `Viudo`, `Union libre`.
+Campos opcionales se envían como `null` o se omiten; no se aceptan cadenas vacías.
+El saldo inicial es cero; el cliente no elige saldo, número de cuenta, rol ni estado.
+La cuenta y el usuario quedan activos. La contraseña se guarda con BCrypt.
+El registro de las cuatro entidades es transaccional: un fallo revierte todos los registros.
 
-### Iniciar sesión — POST /auth/login
+## 2. Iniciar sesión
 
-~~~json
-{
-  "usuario": "ana.lopez",
-  "password": "una-clave-de-8-o-mas"
-}
-~~~
+`POST /auth/login`:
 
-Devuelve HTTP 200 con token, tipo, expiraEnMs, usuario y nombreCompleto. Las credenciales incorrectas devuelven 401; una cuenta con activo = false devuelve 403.
+```json
+{"correo":"ana@example.com","password":"Segura123!"}
+```
 
-### Consultar productos — GET /productos
+Respuesta:
 
-Enviar el token recibido al iniciar sesión:
+```json
+{"token":"<JWT>","tipo":"Bearer","expiraEnMs":28800000,"usuario":"ana@example.com","nombreCompleto":"Ana Perez Ruiz"}
+```
 
-~~~http
-Authorization: Bearer <token>
-~~~
+Envía `Authorization: Bearer <JWT>` en las operaciones protegidas, incluido `GET /productos`.
+En Swagger pulsa **Authorize** y pega el JWT.
+El subject del JWT es el ID del usuario: actualizar el correo no cambia la identidad.
+En cada solicitud protegida se verifica que el usuario y el cliente continúen activos.
+Los tokens del modelo antiguo ya no sirven; inicia sesión de nuevo con correo.
+`POST /auth/register` se sustituyó por `POST /clientes`.
 
-Sin token válido la respuesta es 401. Todas las rutas existentes requieren autenticación salvo registro, login, documentación OpenAPI y el endpoint de error.
+## 3. Consultar
 
-## Configuración local
+- `GET /clientes?pagina=0&tamanio=20` devuelve una página; tamaño máximo 100.
+- Filtros combinables: `curp`, `rfc`, `correo`, `numeroCuenta`, `activo`, `desde`, `hasta`.
+- Ejemplo: `/clientes?activo=true&desde=2026-10-01&hasta=2026-10-31`.
+- Las fechas usan `YYYY-MM-DD`, incluyen ambos días y se interpretan en America/Mexico_City.
+- `GET /clientes/{id}` devuelve cliente, domicilio, usuario y cuentas.
+- `GET /cuentas?activa=true` consulta cuentas activas.
+- `GET /cuentas/{numeroCuenta}` consulta una cuenta.
+- `GET /cuentas/{numeroCuenta}/saldo` devuelve el saldo numérico.
+- `GET /usuarios/{id}` devuelve el propio usuario sin hash de contraseña.
 
-La API escucha en el puerto 8080 por defecto. Se puede cambiar con SERVER_PORT. Define APP_JWT_SECRET con una clave aleatoria de al menos 32 bytes; la aplicación no tiene una clave secreta integrada y no inicia si falta esta variable. El token dura 8 horas por defecto y se puede cambiar con APP_JWT_EXPIRATION_MS.
+## 4. Actualizar
 
-La URL, los timeouts y el ritmo de renovación de GestoPago se configuran mediante las variables `GESTOPAGO_AUTH_URL`, `GESTOPAGO_AUTH_CONNECT_TIMEOUT_MS`, `GESTOPAGO_AUTH_READ_TIMEOUT_MS`, `GESTOPAGO_AUTH_REFRESH_RATE_MS` y `GESTOPAGO_AUTH_RENEWAL_CHECK_MS`. La API revisa el vencimiento indicado por `expires_in` y, si el catálogo responde 401/403, renueva el token y reintenta la consulta una vez. Los fallos de autenticación, HTTP, timeout y comunicación se registran por categoría sin incluir el token ni la contraseña en logs o respuestas.
+`PUT /clientes/{id}` recibe los mismos campos editables del registro, excluyendo
+`curp`, `rfc` y `password`. Tampoco admite número de cuenta, estado, rol o ID.
+Es una actualización completa, no PATCH: incluye todos los campos obligatorios y el domicilio.
+Se actualiza también el correo del usuario mediante el trigger existente.
 
-Inicia el backend desde la raíz del repositorio después de configurar PostgreSQL, Redis y los valores de GestoPago en el archivo .env:
+`PUT /usuarios/{id}/password`:
 
-~~~powershell
-.\gradlew.bat bootRun
-~~~
+```json
+{"passwordActual":"Segura123!","passwordNueva":"Nueva123!"}
+```
 
-La app Windows está en frontend. El comando para iniciar es flutter run -d windows; la URL de la API puede cambiarse con --dart-define=API_BASE_URL=http://localhost:8080.
+Devuelve HTTP 204. Exige contraseña actual válida, nueva contraseña fuerte y usuario propio.
+BCrypt acepta como máximo 72 bytes UTF-8; se valida ese límite antes de codificar.
 
-Después de un login correcto, la app guarda un verificador cifrado en el almacenamiento seguro de Windows durante 7 días. Si la API no responde, compara usuario y contraseña con ese verificador. No guarda la contraseña ni el JWT. El catálogo se almacena en %LOCALAPPDATA%\GestoPago\productos.json. Las cuentas se pueden usar sin conexión en el equipo donde hayan iniciado sesión antes; los cambios de estado de la cuenta solo se comprueban cuando la API vuelve a estar disponible.
+## 5. Baja lógica
+
+- `DELETE /clientes/{id}` devuelve HTTP 204; desactiva cliente, usuario y todas sus cuentas.
+- `DELETE /cuentas/{numeroCuenta}` devuelve HTTP 204; desactiva la cuenta sin eliminarla.
+- `PUT /cuentas/{numeroCuenta}/estado` recibe `{"activa":true}` o `{"activa":false}`.
+- Una cuenta solo puede activarse si su cliente sigue activo.
+- Un JWT emitido previamente se rechaza si el cliente o usuario fue desactivado.
+
+## Errores
+
+400: validación o formato inválido. 401: credenciales o token inválidos.
+403: usuario inactivo o acceso al usuario ajeno. 404: registro no encontrado.
+409: duplicados o conflicto de estado. 500: fallo interno/persistencia.
+
+## PostgreSQL y Flyway
+
+`DB_URL=jdbc:postgresql://localhost:5432/gestopago` en `.env`.
+V1/V2 conservan productos y tokens; V3 se conserva por historial.
+V4 adopta el esquema manual existente o crea el mismo esquema en una base vacía.
+Los triggers existentes manejan auditoría, sincronización y protección de datos.
+JPA no crea ni modifica tablas automáticamente.
+`docs/esquema-clientes.sql` es una copia del esquema manual, sin datos ni credenciales.
+Cambiar la BD de conexión no copia automáticamente productos guardados en otra base;
+el flujo de catálogo conserva su lógica Redis → PostgreSQL → GestoPago.
