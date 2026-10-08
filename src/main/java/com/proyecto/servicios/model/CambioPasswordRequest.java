@@ -1,3 +1,4 @@
 package com.proyecto.servicios.model;
 import jakarta.validation.constraints.NotBlank;
-public record CambioPasswordRequest(@NotBlank String passwordActual, @NotBlank String passwordNueva) {}
+import jakarta.validation.constraints.Size;
+public record CambioPasswordRequest(@NotBlank @Size(max=72) String passwordActual, @NotBlank @Size(max=72) String passwordNueva) {}

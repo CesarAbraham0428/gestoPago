@@ -43,7 +43,7 @@ no hay una política de administración por rol implementada.
 ```
 
 CURP/RFC del ejemplo son datos ficticios que cumplen la estructura; no se valida su existencia ante RENAPO/SAT.
-Nacionalidad: `Mexicana`. Sexo: `Masculino`, `Femenino`.
+Nacionalidad: texto obligatorio de hasta 100 caracteres (por ejemplo `Mexicana` o `Argentina`). Sexo: `Masculino`, `Femenino`.
 Estado civil: `Soltero`, `Casado`, `Divorciado`, `Viudo`, `Union libre`.
 Campos opcionales se envían como `null` o se omiten; no se aceptan cadenas vacías.
 El saldo inicial es cero; el cliente no elige saldo, número de cuenta, rol ni estado.
@@ -118,6 +118,7 @@ BCrypt acepta como máximo 72 bytes UTF-8; se valida ese límite antes de codifi
 `DB_URL=jdbc:postgresql://localhost:5432/gestopago` en `.env`.
 V1/V2 conservan productos y tokens; V3 se conserva por historial.
 V4 adopta el esquema manual existente o crea el mismo esquema en una base vacía.
+V5 amplía nacionalidad, valida letras en los nombres, limita BCrypt a 60 caracteres y alinea la mayoría de edad con America/Mexico_City.
 Los triggers existentes manejan auditoría, sincronización y protección de datos.
 JPA no crea ni modifica tablas automáticamente.
 `docs/esquema-clientes.sql` es una copia del esquema manual, sin datos ni credenciales.

@@ -138,4 +138,61 @@ class ClientesPostgresTest {
         body.put("password","Segura123!").put("telefonoMovil","123");
         mvc.perform(post("/clientes").contentType("application/json").content(body.toString())).andExpect(status().isBadRequest());
     }
+    @Test void consultasDuplicadosYRestriccionesDeBaseDeDatos() throws Exception {
+        ObjectNode body = registro("4").put("nacionalidad", "Argentina");
+        // Cumplir 18 años exactamente permite el registro.
+        body.put("fechaNacimiento", java.time.LocalDate.now(java.time.ZoneId.of("America/Mexico_City"))
+            .minusYears(18).toString());
+        JsonNode c = json(mvc.perform(post("/clientes").contentType("application/json").content(body.toString()))
+            .andExpect(status().isCreated()).andExpect(jsonPath("nacionalidad").value("Argentina")).andReturn());
+        int id = c.get("id").asInt();
+        String numero = c.get("cuentas").get(0).get("numeroCuenta").asText();
+        String bearer = "Bearer " + login("ana4@example.com", "Segura123!");
+        assertEquals(0, c.get("cuentas").get(0).get("saldo").decimalValue().signum());
+        assertTrue(c.get("cuentas").get(0).get("estaActiva").asBoolean());
+        for (String campo : new String[]{"curp", "rfc", "correoElectronico"}) {
+            ObjectNode duplicado = registro("5");
+            duplicado.set(campo, body.get(campo));
+            mvc.perform(post("/clientes").contentType("application/json").content(duplicado.toString()))
+                .andExpect(status().isConflict());
+        }
+        for (String filtro : new String[]{"curp", "rfc", "correo"}) {
+            String valor = body.get(filtro.equals("correo") ? "correoElectronico" : filtro).asText();
+            mvc.perform(get("/clientes").param(filtro, valor).header("Authorization", bearer))
+                .andExpect(status().isOk()).andExpect(jsonPath("totalElements").value(1))
+                .andExpect(jsonPath("content[0].id").value(id));
+        }
+        String hoy = java.time.LocalDate.now(java.time.ZoneId.of("America/Mexico_City")).toString();
+        mvc.perform(get("/clientes").param("desde", hoy).param("hasta", hoy).param("activo", "true")
+            .param("curp", body.get("curp").asText()).header("Authorization", bearer))
+            .andExpect(status().isOk()).andExpect(jsonPath("totalElements").value(1));
+        mvc.perform(get("/clientes").param("desde", "2026-10-05").param("hasta", "2020-01-01")
+            .header("Authorization", bearer)).andExpect(status().isBadRequest());
+        mvc.perform(get("/clientes").param("tamanio", "101").header("Authorization", bearer))
+            .andExpect(status().isBadRequest());
+        mvc.perform(get("/clientes/2147483647").header("Authorization", bearer)).andExpect(status().isNotFound());
+        mvc.perform(get("/cuentas/inexistente").header("Authorization", bearer)).andExpect(status().isNotFound());
+        mvc.perform(get("/cuentas").param("activa", "true").header("Authorization", bearer))
+            .andExpect(status().isOk());
+        mvc.perform(get("/usuarios/2147483647").header("Authorization", bearer)).andExpect(status().isForbidden());
+        mvc.perform(put("/usuarios/" + c.get("usuario").get("id").asInt() + "/password")
+            .header("Authorization", bearer).contentType("application/json")
+            .content("{\"passwordActual\":\"Incorrecta1!\",\"passwordNueva\":\"Nueva123!\"}"))
+            .andExpect(status().isUnauthorized());
+
+        JdbcTemplate jdbc = new JdbcTemplate(datasource);
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+            () -> jdbc.update("update clientes set primer_nombre='Ana1' where id=?", id));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+            () -> jdbc.update("update cuentas set saldo=-1 where numero_cuenta=?", numero));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+            () -> jdbc.update("update cuentas set numero_cuenta='999999999999999999' where numero_cuenta=?", numero));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+            () -> jdbc.update("delete from cuentas where numero_cuenta=?", numero));
+        // La baja deja los registros y el esquema impide reactivar una cuenta de ese cliente.
+        mvc.perform(delete("/clientes/" + id).header("Authorization", bearer)).andExpect(status().isNoContent());
+        assertEquals(1, jdbc.queryForObject("select count(*) from clientes where id=?", Integer.class, id));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+            () -> jdbc.update("update cuentas set esta_activa=true where numero_cuenta=?", numero));
+    }
 }

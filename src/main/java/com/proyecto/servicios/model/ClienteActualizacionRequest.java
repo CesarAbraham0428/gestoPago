@@ -5,13 +5,13 @@ import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 public record ClienteActualizacionRequest(
-    @NotBlank @Size(min=2,max=50) @Pattern(regexp="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]+") String primerNombre,
-    @Size(min=2,max=50) @Pattern(regexp="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]+") String segundoNombre,
-    @NotBlank @Size(min=2,max=50) @Pattern(regexp="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]+") String apellidoPaterno,
-    @NotBlank @Size(min=2,max=50) @Pattern(regexp="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]+") String apellidoMaterno,
+    @NotBlank @com.proyecto.servicios.validation.NombreValido String primerNombre,
+    @com.proyecto.servicios.validation.NombreValido String segundoNombre,
+    @NotBlank @com.proyecto.servicios.validation.NombreValido String apellidoPaterno,
+    @NotBlank @com.proyecto.servicios.validation.NombreValido String apellidoMaterno,
     @NotNull @Past LocalDate fechaNacimiento,
     @NotNull Sexo sexo,
-    @NotNull Nacionalidad nacionalidad,
+    @NotBlank @Size(max=100) String nacionalidad,
     @NotNull EstadoCivil estadoCivil,
     @NotBlank @Email @Size(max=100) String correoElectronico,
     @NotBlank @Pattern(regexp="[0-9]{10}") String telefonoMovil,

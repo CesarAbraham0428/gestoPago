@@ -31,6 +31,7 @@ public class SecurityConfiguration {
                             request.getMethod(), request.getRequestURI());
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    response.setCharacterEncoding("UTF-8");
                     response.getWriter().write("{\"codigo\":1,\"mensaje\":\"Se requiere iniciar sesión\"}");
                 }))
                 .authorizeHttpRequests(authorize -> authorize

@@ -18,8 +18,7 @@ public class Cliente extends Auditado {
     @Column(nullable=false, unique=true, length=13, updatable=false) private String rfc;
     @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable=false, columnDefinition="sexo_enum") private Sexo sexo;
-    @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable=false, columnDefinition="nacionalidad_enum") private Nacionalidad nacionalidad = Nacionalidad.Mexicana;
+    @Column(nullable=false, length=100) private String nacionalidad = "Mexicana";
     @Convert(converter=EstadoCivilConverter.class) @org.hibernate.annotations.ColumnTransformer(write="?::estado_civil_enum")
     @Column(name="estado_civil", nullable=false, columnDefinition="estado_civil_enum") private EstadoCivil estadoCivil;
     @Column(name="correo_electronico", nullable=false, length=100) private String correoElectronico;

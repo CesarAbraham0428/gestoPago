@@ -8,6 +8,6 @@ public class Usuario extends Auditado {
     @OneToOne(fetch=FetchType.LAZY, optional=false)
     @JoinColumn(name="cliente_id", nullable=false, unique=true, updatable=false) private Cliente cliente;
     @Column(nullable=false, length=100) private String correo;
-    @Column(name="password_hash", nullable=false, length=250) private String passwordHash;
+    @Column(name="password_hash", nullable=false, length=60) private String passwordHash;
     @Column(nullable=false) private boolean activo = true;
 }

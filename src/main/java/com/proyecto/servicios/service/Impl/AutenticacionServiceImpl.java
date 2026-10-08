@@ -19,8 +19,11 @@ public class AutenticacionServiceImpl implements AutenticacionService {
     public AutenticacionServiceImpl(UsuarioRepository usuarios,PasswordEncoder encoder,JwtTokenService tokens) {
         this.usuarios=usuarios; this.encoder=encoder; this.tokens=tokens;
     }
+
     @Override @Transactional(readOnly=true)
+
     public AuthResponse iniciarSesion(LoginRequest r) {
+        
         Usuario u=usuarios.findByCorreoIgnoreCase(ClienteServiceImpl.normalizarCorreo(r.correo()))
             .orElseThrow(() -> new AutenticacionException(Tipo.CREDENCIALES_INVALIDAS));
         if(!encoder.matches(r.password(),u.getPasswordHash())) throw new AutenticacionException(Tipo.CREDENCIALES_INVALIDAS);
@@ -28,7 +31,7 @@ public class AutenticacionServiceImpl implements AutenticacionService {
         if(!u.isActivo() || !c.isActivo()) throw new AutenticacionException(Tipo.CUENTA_INACTIVA);
         String nombre=Stream.of(c.getPrimerNombre(),c.getSegundoNombre(),c.getApellidoPaterno(),c.getApellidoMaterno())
             .filter(Objects::nonNull).reduce((a,b) -> a+" "+b).orElse("");
-        // El ID del usuario es estable aunque se actualice el correo.
+        
         return new AuthResponse(tokens.emitir(u.getId().toString()),"Bearer",tokens.getExpirationMs(),u.getCorreo(),nombre);
     }
 }

@@ -23,7 +23,7 @@ El endpoint `GET /productos` requiere Bearer Token de la API y consulta Redis 鈫
    .\gradlew.bat bootRun
    ```
 
-La API escucha en `http://localhost:8080`. Flyway conserva V1/V2 (productos y tokens) y V3 por historial. V4 crea el esquema de clientes en una BD vac铆a o adopta las tablas ya creadas con el script manual, sin recrearlas. Las tablas antiguas `personas` y `registro` se conservan por historial, pero ya no participan en la API.
+La API escucha en `http://localhost:8080`. Flyway conserva V1/V2 (productos y tokens) y V3 por historial. V4 crea el esquema de clientes en una BD vac铆a o adopta las tablas ya creadas con el script manual, sin recrearlas. V5 completa las validaciones de nombres, ampl铆a nacionalidad y ajusta el almacenamiento BCrypt. Las tablas antiguas `personas` y `registro` se conservan por historial, pero ya no participan en la API.
 
 ## Endpoints de autenticaci贸n
 
@@ -37,6 +37,7 @@ La API escucha en `http://localhost:8080`. Flyway conserva V1/V2 (productos y to
 - `/swagger-ui/**` y `/v3/api-docs/**`: documentaci贸n OpenAPI.
 
 Los detalles de las solicitudes y respuestas est谩n en [docs/autenticacion.md](docs/autenticacion.md).
+La revisi贸n contra los requisitos y los tipos de datos se documentan en [docs/revision-requerimientos.md](docs/revision-requerimientos.md).
 
 No hay configuraci贸n CORS ni dependencia de Flutter en el backend. Los archivos existentes de `frontend/` se conservan como trabajo previo y no se compilan ni ejecutan para la API.
 
