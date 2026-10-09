@@ -23,6 +23,9 @@ public class JwtTokenService {
             throw new IllegalArgumentException("APP_JWT_SECRET debe tener al menos 32 bytes");
         }
         this.algorithm = Algorithm.HMAC256(secret);
+        if (expirationMs <= 0) {
+            throw new IllegalArgumentException("La duración del JWT debe ser positiva");
+        }
         this.expirationMs = expirationMs;
     }
 
