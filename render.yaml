@@ -2,6 +2,7 @@ services:
   - type: web
     name: gestopago-api
     runtime: docker
+    plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /actuator/health
     envVars:
