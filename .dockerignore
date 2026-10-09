@@ -1,0 +1,16 @@
+.git
+.gradle
+**/.gradle
+build
+**/build
+frontend
+outputs
+perf
+docs
+scripts
+.idea
+.vscode
+.env
+.env.*
+**/.env
+**/.env.*

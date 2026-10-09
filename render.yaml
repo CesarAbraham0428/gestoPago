@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: gestopago-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: APP_JWT_SECRET
+        generateValue: true
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: GESTOPAGO_AUTH_ID_DISTRIBUIDOR
+        sync: false
+      - key: GESTOPAGO_AUTH_CODIGO_DISPOSITIVO
+        sync: false
+      - key: GESTOPAGO_AUTH_PASSWORD
+        sync: false

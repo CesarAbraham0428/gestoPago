@@ -25,6 +25,17 @@ El endpoint `GET /productos` requiere Bearer Token de la API y consulta Redis �
 
 La API escucha en `http://localhost:8080`. Flyway conserva V1/V2 (productos y tokens) y V3 por historial. V4 crea el esquema de clientes en una BD vacía o adopta las tablas ya creadas con el script manual, sin recrearlas. V5 completa las validaciones de nombres, amplía nacionalidad y ajusta el almacenamiento BCrypt. Las tablas antiguas `personas` y `registro` se conservan por historial, pero ya no participan en la API.
 
+## Despliegue de la API en Render
+
+El repositorio incluye un `Dockerfile` multi etapa para compilar con Java 17 y ejecutar solo el JAR de Spring Boot. `render.yaml` declara el servicio web, el chequeo de salud y las variables requeridas. El `.dockerignore` excluye el frontend, artefactos locales y archivos `.env` del contexto de la imagen.
+
+1. Sube la rama que quieres desplegar a tu repositorio Git y crea un Blueprint en Render apuntando a ese repositorio. Render tomará la configuración de `render.yaml` y construirá el servicio a partir del `Dockerfile`.
+2. Crea o selecciona una base PostgreSQL en la misma región que el servicio. Configura `DB_URL` con el formato `jdbc:postgresql://HOST:PUERTO/BASE`, usando el host interno de Render, y configura por separado `DB_USERNAME` y `DB_PASSWORD`. El usuario de base de datos necesita permisos para que Flyway ejecute las migraciones durante el arranque.
+3. Proporciona `GESTOPAGO_AUTH_ID_DISTRIBUIDOR`, `GESTOPAGO_AUTH_CODIGO_DISPOSITIVO` y `GESTOPAGO_AUTH_PASSWORD` cuando Render lo solicite. Render generará `APP_JWT_SECRET`; consérvalo entre despliegues para que los JWT ya emitidos sigan validándose.
+4. Redis es opcional para la API: sin Redis, el catálogo utiliza el respaldo en PostgreSQL y no se sirve desde caché.
+
+Spring Boot escucha en el `PORT` que Render asigna. El chequeo configurado en `/actuator/health` es público y comprueba la salud de la aplicación y PostgreSQL; Redis no afecta ese resultado porque solo se usa como caché opcional.
+
 ## Endpoints de autenticación
 
 - `POST /clientes`: registra cliente, domicilio, cuenta y usuario en una transacción (público).
