@@ -1,0 +1,508 @@
+{
+  "records": [
+    {
+      "row": 8,
+      "id": "UT-001",
+      "class": "UsuarioServiceTest",
+      "method": "cambioDePasswordGuardaBCryptYVerificaPasswordActual",
+      "tests": 1,
+      "duration": "0.046s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\UsuarioServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.UsuarioServiceTest\\index.html"
+    },
+    {
+      "row": 9,
+      "id": "UT-002",
+      "class": "UsuarioServiceTest",
+      "method": "noPermiteCambiarPasswordAjena",
+      "tests": 1,
+      "duration": "0.011s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\UsuarioServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.UsuarioServiceTest\\index.html"
+    },
+    {
+      "row": 10,
+      "id": "UT-003",
+      "class": "UsuarioServiceTest",
+      "method": "noPermitePasswordActualIncorrecta",
+      "tests": 1,
+      "duration": "0.099s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\UsuarioServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.UsuarioServiceTest\\index.html"
+    },
+    {
+      "row": 11,
+      "id": "UT-004",
+      "class": "UsuarioServiceTest",
+      "method": "noPermitePasswordNuevaDebil",
+      "tests": 1,
+      "duration": "0.007s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\UsuarioServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.UsuarioServiceTest\\index.html"
+    },
+    {
+      "row": 12,
+      "id": "UT-005",
+      "class": "UsuarioServiceTest",
+      "method": "noPermiteCambioParaUsuarioOClienteInactivo",
+      "tests": 2,
+      "duration": "0.068s",
+      "variants": [
+        "[1] entidad=usuario",
+        "[2] entidad=cliente"
+      ],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\UsuarioServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.UsuarioServiceTest\\index.html"
+    },
+    {
+      "row": 13,
+      "id": "UT-006",
+      "class": "UsuarioServiceTest",
+      "method": "obtenerDevuelveDatosDelPropioUsuario",
+      "tests": 1,
+      "duration": "0.014s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\UsuarioServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.UsuarioServiceTest\\index.html"
+    },
+    {
+      "row": 14,
+      "id": "UT-007",
+      "class": "UsuarioServiceTest",
+      "method": "obtenerUsuarioAjenoDevuelve403SinConsultarElRepositorio",
+      "tests": 1,
+      "duration": "0.007s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\UsuarioServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.UsuarioServiceTest\\index.html"
+    },
+    {
+      "row": 15,
+      "id": "UT-008",
+      "class": "UsuarioServiceTest",
+      "method": "usuarioInexistenteDevuelveExcepcionPersonalizada",
+      "tests": 1,
+      "duration": "0.012s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\UsuarioServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.UsuarioServiceTest\\index.html"
+    },
+    {
+      "row": 16,
+      "id": "UT-009",
+      "class": "CuentaServiceTest",
+      "method": "saldoNoCargaLaEntidadCompleta",
+      "tests": 1,
+      "duration": "0.007s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\CuentaServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.CuentaServiceTest\\index.html"
+    },
+    {
+      "row": 17,
+      "id": "UT-010",
+      "class": "CuentaServiceTest",
+      "method": "saldoDeCuentaInexistenteDevuelveExcepcionPersonalizada",
+      "tests": 1,
+      "duration": "0.005s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\CuentaServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.CuentaServiceTest\\index.html"
+    },
+    {
+      "row": 18,
+      "id": "UT-011",
+      "class": "CuentaServiceTest",
+      "method": "rechazaPaginacionInvalidaAntesDeConsultar",
+      "tests": 1,
+      "duration": "0.003s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\CuentaServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.CuentaServiceTest\\index.html"
+    },
+    {
+      "row": 19,
+      "id": "UT-012",
+      "class": "CuentaServiceTest",
+      "method": "paginaGlobalUsaResumen",
+      "tests": 1,
+      "duration": "0.058s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\CuentaServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.CuentaServiceTest\\index.html"
+    },
+    {
+      "row": 20,
+      "id": "UT-013",
+      "class": "CuentaServiceTest",
+      "method": "filtroSinCoincidenciasDevuelve404",
+      "tests": 1,
+      "duration": "0.051s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\CuentaServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.CuentaServiceTest\\index.html"
+    },
+    {
+      "row": 21,
+      "id": "UT-014",
+      "class": "CuentaServiceTest",
+      "method": "idInexistenteDevuelve404",
+      "tests": 1,
+      "duration": "0.005s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\CuentaServiceTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.CuentaServiceTest\\index.html"
+    },
+    {
+      "row": 22,
+      "id": "UT-015",
+      "class": "ClientePatchTest",
+      "method": "modificaLasCuatroCategoriasYConservaCamposOmitidos",
+      "tests": 1,
+      "duration": "0.137s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\ClientePatchTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.ClientePatchTest\\index.html"
+    },
+    {
+      "row": 23,
+      "id": "UT-016",
+      "class": "ClientePatchTest",
+      "method": "rechazaCamposProtegidosSinMutarEntidades",
+      "tests": 7,
+      "duration": "0.635s",
+      "variants": [
+        "[1] campo=curp",
+        "[2] campo=rfc",
+        "[3] campo=numeroCuenta",
+        "[4] campo=cuentas",
+        "[5] campo=activo",
+        "[6] campo=rol",
+        "[7] campo=password"
+      ],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\ClientePatchTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.ClientePatchTest\\index.html"
+    },
+    {
+      "row": 24,
+      "id": "UT-017",
+      "class": "ClientePatchTest",
+      "method": "rechazaDatosInvalidosSinMutarEntidades",
+      "tests": 7,
+      "duration": "0.901s",
+      "variants": [
+        "[1] json={\"primerNombre\":null}",
+        "[2] json={\"telefonoMovil\":\"123\"}",
+        "[3] json={\"domicilio\":{\"codigoPostal\":\"123\"}}",
+        "[4] json={\"domicilio\":{\"id\":8}}",
+        "[5] json={\"sexo\":\"valor-invalido\"}",
+        "[6] json={\"fechaNacimiento\":\"2999-01-01\"}",
+        "[7] json={\"ingresoMensual\":0}"
+      ],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\ClientePatchTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.ClientePatchTest\\index.html"
+    },
+    {
+      "row": 25,
+      "id": "UT-018",
+      "class": "ClientePatchTest",
+      "method": "exigeUnObjetoJsonAntesDeConsultarLaBase",
+      "tests": 3,
+      "duration": "0.137s",
+      "variants": [
+        "[1] json=[]",
+        "[2] json=null",
+        "[3] json=\"texto\""
+      ],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\ClientePatchTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.ClientePatchTest\\index.html"
+    },
+    {
+      "row": 26,
+      "id": "UT-019",
+      "class": "ClientePatchTest",
+      "method": "nullExplicitoLimpiaUnCampoOpcional",
+      "tests": 1,
+      "duration": "0.082s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\ClientePatchTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.ClientePatchTest\\index.html"
+    },
+    {
+      "row": 27,
+      "id": "UT-020",
+      "class": "ClientePatchTest",
+      "method": "clienteInexistenteNoEscribe",
+      "tests": 1,
+      "duration": "0.047s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\ClientePatchTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.ClientePatchTest\\index.html"
+    },
+    {
+      "row": 28,
+      "id": "UT-021",
+      "class": "ClientePatchTest",
+      "method": "clienteInactivoNoPuedeActualizarse",
+      "tests": 1,
+      "duration": "0.090s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\ClientePatchTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.ClientePatchTest\\index.html"
+    },
+    {
+      "row": 29,
+      "id": "UT-022",
+      "class": "ClientePatchTest",
+      "method": "correoDuplicadoNoMutaElClienteNiElDomicilio",
+      "tests": 1,
+      "duration": "2.791s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\service\\ClientePatchTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.service.ClientePatchTest\\index.html"
+    },
+    {
+      "row": 30,
+      "id": "UT-023",
+      "class": "ClienteControllerTest",
+      "method": "putEnColeccionDevuelve405ConMetodosPermitidos",
+      "tests": 1,
+      "duration": "0.336s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\controller\\ClienteControllerTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.controller.ClienteControllerTest\\index.html"
+    },
+    {
+      "row": 31,
+      "id": "UT-024",
+      "class": "ClienteControllerTest",
+      "method": "patchEnDetalleLlegaAlServicioConSoloLosCamposEnviados",
+      "tests": 1,
+      "duration": "0.900s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\controller\\ClienteControllerTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.controller.ClienteControllerTest\\index.html"
+    },
+    {
+      "row": 32,
+      "id": "UT-025",
+      "class": "ClienteControllerTest",
+      "method": "putEnDetalleDevuelve405YOfrecePatch",
+      "tests": 1,
+      "duration": "12.108s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\controller\\ClienteControllerTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.controller.ClienteControllerTest\\index.html"
+    },
+    {
+      "row": 33,
+      "id": "UT-026",
+      "class": "ClienteValidationTest",
+      "method": "aceptaOpcionalesOmitidosNacionalidadLibreYCerosIniciales",
+      "tests": 1,
+      "duration": "0.202s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\validation\\ClienteValidationTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.validation.ClienteValidationTest\\index.html"
+    },
+    {
+      "row": 34,
+      "id": "UT-027",
+      "class": "ClienteValidationTest",
+      "method": "rechazaCampoInvalido",
+      "tests": 15,
+      "duration": "1.562s",
+      "variants": [
+        "[10] campo=telefonoAlternativo, valor=12345678901",
+        "[11] campo=nacionalidad, valor=",
+        "[12] campo=ingresoMensual, valor=0",
+        "[13] campo=ingresoMensual, valor=-1",
+        "[14] campo=ingresoMensual, valor=1.001",
+        "[15] campo=fechaNacimiento, valor=2999-01-01",
+        "[1] campo=primerNombre, valor=A1",
+        "[2] campo=primerNombre, valor= A",
+        "[3] campo=apellidoPaterno, valor=",
+        "[4] campo=apellidoMaterno, valor=Ruiz2",
+        "[5] campo=segundoNombre, valor=",
+        "[6] campo=curp, valor=ABC",
+        "[7] campo=rfc, valor=ABC",
+        "[8] campo=correoElectronico, valor=invalido",
+        "[9] campo=telefonoMovil, valor=123456789"
+      ],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\validation\\ClienteValidationTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.validation.ClienteValidationTest\\index.html"
+    },
+    {
+      "row": 35,
+      "id": "UT-028",
+      "class": "ClienteValidationTest",
+      "method": "validaDomicilioAnidadoYLimitesDeLongitud",
+      "tests": 1,
+      "duration": "0.032s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\validation\\ClienteValidationTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.validation.ClienteValidationTest\\index.html"
+    },
+    {
+      "row": 36,
+      "id": "UT-029",
+      "class": "ClienteValidationTest",
+      "method": "actualizacionRechazaIdentificadoresInmutables",
+      "tests": 3,
+      "duration": "0.190s",
+      "variants": [
+        "[1] campo=curp",
+        "[2] campo=rfc",
+        "[3] campo=numeroCuenta"
+      ],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\validation\\ClienteValidationTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.validation.ClienteValidationTest\\index.html"
+    },
+    {
+      "row": 37,
+      "id": "UT-030",
+      "class": "ClienteValidationTest",
+      "method": "aceptaAmbasLongitudesDeRfcConFormatoValido",
+      "tests": 2,
+      "duration": "0.079s",
+      "variants": [
+        "[1] rfc=ABC900101AB1",
+        "[2] rfc=PERA900101AB1"
+      ],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\validation\\ClienteValidationTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.validation.ClienteValidationTest\\index.html"
+    },
+    {
+      "row": 38,
+      "id": "UT-031",
+      "class": "ClienteValidationTest",
+      "method": "aceptaLosLimitesInclusivosDeLongitudDelNombre",
+      "tests": 2,
+      "duration": "0.064s",
+      "variants": [
+        "[1] longitud=2",
+        "[2] longitud=50"
+      ],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\validation\\ClienteValidationTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.validation.ClienteValidationTest\\index.html"
+    },
+    {
+      "row": 39,
+      "id": "UT-032",
+      "class": "PasswordValidatorTest",
+      "method": "rechazaLaAusenciaDeCadaRequisito",
+      "tests": 6,
+      "duration": "0.036s",
+      "variants": [
+        "[1] password=null",
+        "[2] password=Ab1!",
+        "[3] password=segura123!",
+        "[4] password=SEGURA123!",
+        "[5] password=Seguraabc!",
+        "[6] password=Segura123"
+      ],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\validation\\PasswordValidatorTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.validation.PasswordValidatorTest\\index.html"
+    },
+    {
+      "row": 40,
+      "id": "UT-033",
+      "class": "PasswordValidatorTest",
+      "method": "aceptaPasswordConTodosLosRequisitos",
+      "tests": 2,
+      "duration": "0.014s",
+      "variants": [
+        "[1] password=Abcdef1!",
+        "[2] password=Segura123!"
+      ],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\validation\\PasswordValidatorTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.validation.PasswordValidatorTest\\index.html"
+    },
+    {
+      "row": 41,
+      "id": "UT-034",
+      "class": "PasswordValidatorTest",
+      "method": "aceptaExactamente72BytesYRechazaUnByteMas",
+      "tests": 1,
+      "duration": "0.014s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\validation\\PasswordValidatorTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.validation.PasswordValidatorTest\\index.html"
+    },
+    {
+      "row": 42,
+      "id": "UT-035",
+      "class": "PasswordValidatorTest",
+      "method": "limitaBytesUtf8AunqueLaCantidadDeCaracteresSeaMenor",
+      "tests": 1,
+      "duration": "0.007s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\validation\\PasswordValidatorTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.validation.PasswordValidatorTest\\index.html"
+    },
+    {
+      "row": 43,
+      "id": "UT-036",
+      "class": "RespuestaPrivacidadTest",
+      "method": "detalleIncluyeDatosCompletosSinCredenciales",
+      "tests": 1,
+      "duration": "0.093s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\model\\RespuestaPrivacidadTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.model.RespuestaPrivacidadTest\\index.html"
+    },
+    {
+      "row": 44,
+      "id": "UT-037",
+      "class": "RespuestaPrivacidadTest",
+      "method": "resumenDeClienteSoloExponeCamposNecesarios",
+      "tests": 1,
+      "duration": "0.061s",
+      "variants": [],
+      "source": "src\\test\\java\\com\\proyecto\\servicios\\model\\RespuestaPrivacidadTest.java",
+      "report": "build\\reports\\tests\\test\\com.proyecto.servicios.model.RespuestaPrivacidadTest\\index.html"
+    }
+  ],
+  "classes": {
+    "UsuarioServiceTest": {
+      "tests": 9,
+      "timestamp": "2026-10-09T03:57:52.851Z"
+    },
+    "CuentaServiceTest": {
+      "tests": 6,
+      "timestamp": "2026-10-09T03:57:52.664Z"
+    },
+    "ClientePatchTest": {
+      "tests": 22,
+      "timestamp": "2026-10-09T03:57:47.734Z"
+    },
+    "ClienteControllerTest": {
+      "tests": 3,
+      "timestamp": "2026-10-09T03:57:34.025Z"
+    },
+    "ClienteValidationTest": {
+      "tests": 24,
+      "timestamp": "2026-10-09T03:57:53.178Z"
+    },
+    "PasswordValidatorTest": {
+      "tests": 10,
+      "timestamp": "2026-10-09T03:57:55.383Z"
+    },
+    "RespuestaPrivacidadTest": {
+      "tests": 2,
+      "timestamp": "2026-10-09T03:57:47.487Z"
+    }
+  },
+  "summary": {
+    "tests": 76,
+    "failures": 0,
+    "skipped": 0,
+    "duration": "27.542s",
+    "generated": "08/10/2026 21:57:56 America/Mexico_City"
+  },
+  "excludedScreenshot": "223041"
+}

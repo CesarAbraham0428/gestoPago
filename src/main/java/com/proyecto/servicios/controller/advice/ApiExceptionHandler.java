@@ -21,6 +21,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 @Slf4j
 public class ApiExceptionHandler {
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<GenericResponse> metodoNoPermitido(org.springframework.web.HttpRequestMethodNotSupportedException exception) {
+        GenericResponse response = new GenericResponse();
+        response.setCodigo(1);
+        response.setMensaje("Método " + exception.getMethod()
+            + " no permitido para esta ruta. Para actualizar un cliente usa PATCH /clientes/{id}");
+        var headers = new org.springframework.http.HttpHeaders();
+        if (exception.getSupportedHttpMethods() != null) headers.setAllow(exception.getSupportedHttpMethods());
+        return new ResponseEntity<>(response, headers, HttpStatus.METHOD_NOT_ALLOWED);
+    }
+
     @ExceptionHandler(NegocioException.class)
     ResponseEntity<GenericResponse> negocio(NegocioException exception) {
         return respuesta(exception.getStatus(), 1, exception.getMessage());

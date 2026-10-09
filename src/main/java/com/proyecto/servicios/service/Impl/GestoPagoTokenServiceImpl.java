@@ -18,6 +18,7 @@ import org.springframework.transaction.TransactionException;
 
 import java.net.SocketTimeoutException;
 import java.time.Duration;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Optional;
@@ -35,6 +36,7 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
     private String codigoDispositivo;
     private String password;
     private long refreshRateMs;
+    private final Clock clock;
 
     @Autowired
     public GestoPagoTokenServiceImpl(
@@ -45,6 +47,13 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
             @Value("${gestopago.auth.codigo-dispositivo}") String codigoDispositivo,
             @Value("${gestopago.auth.password}") String password,
             @Value("${gestopago.auth.refresh-rate-ms:3600000}") long refreshRateMs) {
+        this(gestoPagoAuthClient, tokenRepository, tokenMapper, idDistribuidor, codigoDispositivo,
+            password, refreshRateMs, Clock.systemDefaultZone());
+    }
+
+    GestoPagoTokenServiceImpl(GestoPagoAuthClient gestoPagoAuthClient, GestoPagoTokenRepository tokenRepository,
+        GestoPagoTokenMapper tokenMapper, Integer idDistribuidor, String codigoDispositivo,
+        String password, long refreshRateMs, Clock clock) {
         this.gestoPagoAuthClient = gestoPagoAuthClient;
         this.tokenRepository = tokenRepository;
         this.tokenMapper = tokenMapper;
@@ -52,6 +61,7 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
         this.codigoDispositivo = codigoDispositivo;
         this.password = password;
         this.refreshRateMs = refreshRateMs;
+        this.clock = clock;
     }
 
     @Override
@@ -66,7 +76,7 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
         try {
             Optional<GestoPagoToken> actual = tokenRepository
                     .findByIdDistribuidorAndCodigoDispositivoAndActivoTrue(idDistribuidor, codigoDispositivo);
-            if (actual.isPresent() && !necesitaRenovacion(actual.get(), LocalDateTime.now())) {
+            if (actual.isPresent() && !necesitaRenovacion(actual.get(), LocalDateTime.now(clock))) {
                 log.debug("El token de GestoPago todavía está vigente; no se renueva");
                 return;
             }
@@ -88,14 +98,14 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
         Optional<GestoPagoToken> token = tokenRepository
                 .findByIdDistribuidorAndCodigoDispositivoAndActivoTrue(idDistribuidor, codigoDispositivo);
 
-        if (token.isPresent() && !necesitaRenovacion(token.get(), LocalDateTime.now())) {
+        if (token.isPresent() && !necesitaRenovacion(token.get(), LocalDateTime.now(clock))) {
             return token;
         }
 
         try {
             return Optional.of(renovarTokenInterno());
         } catch (GestoPagoAuthException exception) {
-            if (token.isPresent() && sigueVigente(token.get(), LocalDateTime.now())) {
+            if (token.isPresent() && sigueVigente(token.get(), LocalDateTime.now(clock))) {
                 log.warn("Falló la renovación anticipada; se usará el token vigente. tipo={}, statusHttp={}",
                         exception.getTipo(), exception.getStatusHttp());
                 return token;

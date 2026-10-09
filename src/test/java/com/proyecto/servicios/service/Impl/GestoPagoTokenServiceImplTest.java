@@ -14,6 +14,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,6 +36,7 @@ class GestoPagoTokenServiceImplTest {
     private static final Integer DISTRIBUTOR_ID = 42;
     private static final String DEVICE_CODE = "device-test";
     private static final String PASSWORD = "password-test";
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-10-08T12:00:00Z"), ZoneOffset.UTC);
 
     @Mock
     private GestoPagoAuthClient authClient;
@@ -46,12 +50,12 @@ class GestoPagoTokenServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new GestoPagoTokenServiceImpl(
-                authClient, repository, mapper, DISTRIBUTOR_ID, DEVICE_CODE, PASSWORD, 3_600_000);
+                authClient, repository, mapper, DISTRIBUTOR_ID, DEVICE_CODE, PASSWORD, 3_600_000, CLOCK);
     }
 
     @Test
     void obtenerTokenActivo_reutilizaTokenFrescoSinConsultarAutenticacion() {
-        GestoPagoToken fresh = token("still-fresh", LocalDateTime.now().minusMinutes(5), 3_600L);
+        GestoPagoToken fresh = token("still-fresh", LocalDateTime.now(CLOCK).minusMinutes(5), 3_600L);
         when(repository.findByIdDistribuidorAndCodigoDispositivoAndActivoTrue(DISTRIBUTOR_ID, DEVICE_CODE))
                 .thenReturn(Optional.of(fresh));
 
@@ -67,7 +71,7 @@ class GestoPagoTokenServiceImplTest {
         when(repository.findByIdDistribuidorAndCodigoDispositivoAndActivoTrue(DISTRIBUTOR_ID, DEVICE_CODE))
                 .thenReturn(Optional.empty());
         GestoPagoAuthResponse response = authResponse("new-token", 3_600L);
-        GestoPagoToken newToken = token("new-token", LocalDateTime.now(), 3_600L);
+        GestoPagoToken newToken = token("new-token", LocalDateTime.now(CLOCK), 3_600L);
         when(repository.findByIdDistribuidorAndCodigoDispositivo(DISTRIBUTOR_ID, DEVICE_CODE))
                 .thenReturn(Optional.empty());
         when(authClient.authenticate(DISTRIBUTOR_ID, DEVICE_CODE, PASSWORD)).thenReturn(response);
@@ -86,26 +90,28 @@ class GestoPagoTokenServiceImplTest {
     }
 
     @Test
-    void obtenerTokenActivo_siTokenExpiradoRenuevaYPersisteUnTokenNuevo() {
-        GestoPagoToken expired = token("expired-token", LocalDateTime.now().minusMinutes(10), 60L);
+    void obtenerTokenActivo_siTokenExpiradoRenuevaElRegistroExistente() {
+        usarMapperReal();
+        GestoPagoToken expired = token("expired-token", LocalDateTime.now(CLOCK).minusMinutes(10), 60L);
+        expired.setId(5);
         when(repository.findByIdDistribuidorAndCodigoDispositivoAndActivoTrue(DISTRIBUTOR_ID, DEVICE_CODE))
-                .thenReturn(Optional.of(expired));
-        GestoPagoAuthResponse response = authResponse("new-token", 3_600L);
-        GestoPagoToken newToken = token("new-token", LocalDateTime.now(), 3_600L);
+            .thenReturn(Optional.of(expired));
         when(repository.findByIdDistribuidorAndCodigoDispositivo(DISTRIBUTOR_ID, DEVICE_CODE))
-                .thenReturn(Optional.empty());
-        when(authClient.authenticate(DISTRIBUTOR_ID, DEVICE_CODE, PASSWORD)).thenReturn(response);
-        when(mapper.toEntity(response)).thenReturn(newToken);
+            .thenReturn(Optional.of(expired));
+        when(authClient.authenticate(DISTRIBUTOR_ID, DEVICE_CODE, PASSWORD))
+            .thenReturn(authResponse("new-token", 3_600L));
         when(repository.saveAndFlush(any(GestoPagoToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         GestoPagoToken result = service.obtenerTokenActivo(DISTRIBUTOR_ID, DEVICE_CODE).orElseThrow();
 
-        assertSame(newToken, result);
+        assertSame(expired, result);
+        assertEquals(5, result.getId());
         assertEquals("new-token", result.getToken());
-        verify(authClient).authenticate(DISTRIBUTOR_ID, DEVICE_CODE, PASSWORD);
-        verify(repository).saveAndFlush(newToken);
+        assertEquals(3_600L, result.getExpiresIn());
+        assertEquals(DISTRIBUTOR_ID, result.getIdDistribuidor());
+        assertEquals(DEVICE_CODE, result.getCodigoDispositivo());
+        verify(repository).saveAndFlush(expired);
     }
-
     @Test
     void renovarToken_siProveedorDevuelveRespuestaSinTokenClasificaRespuestaInvalida() {
         when(authClient.authenticate(DISTRIBUTOR_ID, DEVICE_CODE, PASSWORD)).thenReturn(authResponse(" ", 3_600L));
@@ -143,7 +149,7 @@ class GestoPagoTokenServiceImplTest {
 
     @Test
     void obtenerTokenActivo_siRenovacionAnticipadaFallaUsaTokenAunVigente() {
-        GestoPagoToken nearExpiry = token("still-valid", LocalDateTime.now().minusSeconds(57), 60L);
+        GestoPagoToken nearExpiry = token("still-valid", LocalDateTime.now(CLOCK).minusSeconds(57), 60L);
         when(repository.findByIdDistribuidorAndCodigoDispositivoAndActivoTrue(DISTRIBUTOR_ID, DEVICE_CODE))
                 .thenReturn(Optional.of(nearExpiry));
         FeignException unauthorized = feignFailure(401, "Unauthorized");
@@ -157,8 +163,24 @@ class GestoPagoTokenServiceImplTest {
     }
 
     @Test
+    void obtenerTokenActivo_noDevuelveUnTokenQueYaVencioSiFallaLaRenovacion() {
+        GestoPagoToken expired = token("expired", LocalDateTime.now(CLOCK).minusSeconds(60), 60L);
+        when(repository.findByIdDistribuidorAndCodigoDispositivoAndActivoTrue(DISTRIBUTOR_ID, DEVICE_CODE))
+            .thenReturn(Optional.of(expired));
+        FeignException unauthorized = feignFailure(401, "Unauthorized");
+        when(authClient.authenticate(DISTRIBUTOR_ID, DEVICE_CODE, PASSWORD))
+            .thenThrow(unauthorized);
+
+        var exception = assertThrows(GestoPagoAuthException.class,
+            () -> service.obtenerTokenActivo(DISTRIBUTOR_ID, DEVICE_CODE));
+
+        assertEquals(GestoPagoAuthException.Tipo.AUTENTICACION, exception.getTipo());
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void revisarRenovacionProgramada_omiteTokenFresco() {
-        GestoPagoToken fresh = token("fresh", LocalDateTime.now().minusMinutes(5), 3_600L);
+        GestoPagoToken fresh = token("fresh", LocalDateTime.now(CLOCK).minusMinutes(5), 3_600L);
         when(repository.findByIdDistribuidorAndCodigoDispositivoAndActivoTrue(DISTRIBUTOR_ID, DEVICE_CODE))
                 .thenReturn(Optional.of(fresh));
 
@@ -169,24 +191,31 @@ class GestoPagoTokenServiceImplTest {
     }
 
     @Test
-    void revisarRenovacionProgramada_renuevaTokenVencidoYPersisteElNuevo() {
-        GestoPagoToken expired = token("expired", LocalDateTime.now().minusMinutes(10), 60L);
+    void revisarRenovacionProgramada_renuevaElRegistroVencidoSinCrearOtro() {
+        usarMapperReal();
+        GestoPagoToken expired = token("expired", LocalDateTime.now(CLOCK).minusMinutes(10), 60L);
+        expired.setId(5);
         when(repository.findByIdDistribuidorAndCodigoDispositivoAndActivoTrue(DISTRIBUTOR_ID, DEVICE_CODE))
-                .thenReturn(Optional.of(expired));
-        GestoPagoAuthResponse response = authResponse("renewed", 3_600L);
-        GestoPagoToken newToken = token("renewed", LocalDateTime.now(), 3_600L);
+            .thenReturn(Optional.of(expired));
         when(repository.findByIdDistribuidorAndCodigoDispositivo(DISTRIBUTOR_ID, DEVICE_CODE))
-                .thenReturn(Optional.empty());
-        when(authClient.authenticate(DISTRIBUTOR_ID, DEVICE_CODE, PASSWORD)).thenReturn(response);
-        when(mapper.toEntity(response)).thenReturn(newToken);
+            .thenReturn(Optional.of(expired));
+        when(authClient.authenticate(DISTRIBUTOR_ID, DEVICE_CODE, PASSWORD))
+            .thenReturn(authResponse("renewed", 3_600L));
         when(repository.saveAndFlush(any(GestoPagoToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.revisarRenovacionProgramada();
 
-        verify(authClient).authenticate(DISTRIBUTOR_ID, DEVICE_CODE, PASSWORD);
-        verify(repository).saveAndFlush(newToken);
+        verify(repository).saveAndFlush(expired);
+        assertEquals(5, expired.getId());
+        assertEquals("renewed", expired.getToken());
+        assertEquals(3_600L, expired.getExpiresIn());
     }
 
+    private void usarMapperReal() {
+        service = new GestoPagoTokenServiceImpl(authClient, repository,
+            org.mapstruct.factory.Mappers.getMapper(GestoPagoTokenMapper.class),
+            DISTRIBUTOR_ID, DEVICE_CODE, PASSWORD, 3_600_000, CLOCK);
+    }
     private static GestoPagoAuthResponse authResponse(String token, long expiresIn) {
         GestoPagoAuthResponse response = new GestoPagoAuthResponse();
         response.setToken(token);

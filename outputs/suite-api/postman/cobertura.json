@@ -1,0 +1,555 @@
+{
+  "casosSuite": 78,
+  "solicitudes": 91,
+  "variantes": 3,
+  "auxiliares": 10,
+  "estado": "Preparada; no ejecutada contra API",
+  "casos": [
+    {
+      "id": "API-001",
+      "modulo": "Clientes",
+      "metodo": "POST",
+      "httpEsperado": 201,
+      "escenario": "Registro válido"
+    },
+    {
+      "id": "API-002",
+      "modulo": "Clientes",
+      "metodo": "POST",
+      "httpEsperado": 409,
+      "escenario": "Duplicado: curp"
+    },
+    {
+      "id": "API-003",
+      "modulo": "Clientes",
+      "metodo": "POST",
+      "httpEsperado": 409,
+      "escenario": "Duplicado: rfc"
+    },
+    {
+      "id": "API-004",
+      "modulo": "Clientes",
+      "metodo": "POST",
+      "httpEsperado": 409,
+      "escenario": "Duplicado: correoElectronico"
+    },
+    {
+      "id": "API-005",
+      "modulo": "Clientes",
+      "metodo": "POST",
+      "httpEsperado": 400,
+      "escenario": "Dato inválido: primerNombre"
+    },
+    {
+      "id": "API-006",
+      "modulo": "Clientes",
+      "metodo": "POST",
+      "httpEsperado": 400,
+      "escenario": "Dato inválido: correoElectronico"
+    },
+    {
+      "id": "API-007",
+      "modulo": "Clientes",
+      "metodo": "POST",
+      "httpEsperado": 400,
+      "escenario": "Dato inválido: telefonoMovil"
+    },
+    {
+      "id": "API-008",
+      "modulo": "Clientes",
+      "metodo": "POST",
+      "httpEsperado": 400,
+      "escenario": "Dato inválido: ingresoMensual"
+    },
+    {
+      "id": "API-009",
+      "modulo": "Clientes",
+      "metodo": "POST",
+      "httpEsperado": 400,
+      "escenario": "Dato inválido: domicilio.codigoPostal"
+    },
+    {
+      "id": "API-010",
+      "modulo": "Clientes",
+      "metodo": "POST",
+      "httpEsperado": 400,
+      "escenario": "Dato inválido: password"
+    },
+    {
+      "id": "API-011",
+      "modulo": "Clientes",
+      "metodo": "POST",
+      "httpEsperado": 400,
+      "escenario": "Dato inválido: fechaNacimiento"
+    },
+    {
+      "id": "API-012",
+      "modulo": "Clientes",
+      "metodo": "POST",
+      "httpEsperado": 201,
+      "escenario": "Edad mínima aceptada"
+    },
+    {
+      "id": "API-013",
+      "modulo": "Clientes",
+      "metodo": "POST",
+      "httpEsperado": 400,
+      "escenario": "Menor de edad"
+    },
+    {
+      "id": "API-014",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Lista global"
+    },
+    {
+      "id": "API-015",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Filtro id"
+    },
+    {
+      "id": "API-016",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Filtro curp"
+    },
+    {
+      "id": "API-017",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Filtro rfc"
+    },
+    {
+      "id": "API-018",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Filtro correo"
+    },
+    {
+      "id": "API-019",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Filtro numeroCuenta"
+    },
+    {
+      "id": "API-020",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Filtro activo"
+    },
+    {
+      "id": "API-021",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Filtro desde"
+    },
+    {
+      "id": "API-022",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Detalle existente"
+    },
+    {
+      "id": "API-023",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 404,
+      "escenario": "Detalle inexistente"
+    },
+    {
+      "id": "API-024",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 404,
+      "escenario": "Filtro sin coincidencias"
+    },
+    {
+      "id": "API-025",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 400,
+      "escenario": "Consulta inválida: pagina=-1"
+    },
+    {
+      "id": "API-026",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 400,
+      "escenario": "Consulta inválida: tamanio=0"
+    },
+    {
+      "id": "API-027",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 400,
+      "escenario": "Consulta inválida: tamanio=101"
+    },
+    {
+      "id": "API-028",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 400,
+      "escenario": "Consulta inválida: desde=2026-10-08&hasta=2026-10-07"
+    },
+    {
+      "id": "API-029",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 400,
+      "escenario": "Consulta inválida: desconocido=1"
+    },
+    {
+      "id": "API-030",
+      "modulo": "Clientes",
+      "metodo": "PATCH",
+      "httpEsperado": 200,
+      "escenario": "Modificar solo campos enviados"
+    },
+    {
+      "id": "API-031",
+      "modulo": "Clientes",
+      "metodo": "PATCH",
+      "httpEsperado": 200,
+      "escenario": "Limpiar opcional"
+    },
+    {
+      "id": "API-032",
+      "modulo": "Clientes",
+      "metodo": "PATCH",
+      "httpEsperado": 200,
+      "escenario": "Sincronizar correo de usuario"
+    },
+    {
+      "id": "API-033",
+      "modulo": "Clientes",
+      "metodo": "PATCH",
+      "httpEsperado": 400,
+      "escenario": "Campo protegido: curp"
+    },
+    {
+      "id": "API-034",
+      "modulo": "Clientes",
+      "metodo": "PATCH",
+      "httpEsperado": 400,
+      "escenario": "Campo protegido: rfc"
+    },
+    {
+      "id": "API-035",
+      "modulo": "Clientes",
+      "metodo": "PATCH",
+      "httpEsperado": 400,
+      "escenario": "Campo protegido: numeroCuenta"
+    },
+    {
+      "id": "API-036",
+      "modulo": "Clientes",
+      "metodo": "PATCH",
+      "httpEsperado": 400,
+      "escenario": "Campo protegido: activo"
+    },
+    {
+      "id": "API-037",
+      "modulo": "Clientes",
+      "metodo": "PATCH",
+      "httpEsperado": 400,
+      "escenario": "Campo protegido: password"
+    },
+    {
+      "id": "API-038",
+      "modulo": "Clientes",
+      "metodo": "PATCH",
+      "httpEsperado": 400,
+      "escenario": "JSON no objeto"
+    },
+    {
+      "id": "API-039",
+      "modulo": "Clientes",
+      "metodo": "PATCH",
+      "httpEsperado": 409,
+      "escenario": "Correo ya usado"
+    },
+    {
+      "id": "API-040",
+      "modulo": "Clientes",
+      "metodo": "PUT",
+      "httpEsperado": 405,
+      "escenario": "Método no admitido"
+    },
+    {
+      "id": "API-041",
+      "modulo": "Clientes",
+      "metodo": "PUT",
+      "httpEsperado": 405,
+      "escenario": "Método no admitido"
+    },
+    {
+      "id": "API-042",
+      "modulo": "Usuarios",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Consultar usuario propio"
+    },
+    {
+      "id": "API-043",
+      "modulo": "Usuarios",
+      "metodo": "GET",
+      "httpEsperado": 403,
+      "escenario": "Consultar usuario ajeno"
+    },
+    {
+      "id": "API-044",
+      "modulo": "Usuarios",
+      "metodo": "PUT",
+      "httpEsperado": 204,
+      "escenario": "Cambiar contraseña válida"
+    },
+    {
+      "id": "API-045",
+      "modulo": "Usuarios",
+      "metodo": "PUT",
+      "httpEsperado": 401,
+      "escenario": "Contraseña actual incorrecta"
+    },
+    {
+      "id": "API-046",
+      "modulo": "Usuarios",
+      "metodo": "PUT",
+      "httpEsperado": 400,
+      "escenario": "Contraseña nueva débil"
+    },
+    {
+      "id": "API-047",
+      "modulo": "Usuarios",
+      "metodo": "PUT",
+      "httpEsperado": 403,
+      "escenario": "Cambio de usuario ajeno"
+    },
+    {
+      "id": "API-048",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Lista global"
+    },
+    {
+      "id": "API-049",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Filtrar Activas"
+    },
+    {
+      "id": "API-050",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Filtrar Alias activa"
+    },
+    {
+      "id": "API-051",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Filtrar Saldo exacto"
+    },
+    {
+      "id": "API-052",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Filtrar ID"
+    },
+    {
+      "id": "API-053",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Consulta existente"
+    },
+    {
+      "id": "API-054",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Consulta existente"
+    },
+    {
+      "id": "API-055",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 200,
+      "escenario": "Consulta existente"
+    },
+    {
+      "id": "API-056",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 404,
+      "escenario": "Sin coincidencias"
+    },
+    {
+      "id": "API-057",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 404,
+      "escenario": "Sin coincidencias"
+    },
+    {
+      "id": "API-058",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 404,
+      "escenario": "Sin coincidencias"
+    },
+    {
+      "id": "API-059",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 404,
+      "escenario": "Sin coincidencias"
+    },
+    {
+      "id": "API-060",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 400,
+      "escenario": "Consulta inválida"
+    },
+    {
+      "id": "API-061",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 400,
+      "escenario": "Consulta inválida"
+    },
+    {
+      "id": "API-062",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 400,
+      "escenario": "Consulta inválida"
+    },
+    {
+      "id": "API-063",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 400,
+      "escenario": "Consulta inválida"
+    },
+    {
+      "id": "API-064",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 400,
+      "escenario": "Consulta inválida"
+    },
+    {
+      "id": "API-065",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 400,
+      "escenario": "Consulta inválida"
+    },
+    {
+      "id": "API-066",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 400,
+      "escenario": "Consulta inválida"
+    },
+    {
+      "id": "API-067",
+      "modulo": "Cuentas",
+      "metodo": "PUT",
+      "httpEsperado": 200,
+      "escenario": "Desactivar cuenta"
+    },
+    {
+      "id": "API-068",
+      "modulo": "Cuentas",
+      "metodo": "PUT",
+      "httpEsperado": 200,
+      "escenario": "Reactivar con cliente activo"
+    },
+    {
+      "id": "API-069",
+      "modulo": "Cuentas",
+      "metodo": "PUT",
+      "httpEsperado": 400,
+      "escenario": "Estado obligatorio"
+    },
+    {
+      "id": "API-070",
+      "modulo": "Cuentas",
+      "metodo": "DELETE",
+      "httpEsperado": 204,
+      "escenario": "Baja lógica de cuenta"
+    },
+    {
+      "id": "API-071",
+      "modulo": "Clientes",
+      "metodo": "DELETE",
+      "httpEsperado": 204,
+      "escenario": "Baja lógica con cascada"
+    },
+    {
+      "id": "API-072",
+      "modulo": "Clientes",
+      "metodo": "PATCH",
+      "httpEsperado": 409,
+      "escenario": "Cliente inactivo"
+    },
+    {
+      "id": "API-073",
+      "modulo": "Cuentas",
+      "metodo": "PUT",
+      "httpEsperado": 409,
+      "escenario": "Reactivar con cliente inactivo"
+    },
+    {
+      "id": "API-074",
+      "modulo": "Usuarios",
+      "metodo": "GET",
+      "httpEsperado": 401,
+      "escenario": "Sin autenticación"
+    },
+    {
+      "id": "API-075",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 401,
+      "escenario": "Sin autenticación"
+    },
+    {
+      "id": "API-076",
+      "modulo": "Clientes",
+      "metodo": "GET",
+      "httpEsperado": 401,
+      "escenario": "Sin autenticación"
+    },
+    {
+      "id": "API-077",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 401,
+      "escenario": "Sin autenticación"
+    },
+    {
+      "id": "API-078",
+      "modulo": "Cuentas",
+      "metodo": "GET",
+      "httpEsperado": 401,
+      "escenario": "Sin autenticación"
+    }
+  ]
+}

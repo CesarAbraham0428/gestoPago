@@ -20,6 +20,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
+import org.mockito.Captor;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mapstruct.factory.Mappers;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -50,6 +52,8 @@ class ProductoServiceImplTest {
     private GestoPagoTokenService tokenService;
     @Mock
     private ProductoRepository productoRepository;
+    @Captor
+    private ArgumentCaptor<List<ProductoResponse>> productosEnviados;
 
     private ProductoServiceImpl service;
     private ProductoMapper productoMapper = Mappers.getMapper(ProductoMapper.class);
@@ -115,6 +119,8 @@ class ProductoServiceImplTest {
 
         assertSame(storedCatalog, result);
         assertEquals(0, result.getCodigo());
+        verify(persistence).persistirCatalogoRecuperado(productosEnviados.capture());
+        comprobarProductosEnviados("Proveedor");
         InOrder order = inOrder(persistence, cache);
         order.verify(persistence).persistirCatalogoRecuperado(any());
         order.verify(cache).guardar(storedCatalog);
@@ -286,6 +292,8 @@ class ProductoServiceImplTest {
 
         service.sincronizarCatalogo();
 
+        verify(persistence).actualizarSiHayMasProductos(productosEnviados.capture());
+        comprobarProductosEnviados("Nuevo", "Otro");
         InOrder order = inOrder(persistence, cache);
         order.verify(persistence).actualizarSiHayMasProductos(any());
         order.verify(cache).guardar(storedCatalog);
@@ -337,6 +345,17 @@ class ProductoServiceImplTest {
 
         verify(persistence, never()).actualizarSiHayMasProductos(any());
         verify(cache, never()).guardar(any());
+    }
+
+    private void comprobarProductosEnviados(String... nombres) {
+        var enviados = productosEnviados.getValue();
+        assertEquals(nombres.length, enviados.size());
+        for (int i = 0; i < nombres.length; i++) {
+            assertEquals(nombres[i], enviados.get(i).getProducto());
+            assertEquals("Servicio", enviados.get(i).getServicio());
+            assertEquals(10, enviados.get(i).getIdServicio());
+            assertEquals(20, enviados.get(i).getIdProducto());
+        }
     }
 
     private void mockEmptySourcesAndProvider(GestoPagoCatalogResponse providerResponse) {

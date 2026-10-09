@@ -7,6 +7,7 @@ import com.proyecto.servicios.service.exception.*;
 import com.proyecto.servicios.validation.PasswordValidator;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly=true)
@@ -28,11 +28,15 @@ public class ClienteServiceImpl implements ClienteService {
     private final UsuarioRepository usuarios;
     private final PasswordEncoder encoder;
     private final EntityManager em;
+    private final com.fasterxml.jackson.databind.ObjectMapper mapper;
+    private final jakarta.validation.Validator validator;
 
     public ClienteServiceImpl(ClientesRepository clientes, DomicilioRepository domicilios,
-        CuentaRepository cuentas, UsuarioRepository usuarios, PasswordEncoder encoder, EntityManager em) {
+        CuentaRepository cuentas, UsuarioRepository usuarios, PasswordEncoder encoder, EntityManager em,
+        com.fasterxml.jackson.databind.ObjectMapper mapper, jakarta.validation.Validator validator) {
         this.clientes=clientes; this.domicilios=domicilios; this.cuentas=cuentas;
         this.usuarios=usuarios; this.encoder=encoder; this.em=em;
+        this.mapper=mapper; this.validator=validator;
     }
     @Override @Transactional
     public ClienteResponse registrar(ClienteRequest r) {
@@ -62,42 +66,44 @@ public class ClienteServiceImpl implements ClienteService {
         Usuario u=new Usuario(); u.setCliente(c); u.setCorreo(correo);
         u.setPasswordHash(encoder.encode(r.password())); usuarios.save(u);
         em.flush(); em.refresh(c); em.refresh(d); em.refresh(cuenta); em.refresh(u);
-        return respuesta(c);
+        return ClienteMapper.cliente(c, d, u, List.of(cuenta));
     }
-    
+
     @Override public ClienteResponse obtener(Integer id) { return respuesta(buscar(id)); }
     @Override
-    public Page<ClienteResponse> consultar(String curp,String rfc,String correo,String numeroCuenta,
+    public Page<?> consultar(Integer id, String curp,String rfc,String correo,String numeroCuenta,
         Boolean activo,LocalDate desde,LocalDate hasta,int pagina,int tamanio) {
         if (pagina<0 || tamanio<1 || tamanio>100) invalido("Página inválida; tamaño permitido: 1 a 100");
         if (desde!=null && hasta!=null && desde.isAfter(hasta)) invalido("Rango de fechas inválido");
-        Integer cuentaCliente = numeroCuenta==null ? null : cuentas.findByNumeroCuenta(numeroCuenta)
-            .orElseThrow(() -> new CuentaNoEncontradaException()).getCliente().getId();
-        Page<Cliente> resultado = clientes.findAll((c,q,cb) -> {
+        Integer cuentaCliente = numeroCuenta==null ? null : cuentas.findClienteIdByNumeroCuenta(numeroCuenta.trim())
+            .orElseThrow(CuentaNoEncontradaException::new);
+        Specification<Cliente> filtrosConsulta = (c,q,cb) -> {
             List<Predicate> filtros=new ArrayList<>();
+            if(id!=null) filtros.add(cb.equal(c.get("id"),id));
             if(curp!=null) filtros.add(cb.equal(c.get("curp"),curp.trim().toUpperCase(Locale.ROOT)));
             if(rfc!=null) filtros.add(cb.equal(c.get("rfc"),rfc.trim().toUpperCase(Locale.ROOT)));
-            if(correo!=null) filtros.add(cb.equal(c.get("correoElectronico"),normalizarCorreo(correo)));
+            if(correo!=null) filtros.add(cb.equal(cb.lower(c.get("correoElectronico")),normalizarCorreo(correo)));
             if(cuentaCliente!=null) filtros.add(cb.equal(c.get("id"),cuentaCliente));
             if(activo!=null) filtros.add(cb.equal(c.get("activo"),activo));
             if(desde!=null) filtros.add(cb.greaterThanOrEqualTo(c.get("fechaCreacion"),desde.atStartOfDay(ZONA).toInstant()));
             if(hasta!=null) filtros.add(cb.lessThan(c.get("fechaCreacion"),hasta.plusDays(1).atStartOfDay(ZONA).toInstant()));
             return cb.and(filtros.toArray(Predicate[]::new));
-        },PageRequest.of(pagina,tamanio,Sort.by("id")));
-        if (resultado.isEmpty()) return resultado.map(this::respuesta);
-        List<Integer> ids = resultado.map(Cliente::getId).getContent();
-        Map<Integer,Domicilio> direcciones = domicilios.findByClienteIdIn(ids).stream()
-            .collect(Collectors.toMap(d -> d.getCliente().getId(), d -> d));
-        Map<Integer,Usuario> accesos = usuarios.findByClienteIdIn(ids).stream()
-            .collect(Collectors.toMap(u -> u.getCliente().getId(), u -> u));
-        Map<Integer,List<Cuenta>> cuentasPorCliente = cuentas.findByClienteIdInOrderByIdAsc(ids).stream()
-            .collect(Collectors.groupingBy(c -> c.getCliente().getId()));
-        return resultado.map(c -> respuesta(c, direcciones.get(c.getId()), accesos.get(c.getId()),
-            cuentasPorCliente.getOrDefault(c.getId(), List.of())));
+        };
+        if (id != null || curp != null || rfc != null || correo != null || numeroCuenta != null
+            || activo != null || desde != null || hasta != null) {
+            Page<Cliente> resultado = clientes.findAll(filtrosConsulta,
+                PageRequest.of(pagina, tamanio, Sort.by("id")));
+            if (resultado.getTotalElements() == 0) throw new ClienteNoEncontradoException();
+            return respuestas(resultado);
+        }
+        return clientes.findBy(filtrosConsulta, query -> query.as(ClienteResumenProjection.class)
+            .page(PageRequest.of(pagina, tamanio, Sort.by("id"))))
+            .map(c -> new ClienteResumenResponse(c.getId(), c.getPrimerNombre(), c.getSegundoNombre(),
+                c.getApellidoPaterno(), c.getApellidoMaterno(), c.isActivo(), c.getFechaCreacion()));
     }
-    @Override @Transactional
-    public ClienteResponse actualizar(Integer id,ClienteActualizacionRequest r) {
-        Cliente c=bloquear(id); validarEdad(r.fechaNacimiento());
+    private ClienteResponse aplicarActualizacion(Cliente c, ClienteActualizacionRequest r) {
+        Integer id = c.getId();
+        validarEdad(r.fechaNacimiento());
         if(!c.isActivo()) conflicto("El cliente está inactivo");
         String correo=normalizarCorreo(r.correoElectronico());
         if(clientes.existsByCorreoElectronicoIgnoreCaseAndIdNot(correo,id)) throw new CorreoDuplicadoException();
@@ -113,6 +119,48 @@ public class ClienteServiceImpl implements ClienteService {
         em.flush(); em.clear(); return obtener(id);
     }
     @Override @Transactional
+    public ClienteResponse actualizarParcial(Integer id, com.fasterxml.jackson.databind.JsonNode cambios) {
+        if (cambios == null || !cambios.isObject()) invalido("PATCH requiere un objeto JSON");
+        Cliente c = bloquear(id);
+        Domicilio d = domicilios.findByClienteId(id)
+            .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Domicilio no encontrado"));
+        ClienteActualizacionRequest actual = new ClienteActualizacionRequest(
+            c.getPrimerNombre(), c.getSegundoNombre(), c.getApellidoPaterno(), c.getApellidoMaterno(),
+            c.getFechaNacimiento(), c.getSexo(), c.getNacionalidad(), c.getEstadoCivil(),
+            c.getCorreoElectronico(), c.getTelefonoMovil(), c.getTelefonoAlternativo(),
+            c.getOcupacion(), c.getEmpresa(), c.getIngresoMensual(),
+            new DomicilioRequest(d.getCalle(), d.getNumeroExterior(), d.getNumeroInterior(), d.getColonia(),
+                d.getMunicipio(), d.getEstado(), d.getCodigoPostal(), d.getPais()));
+        com.fasterxml.jackson.databind.node.ObjectNode combinado = mapper.valueToTree(actual);
+        combinar(combinado, cambios, "");
+        try {
+            ClienteActualizacionRequest request = mapper.treeToValue(combinado, ClienteActualizacionRequest.class);
+            var errores = validator.validate(request);
+            if (!errores.isEmpty()) {
+                var primero = errores.iterator().next();
+                invalido(primero.getPropertyPath() + ": " + primero.getMessage());
+            }
+            return aplicarActualizacion(c, request);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+            throw new ValidacionException("Solicitud inválida: revisa los tipos y valores de los campos");
+        }
+    }
+
+    private void combinar(com.fasterxml.jackson.databind.node.ObjectNode destino,
+        com.fasterxml.jackson.databind.JsonNode cambios, String prefijo) {
+        cambios.fields().forEachRemaining(campo -> {
+            String nombre = campo.getKey();
+            if (!destino.has(nombre)) invalido("Campo no permitido en actualización: " + prefijo + nombre);
+            if (destino.get(nombre).isObject() && campo.getValue().isObject()) {
+                combinar((com.fasterxml.jackson.databind.node.ObjectNode) destino.get(nombre),
+                    campo.getValue(), prefijo + nombre + ".");
+            } else {
+                destino.set(nombre, campo.getValue());
+            }
+        });
+    }
+
+    @Override @Transactional
     public void desactivar(Integer id) {
         Cliente c=bloquear(id); c.setActivo(false);
         // Los triggers desactivan usuario y cuentas en esta misma transacción.
@@ -126,18 +174,26 @@ public class ClienteServiceImpl implements ClienteService {
     }
     private ClienteResponse respuesta(Cliente c) {
         Domicilio d=domicilios.findByClienteId(c.getId()).orElseThrow(() -> error(HttpStatus.NOT_FOUND,"Domicilio no encontrado"));
-        Usuario u=usuarios.findByClienteId(c.getId()).orElseThrow(() -> new UsuarioNoEncontradoException());
-        return respuesta(c, d, u, cuentas.findByClienteIdOrderByIdAsc(c.getId()));
+        Usuario u=usuarios.findByClienteId(c.getId()).orElseThrow(UsuarioNoEncontradoException::new);
+        return ClienteMapper.cliente(c, d, u, cuentas.findByClienteIdOrderByIdAsc(c.getId()));
     }
-    private ClienteResponse respuesta(Cliente c, Domicilio d, Usuario u, List<Cuenta> cuentasCliente) {
-        if (d == null) throw error(HttpStatus.NOT_FOUND,"Domicilio no encontrado");
-        if (u == null) throw new UsuarioNoEncontradoException();
-        return new ClienteResponse(c.getId(),c.getPrimerNombre(),c.getSegundoNombre(),c.getApellidoPaterno(),
-            c.getApellidoMaterno(),c.getFechaNacimiento(),c.getCurp(),c.getRfc(),c.getSexo(),c.getNacionalidad(),
-            c.getEstadoCivil(),c.getCorreoElectronico(),c.getTelefonoMovil(),c.getTelefonoAlternativo(),
-            c.getOcupacion(),c.getEmpresa(),c.getIngresoMensual(),c.isActivo(),c.getFechaCreacion(),
-            c.getFechaActualizacion(),ClienteMapper.domicilio(d),
-            cuentasCliente.stream().map(ClienteMapper::cuenta).toList(),ClienteMapper.usuario(u));
+    private Page<ClienteResponse> respuestas(Page<Cliente> pagina) {
+        if (pagina.isEmpty()) return pagina.map(this::respuesta);
+        List<Integer> ids = pagina.map(Cliente::getId).getContent();
+        Map<Integer,Domicilio> direcciones = new HashMap<>();
+        domicilios.findByClienteIdIn(ids).forEach(d -> direcciones.put(d.getCliente().getId(), d));
+        Map<Integer,Usuario> accesos = new HashMap<>();
+        usuarios.findByClienteIdIn(ids).forEach(u -> accesos.put(u.getCliente().getId(), u));
+        Map<Integer,List<Cuenta>> cuentasPorCliente = new HashMap<>();
+        cuentas.findByClienteIdInOrderByIdAsc(ids).forEach(c ->
+            cuentasPorCliente.computeIfAbsent(c.getCliente().getId(), id -> new ArrayList<>()).add(c));
+        return pagina.map(c -> {
+            Domicilio d = direcciones.get(c.getId());
+            Usuario u = accesos.get(c.getId());
+            if (d == null) throw error(HttpStatus.NOT_FOUND, "Domicilio no encontrado");
+            if (u == null) throw new UsuarioNoEncontradoException();
+            return ClienteMapper.cliente(c, d, u, cuentasPorCliente.getOrDefault(c.getId(), List.of()));
+        });
     }
     private void aplicarDomicilio(Domicilio d,DomicilioRequest r) {
         d.setCalle(r.calle().trim()); d.setNumeroExterior(r.numeroExterior().trim());

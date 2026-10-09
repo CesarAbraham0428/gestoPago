@@ -9,7 +9,7 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 
-@RestController 
+@RestController
 @RequestMapping("/clientes")
 
 public class ClienteController {
@@ -17,25 +17,31 @@ public class ClienteController {
     private final ClienteService service;
 
     public ClienteController(ClienteService service) { this.service=service; }
-    
+
     @PostMapping public ResponseEntity<ClienteResponse> registrar(@Valid @RequestBody ClienteRequest request) {
         ClienteResponse c=service.registrar(request);
         return ResponseEntity.created(java.net.URI.create("/clientes/"+c.id())).body(c);
     }
 
-    @GetMapping public Page<ClienteResponse> consultar(
+    @GetMapping public Page<?> consultar(
+        @RequestParam(required=false) Integer id,
         @RequestParam(required=false) String curp, @RequestParam(required=false) String rfc,
         @RequestParam(required=false) String correo, @RequestParam(required=false) String numeroCuenta,
         @RequestParam(required=false) Boolean activo,
         @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate desde,
         @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate hasta,
-        @RequestParam(defaultValue="0") int pagina,@RequestParam(defaultValue="20") int tamanio) {
-        return service.consultar(curp,rfc,correo,numeroCuenta,activo,desde,hasta,pagina,tamanio);
+        @RequestParam(defaultValue="0") int pagina,@RequestParam(defaultValue="20") int tamanio, @RequestParam java.util.Map<String,String> parametros) {
+        if (!java.util.Set.of("id", "curp", "rfc", "correo", "numeroCuenta", "activo", "desde", "hasta", "pagina", "tamanio")
+            .containsAll(parametros.keySet())) {
+            throw new com.proyecto.servicios.service.exception.ValidacionException("Filtro de cliente no permitido");
+        }
+        return service.consultar(id,curp,rfc,correo,numeroCuenta,activo,desde,hasta,pagina,tamanio);
     }
 
     @GetMapping("/{id}") public ClienteResponse obtener(@PathVariable Integer id) { return service.obtener(id); }
-    @PutMapping("/{id}") public ClienteResponse actualizar(@PathVariable Integer id,@Valid @RequestBody ClienteActualizacionRequest r) {
-        return service.actualizar(id,r);
+    @PatchMapping("/{id}") public ClienteResponse actualizarParcial(@PathVariable Integer id,
+        @RequestBody com.fasterxml.jackson.databind.JsonNode cambios) {
+        return service.actualizarParcial(id, cambios);
     }
 
     @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)

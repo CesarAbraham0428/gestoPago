@@ -17,6 +17,9 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.verifyNoInteractions;
+import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -101,7 +104,7 @@ class CatalogoProductosCacheTest {
         boolean saved = cache.guardar(invalidCatalog);
 
         assertFalse(saved);
-        verify(valueOperations, never()).set(anyString(), anyString(), any(Duration.class));
+        verifyNoInteractions(redisTemplate, valueOperations);
     }
 
     @Test
@@ -112,7 +115,7 @@ class CatalogoProductosCacheTest {
         boolean saved = cache.guardar(emptyCatalog);
 
         assertFalse(saved);
-        verify(valueOperations, never()).set(anyString(), anyString(), any(Duration.class));
+        verifyNoInteractions(redisTemplate, valueOperations);
     }
 
     @Test
@@ -126,6 +129,40 @@ class CatalogoProductosCacheTest {
 
         assertFalse(saved);
         verify(redisTemplate).delete(CACHE_KEY);
+    }
+
+    @Test
+    void guardar_serializaLosDatosConLaClaveYLaVigenciaConfiguradas() throws Exception {
+        stubValueOperations();
+        var catalog = catalogWithProduct("Internet", "Recargas", 10, 20);
+
+        assertTrue(cache.guardar(catalog));
+
+        ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
+        verify(valueOperations).set(org.mockito.ArgumentMatchers.eq(CACHE_KEY), json.capture(),
+            org.mockito.ArgumentMatchers.eq(Duration.ofHours(24)));
+        var stored = new ObjectMapper().readTree(json.getValue());
+        assertEquals(0, stored.get("codigo").asInt());
+        assertEquals(1, stored.get("total").asInt());
+        assertEquals("Internet", stored.get("productos").get(0).get("producto").asText());
+        assertEquals("Recargas", stored.get("productos").get(0).get("servicio").asText());
+        assertEquals(10, stored.get("productos").get(0).get("idServicio").asInt());
+        assertEquals(20, stored.get("productos").get(0).get("idProducto").asInt());
+    }
+
+    @Test
+    void obtener_deserializaUnCatalogoValidoSinDescartarlo() throws Exception {
+        stubValueOperations();
+        when(valueOperations.get(CACHE_KEY)).thenReturn(new ObjectMapper().writeValueAsString(
+            catalogWithProduct("Internet", "Recargas", 10, 20)));
+
+        var result = cache.obtener();
+
+        assertTrue(result.redisDisponible());
+        assertEquals(1, result.catalogo().getTotal());
+        assertEquals("Internet", result.catalogo().getProductos().get(0).getProducto());
+        assertEquals(20, result.catalogo().getProductos().get(0).getIdProducto());
+        verify(redisTemplate, never()).delete(anyString());
     }
 
     private static CatalogoProductosResponse catalogWithProduct(

@@ -29,12 +29,14 @@ La API escucha en `http://localhost:8080`. Flyway conserva V1/V2 (productos y to
 
 - `POST /clientes`: registra cliente, domicilio, cuenta y usuario en una transacción (público).
 - `POST /auth/login`: valida correo y contraseña de un usuario activo y devuelve un Bearer Token (público).
-- `GET /clientes`, `GET /clientes/{id}`, `PUT /clientes/{id}` y `DELETE /clientes/{id}`: consulta, actualización y baja lógica.
+- `GET /clientes`, `GET /clientes/{id}`, `PATCH /clientes/{id}` y `DELETE /clientes/{id}`: consulta, actualización y baja lógica.
 - `GET /cuentas`, `GET /cuentas/{numeroCuenta}` y `GET /cuentas/{numeroCuenta}/saldo`: consultas bancarias.
 - `PUT /cuentas/{numeroCuenta}/estado` y `DELETE /cuentas/{numeroCuenta}`: activación/desactivación lógica.
 - `GET /usuarios/{id}` y `PUT /usuarios/{id}/password`: consulta y cambio de contraseña del propio usuario.
 - `GET /productos`: devuelve el catálogo; requiere `Authorization: Bearer <token>`.
 - `/swagger-ui/**` y `/v3/api-docs/**`: documentación OpenAPI.
+
+Los listados de clientes y cuentas usan `pagina` (0 por defecto) y `tamanio` (20 por defecto, máximo 100), con resultados en `content`. Los listados globales son resúmenes y los detalles/filtros incluyen información completa. Los cambios de contrato, privacidad y optimización están en [docs/revision-clientes-cuentas.md](docs/revision-clientes-cuentas.md).
 
 Los detalles de las solicitudes y respuestas están en [docs/autenticacion.md](docs/autenticacion.md).
 La revisión contra los requisitos y los tipos de datos se documentan en [docs/revision-requerimientos.md](docs/revision-requerimientos.md).
@@ -47,7 +49,7 @@ No hay configuración CORS ni dependencia de Flutter en el backend. Los archivos
 .\gradlew.bat test
 ```
 
-Las pruebas unitarias cubren la capa de servicio, persistencia y cliente de catálogo. El plan JMeter, sus parámetros y las métricas requeridas están en [perf/README.md](perf/README.md).
+Las pruebas cubren validación, clientes, cuentas, usuarios, autenticación, JWT y catálogo. El diseño, aislamiento y alcance de cada capa se documentan en [docs/pruebas-api.md](docs/pruebas-api.md). El plan JMeter, sus parámetros y las métricas requeridas están en [perf/README.md](perf/README.md).
 
 Para probar también el esquema real de PostgreSQL, instala las herramientas cliente de PostgreSQL en PATH y ejecuta:
 

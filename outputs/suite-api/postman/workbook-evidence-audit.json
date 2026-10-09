@@ -1,0 +1,2640 @@
+{
+  "runId": "c51024bb-fed0-4733-b372-ad9b96672b34",
+  "totalPass": 216,
+  "totalFail": 0,
+  "runRequests": 91,
+  "uniqueTests": 215,
+  "validations": [
+    {
+      "id": "API-001",
+      "runCaseId": "API-001",
+      "executionNumber": 1,
+      "row": 8,
+      "url": "http://localhost:8080/clientes",
+      "http": 201,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        2282
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 001342.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001319.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-002",
+      "runCaseId": "API-002",
+      "executionNumber": 2,
+      "row": 9,
+      "url": "http://localhost:8080/clientes",
+      "http": 409,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        33
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001451.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-003",
+      "runCaseId": "API-003",
+      "executionNumber": 3,
+      "row": 10,
+      "url": "http://localhost:8080/clientes",
+      "http": 409,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        36
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001458.png"
+      ],
+      "shared": {
+        "row": 9,
+        "id": "API-002"
+      }
+    },
+    {
+      "id": "API-004",
+      "runCaseId": "API-004",
+      "executionNumber": 4,
+      "row": 11,
+      "url": "http://localhost:8080/clientes",
+      "http": 409,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        54
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001513.png"
+      ],
+      "shared": {
+        "row": 9,
+        "id": "API-002"
+      }
+    },
+    {
+      "id": "API-005",
+      "runCaseId": "API-005",
+      "executionNumber": 5,
+      "row": 12,
+      "url": "http://localhost:8080/clientes",
+      "http": 400,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        60
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 001534.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001540.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-006",
+      "runCaseId": "API-006",
+      "executionNumber": 6,
+      "row": 13,
+      "url": "http://localhost:8080/clientes",
+      "http": 400,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        71
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 001559.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001605.png"
+      ],
+      "shared": {
+        "row": 12,
+        "id": "API-005"
+      }
+    },
+    {
+      "id": "API-007",
+      "runCaseId": "API-007",
+      "executionNumber": 7,
+      "row": 14,
+      "url": "http://localhost:8080/clientes",
+      "http": 400,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        36
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 001620.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001628.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-008",
+      "runCaseId": "API-008",
+      "executionNumber": 8,
+      "row": 15,
+      "url": "http://localhost:8080/clientes",
+      "http": 400,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        109
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 001642.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001650.png"
+      ],
+      "shared": {
+        "row": 14,
+        "id": "API-007"
+      }
+    },
+    {
+      "id": "API-009",
+      "runCaseId": "API-009",
+      "executionNumber": 9,
+      "row": 16,
+      "url": "http://localhost:8080/clientes",
+      "http": 400,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        27
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 14,
+        "id": "API-007"
+      }
+    },
+    {
+      "id": "API-010",
+      "runCaseId": "API-010",
+      "executionNumber": 10,
+      "row": 17,
+      "url": "http://localhost:8080/clientes",
+      "http": 400,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        15
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 001703.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001710.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-011",
+      "runCaseId": "API-011",
+      "executionNumber": 11,
+      "row": 18,
+      "url": "http://localhost:8080/clientes",
+      "http": 400,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        16
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 001728.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001733.png"
+      ],
+      "shared": {
+        "row": 17,
+        "id": "API-010"
+      }
+    },
+    {
+      "id": "API-012",
+      "runCaseId": "API-012",
+      "executionNumber": 12,
+      "row": 19,
+      "url": "http://localhost:8080/clientes",
+      "http": 201,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        1184
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 001810.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001816.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-013",
+      "runCaseId": "API-013",
+      "executionNumber": 13,
+      "row": 20,
+      "url": "http://localhost:8080/clientes",
+      "http": 400,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        12
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 001826.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001832.png"
+      ],
+      "shared": {
+        "row": 19,
+        "id": "API-012"
+      }
+    },
+    {
+      "id": "API-014",
+      "runCaseId": "API-014",
+      "executionNumber": 14,
+      "row": 21,
+      "url": "http://localhost:8080/clientes?pagina=0&tamanio=20",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        149
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001849.png"
+      ],
+      "shared": {
+        "row": 19,
+        "id": "API-012"
+      }
+    },
+    {
+      "id": "API-015",
+      "runCaseId": "API-015",
+      "executionNumber": 15,
+      "row": 22,
+      "url": "http://localhost:8080/clientes?id=3",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        72
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001905.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-016",
+      "runCaseId": "API-016",
+      "executionNumber": 16,
+      "row": 23,
+      "url": "http://localhost:8080/clientes?curp=YAMD900101HDFRZN65",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        53
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001916.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-017",
+      "runCaseId": "API-017",
+      "executionNumber": 17,
+      "row": 24,
+      "url": "http://localhost:8080/clientes?rfc=YAMD900101484",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        53
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001923.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-018",
+      "runCaseId": "API-018",
+      "executionNumber": 18,
+      "row": 25,
+      "url": "http://localhost:8080/clientes?correo=qa.9a0ced7e69484419b43bea9dae2a6104@example.com",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        69
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001929.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-019",
+      "runCaseId": "API-019",
+      "executionNumber": 19,
+      "row": 26,
+      "url": "http://localhost:8080/clientes?numeroCuenta=000000000000000003",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        50
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001935.png"
+      ],
+      "shared": {
+        "row": 27,
+        "id": "API-020"
+      }
+    },
+    {
+      "id": "API-020",
+      "runCaseId": "API-020",
+      "executionNumber": 20,
+      "row": 27,
+      "url": "http://localhost:8080/clientes?activo=true",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        60
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001943.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-021",
+      "runCaseId": "API-021",
+      "executionNumber": 21,
+      "row": 28,
+      "url": "http://localhost:8080/clientes?desde=2026-10-09&hasta=2026-10-09",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        132
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 001954.png"
+      ],
+      "shared": {
+        "row": 27,
+        "id": "API-020"
+      }
+    },
+    {
+      "id": "API-022",
+      "runCaseId": "API-022",
+      "executionNumber": 22,
+      "row": 29,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        55
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 27,
+        "id": "API-020"
+      }
+    },
+    {
+      "id": "API-023",
+      "runCaseId": "API-023",
+      "executionNumber": 23,
+      "row": 30,
+      "url": "http://localhost:8080/clientes/2147483647",
+      "http": 404,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        35
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002012.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-024",
+      "runCaseId": "API-024",
+      "executionNumber": 24,
+      "row": 31,
+      "url": "http://localhost:8080/clientes?curp=inexistente",
+      "http": 404,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        27
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 30,
+        "id": "API-023"
+      }
+    },
+    {
+      "id": "API-025",
+      "runCaseId": "API-025",
+      "executionNumber": 25,
+      "row": 32,
+      "url": "http://localhost:8080/clientes?pagina=-1",
+      "http": 400,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        20
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 30,
+        "id": "API-023"
+      }
+    },
+    {
+      "id": "API-026",
+      "runCaseId": "API-026",
+      "executionNumber": 26,
+      "row": 33,
+      "url": "http://localhost:8080/clientes?tamanio=0",
+      "http": 400,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        31
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 30,
+        "id": "API-023"
+      }
+    },
+    {
+      "id": "API-027",
+      "runCaseId": "API-027",
+      "executionNumber": 27,
+      "row": 34,
+      "url": "http://localhost:8080/clientes?tamanio=101",
+      "http": 400,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        20
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-028",
+      "runCaseId": "API-028",
+      "executionNumber": 28,
+      "row": 35,
+      "url": "http://localhost:8080/clientes?desde=2026-10-08&hasta=2026-10-07",
+      "http": 400,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        22
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-029",
+      "runCaseId": "API-029",
+      "executionNumber": 29,
+      "row": 36,
+      "url": "http://localhost:8080/clientes?desconocido=1",
+      "http": 400,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        28
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-030",
+      "runCaseId": "API-030",
+      "executionNumber": 30,
+      "row": 37,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 200,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        201
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 002105.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002112.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-031",
+      "runCaseId": "API-031",
+      "executionNumber": 31,
+      "row": 38,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 200,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        76
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 37,
+        "id": "API-030"
+      }
+    },
+    {
+      "id": "API-032",
+      "runCaseId": "API-032",
+      "executionNumber": 32,
+      "row": 39,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 200,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        102
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 37,
+        "id": "API-030"
+      }
+    },
+    {
+      "id": "API-033",
+      "runCaseId": "API-033",
+      "executionNumber": 33,
+      "row": 40,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 400,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        30
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 002131.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002136.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-034",
+      "runCaseId": "API-034",
+      "executionNumber": 34,
+      "row": 41,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 400,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        30
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 002151.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002156.png"
+      ],
+      "shared": {
+        "row": 40,
+        "id": "API-033"
+      }
+    },
+    {
+      "id": "API-035",
+      "runCaseId": "API-035",
+      "executionNumber": 35,
+      "row": 42,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 400,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        26
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 002203.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002209.png"
+      ],
+      "shared": {
+        "row": 40,
+        "id": "API-033"
+      }
+    },
+    {
+      "id": "API-036",
+      "runCaseId": "API-036",
+      "executionNumber": 36,
+      "row": 43,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 400,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        30
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 41,
+        "id": "API-034"
+      }
+    },
+    {
+      "id": "API-037",
+      "runCaseId": "API-037",
+      "executionNumber": 37,
+      "row": 44,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 400,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        37
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-038",
+      "runCaseId": "API-038",
+      "executionNumber": 38,
+      "row": 45,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 400,
+      "good": true,
+      "assertions": 9,
+      "times": [
+        19,
+        37,
+        18
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-039",
+      "runCaseId": "API-039",
+      "executionNumber": 39,
+      "row": 46,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 409,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        53
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002229.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-040",
+      "runCaseId": "API-040",
+      "executionNumber": 40,
+      "row": 47,
+      "url": "http://localhost:8080/clientes",
+      "http": 405,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        24
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 46,
+        "id": "API-039"
+      }
+    },
+    {
+      "id": "API-041",
+      "runCaseId": "API-041",
+      "executionNumber": 41,
+      "row": 48,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 405,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        16
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 46,
+        "id": "API-039"
+      }
+    },
+    {
+      "id": "API-042",
+      "runCaseId": "API-042",
+      "executionNumber": 42,
+      "row": 49,
+      "url": "http://localhost:8080/usuarios/3",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        49
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-043",
+      "runCaseId": "API-043",
+      "executionNumber": 43,
+      "row": 50,
+      "url": "http://localhost:8080/usuarios/4",
+      "http": 403,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        18
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-047",
+      "runCaseId": "API-044",
+      "executionNumber": 44,
+      "row": 54,
+      "url": "http://localhost:8080/usuarios/3/password",
+      "http": 204,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        1342
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-044",
+      "runCaseId": "API-045",
+      "executionNumber": 45,
+      "row": 51,
+      "url": "http://localhost:8080/usuarios/3/password",
+      "http": 401,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        763
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 002259.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002305.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-045",
+      "runCaseId": "API-046",
+      "executionNumber": 46,
+      "row": 52,
+      "url": "http://localhost:8080/usuarios/3/password",
+      "http": 400,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        20
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 51,
+        "id": "API-045"
+      }
+    },
+    {
+      "id": "API-046",
+      "runCaseId": "API-047",
+      "executionNumber": 47,
+      "row": 53,
+      "url": "http://localhost:8080/usuarios/4/password",
+      "http": 403,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        20
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 51,
+        "id": "API-045"
+      }
+    },
+    {
+      "id": "API-048",
+      "runCaseId": "API-048",
+      "executionNumber": 48,
+      "row": 55,
+      "url": "http://localhost:8080/cuentas",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        78
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002327.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-049",
+      "runCaseId": "API-049",
+      "executionNumber": 49,
+      "row": 56,
+      "url": "http://localhost:8080/cuentas?activo=true",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        27
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002338.png"
+      ],
+      "shared": {
+        "row": 55,
+        "id": "API-048"
+      }
+    },
+    {
+      "id": "API-050",
+      "runCaseId": "API-050",
+      "executionNumber": 50,
+      "row": 57,
+      "url": "http://localhost:8080/cuentas?activa=true",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        41
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 55,
+        "id": "API-048"
+      }
+    },
+    {
+      "id": "API-051",
+      "runCaseId": "API-051",
+      "executionNumber": 51,
+      "row": 58,
+      "url": "http://localhost:8080/cuentas?saldo=0",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        39
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002356.png"
+      ],
+      "shared": {
+        "row": 55,
+        "id": "API-048"
+      }
+    },
+    {
+      "id": "API-052",
+      "runCaseId": "API-052",
+      "executionNumber": 52,
+      "row": 59,
+      "url": "http://localhost:8080/cuentas?id=3",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        28
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002407.png"
+      ],
+      "shared": {
+        "row": 58,
+        "id": "API-051"
+      }
+    },
+    {
+      "id": "API-053",
+      "runCaseId": "API-053",
+      "executionNumber": 53,
+      "row": 60,
+      "url": "http://localhost:8080/cuentas/id/3",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        27
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002415.png"
+      ],
+      "shared": {
+        "row": 58,
+        "id": "API-051"
+      }
+    },
+    {
+      "id": "API-054",
+      "runCaseId": "API-054",
+      "executionNumber": 54,
+      "row": 61,
+      "url": "http://localhost:8080/cuentas/000000000000000003",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        32
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 58,
+        "id": "API-051"
+      }
+    },
+    {
+      "id": "API-055",
+      "runCaseId": "API-055",
+      "executionNumber": 55,
+      "row": 62,
+      "url": "http://localhost:8080/cuentas/000000000000000003/saldo",
+      "http": 200,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        58
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 59,
+        "id": "API-052"
+      }
+    },
+    {
+      "id": "API-056",
+      "runCaseId": "API-056",
+      "executionNumber": 56,
+      "row": 63,
+      "url": "http://localhost:8080/cuentas/id/2147483647",
+      "http": 404,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        21
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 60,
+        "id": "API-053"
+      }
+    },
+    {
+      "id": "API-057",
+      "runCaseId": "API-057",
+      "executionNumber": 57,
+      "row": 64,
+      "url": "http://localhost:8080/cuentas/inexistente",
+      "http": 404,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        42
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-058",
+      "runCaseId": "API-058",
+      "executionNumber": 58,
+      "row": 65,
+      "url": "http://localhost:8080/cuentas/inexistente/saldo",
+      "http": 404,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        19
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002433.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-059",
+      "runCaseId": "API-059",
+      "executionNumber": 59,
+      "row": 66,
+      "url": "http://localhost:8080/cuentas?saldo=9999999999999999.99",
+      "http": 404,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        21
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 65,
+        "id": "API-058"
+      }
+    },
+    {
+      "id": "API-060",
+      "runCaseId": "API-060",
+      "executionNumber": 60,
+      "row": 67,
+      "url": "http://localhost:8080/cuentas?saldo=-1",
+      "http": 400,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        21
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 65,
+        "id": "API-058"
+      }
+    },
+    {
+      "id": "API-061",
+      "runCaseId": "API-061",
+      "executionNumber": 61,
+      "row": 68,
+      "url": "http://localhost:8080/cuentas?activo=true&activa=false",
+      "http": 400,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        22
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 65,
+        "id": "API-058"
+      }
+    },
+    {
+      "id": "API-062",
+      "runCaseId": "API-062",
+      "executionNumber": 62,
+      "row": 69,
+      "url": "http://localhost:8080/cuentas?clienteId=1",
+      "http": 400,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        21
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-063",
+      "runCaseId": "API-063",
+      "executionNumber": 63,
+      "row": 70,
+      "url": "http://localhost:8080/cuentas?numeroCuenta=1",
+      "http": 400,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        16
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-064",
+      "runCaseId": "API-064",
+      "executionNumber": 64,
+      "row": 71,
+      "url": "http://localhost:8080/cuentas?pagina=-1",
+      "http": 400,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        18
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-065",
+      "runCaseId": "API-065",
+      "executionNumber": 65,
+      "row": 72,
+      "url": "http://localhost:8080/cuentas?tamanio=0",
+      "http": 400,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        47
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-066",
+      "runCaseId": "API-066",
+      "executionNumber": 66,
+      "row": 73,
+      "url": "http://localhost:8080/cuentas?tamanio=101",
+      "http": 400,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        19
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-067",
+      "runCaseId": "API-067",
+      "executionNumber": 67,
+      "row": 74,
+      "url": "http://localhost:8080/cuentas/000000000000000003/estado",
+      "http": 200,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        44
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 002448.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002453.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-068",
+      "runCaseId": "API-068",
+      "executionNumber": 68,
+      "row": 75,
+      "url": "http://localhost:8080/cuentas/000000000000000003/estado",
+      "http": 200,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        42
+      ],
+      "requestImages": [
+        "Captura de pantalla 2026-10-09 002513.png"
+      ],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002506.png"
+      ],
+      "shared": {
+        "row": 74,
+        "id": "API-067"
+      }
+    },
+    {
+      "id": "API-069",
+      "runCaseId": "API-069",
+      "executionNumber": 69,
+      "row": 76,
+      "url": "http://localhost:8080/cuentas/000000000000000003/estado",
+      "http": 400,
+      "good": true,
+      "assertions": 6,
+      "times": [
+        18,
+        16
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 74,
+        "id": "API-067"
+      }
+    },
+    {
+      "id": "API-070",
+      "runCaseId": "API-070",
+      "executionNumber": 70,
+      "row": 77,
+      "url": "http://localhost:8080/cuentas/000000000000000003",
+      "http": 204,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        38
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002534.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-071",
+      "runCaseId": "API-071",
+      "executionNumber": 71,
+      "row": 78,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 204,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        25
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 77,
+        "id": "API-070"
+      }
+    },
+    {
+      "id": "API-072",
+      "runCaseId": "API-072",
+      "executionNumber": 72,
+      "row": 79,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 409,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        23
+      ],
+      "requestImages": [],
+      "responseImages": [
+        "Captura de pantalla 2026-10-09 002601.png"
+      ],
+      "shared": null
+    },
+    {
+      "id": "API-073",
+      "runCaseId": "API-073",
+      "executionNumber": 73,
+      "row": 80,
+      "url": "http://localhost:8080/cuentas/000000000000000003/estado",
+      "http": 409,
+      "good": true,
+      "assertions": 3,
+      "times": [
+        45
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 79,
+        "id": "API-072"
+      }
+    },
+    {
+      "id": "API-074",
+      "runCaseId": "API-074",
+      "executionNumber": 74,
+      "row": 81,
+      "url": "http://localhost:8080/usuarios/3",
+      "http": 401,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        40
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": {
+        "row": 79,
+        "id": "API-072"
+      }
+    },
+    {
+      "id": "API-075",
+      "runCaseId": "API-075",
+      "executionNumber": 75,
+      "row": 82,
+      "url": "http://localhost:8080/clientes",
+      "http": 401,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        24
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-076",
+      "runCaseId": "API-076",
+      "executionNumber": 76,
+      "row": 83,
+      "url": "http://localhost:8080/clientes/3",
+      "http": 401,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        7
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-077",
+      "runCaseId": "API-077",
+      "executionNumber": 77,
+      "row": 84,
+      "url": "http://localhost:8080/cuentas",
+      "http": 401,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        7
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    },
+    {
+      "id": "API-078",
+      "runCaseId": "API-078",
+      "executionNumber": 78,
+      "row": 85,
+      "url": "http://localhost:8080/cuentas/000000000000000003",
+      "http": 401,
+      "good": true,
+      "assertions": 2,
+      "times": [
+        13
+      ],
+      "requestImages": [],
+      "responseImages": [],
+      "shared": null
+    }
+  ],
+  "shots": [
+    {
+      "time": "000324",
+      "target": "summary",
+      "kind": "resumen",
+      "passed": 216,
+      "failed": 0,
+      "suiteId": null,
+      "row": 92,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 000324.png",
+      "label": "Resumen general",
+      "cell": "K92",
+      "width": 1111,
+      "height": 661,
+      "displayWidth": 798,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "001319",
+      "id": 1,
+      "kind": "respuesta",
+      "http": 201,
+      "ms": 2282,
+      "suiteId": 1,
+      "row": 8,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001319.png",
+      "label": "API-001",
+      "cell": "K8",
+      "width": 1361,
+      "height": 659,
+      "displayWidth": 947,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "001342",
+      "id": 1,
+      "kind": "peticion",
+      "http": 201,
+      "ms": 2282,
+      "suiteId": 1,
+      "row": 8,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 001342.png",
+      "label": "API-001",
+      "cell": "F8",
+      "width": 1365,
+      "height": 664,
+      "displayWidth": 980,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "001358",
+      "target": "login",
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 674,
+      "suiteId": null,
+      "row": 90,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001358.png",
+      "label": "Login auxiliar",
+      "cell": "K90",
+      "width": 1365,
+      "height": 659,
+      "displayWidth": 983,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "001451",
+      "id": 2,
+      "kind": "respuesta",
+      "http": 409,
+      "ms": 33,
+      "visible": [
+        2,
+        3,
+        4
+      ],
+      "suiteId": 2,
+      "row": 9,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001451.png",
+      "label": "API-002",
+      "cell": "K9",
+      "width": 1365,
+      "height": 651,
+      "displayWidth": 995,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "001458",
+      "id": 3,
+      "kind": "respuesta",
+      "http": 409,
+      "ms": 36,
+      "suiteId": 3,
+      "row": 10,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001458.png",
+      "label": "API-003",
+      "cell": "K10",
+      "width": 1363,
+      "height": 661,
+      "displayWidth": 979,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "001513",
+      "id": 4,
+      "kind": "respuesta",
+      "http": 409,
+      "ms": 54,
+      "suiteId": 4,
+      "row": 11,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001513.png",
+      "label": "API-004",
+      "cell": "K11",
+      "width": 1365,
+      "height": 665,
+      "displayWidth": 975,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "001534",
+      "id": 5,
+      "kind": "peticion",
+      "http": 400,
+      "ms": 60,
+      "suiteId": 5,
+      "row": 12,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 001534.png",
+      "label": "API-005",
+      "cell": "F12",
+      "width": 1365,
+      "height": 659,
+      "displayWidth": 988,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "001540",
+      "id": 5,
+      "kind": "respuesta",
+      "http": 400,
+      "ms": 60,
+      "visible": [
+        4,
+        5,
+        6
+      ],
+      "suiteId": 5,
+      "row": 12,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001540.png",
+      "label": "API-005",
+      "cell": "K12",
+      "width": 1364,
+      "height": 663,
+      "displayWidth": 944,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "001559",
+      "id": 6,
+      "kind": "peticion",
+      "http": 400,
+      "ms": 71,
+      "suiteId": 6,
+      "row": 13,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 001559.png",
+      "label": "API-006",
+      "cell": "F13",
+      "width": 1361,
+      "height": 656,
+      "displayWidth": 989,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "001605",
+      "id": 6,
+      "kind": "respuesta",
+      "http": 400,
+      "ms": 71,
+      "suiteId": 6,
+      "row": 13,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001605.png",
+      "label": "API-006",
+      "cell": "K13",
+      "width": 1365,
+      "height": 657,
+      "displayWidth": 953,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "001620",
+      "id": 7,
+      "kind": "peticion",
+      "http": 400,
+      "ms": 36,
+      "suiteId": 7,
+      "row": 14,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 001620.png",
+      "label": "API-007",
+      "cell": "F14",
+      "width": 1359,
+      "height": 656,
+      "displayWidth": 988,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "001628",
+      "id": 7,
+      "kind": "respuesta",
+      "http": 400,
+      "ms": 36,
+      "visible": [
+        7,
+        8,
+        9
+      ],
+      "suiteId": 7,
+      "row": 14,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001628.png",
+      "label": "API-007",
+      "cell": "K14",
+      "width": 1363,
+      "height": 660,
+      "displayWidth": 947,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "001642",
+      "id": 8,
+      "kind": "peticion",
+      "http": 400,
+      "ms": 109,
+      "suiteId": 8,
+      "row": 15,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 001642.png",
+      "label": "API-008",
+      "cell": "F15",
+      "width": 1365,
+      "height": 658,
+      "displayWidth": 989,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "001650",
+      "id": 8,
+      "kind": "respuesta",
+      "http": 400,
+      "ms": 109,
+      "suiteId": 8,
+      "row": 15,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001650.png",
+      "label": "API-008",
+      "cell": "K15",
+      "width": 1363,
+      "height": 661,
+      "displayWidth": 946,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "001703",
+      "id": 10,
+      "kind": "peticion",
+      "http": 400,
+      "ms": 15,
+      "suiteId": 10,
+      "row": 17,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 001703.png",
+      "label": "API-010",
+      "cell": "F17",
+      "width": 1362,
+      "height": 649,
+      "displayWidth": 1000,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "001710",
+      "id": 10,
+      "kind": "respuesta",
+      "http": 400,
+      "ms": 15,
+      "visible": [
+        9,
+        10,
+        11
+      ],
+      "suiteId": 10,
+      "row": 17,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001710.png",
+      "label": "API-010",
+      "cell": "K17",
+      "width": 1364,
+      "height": 657,
+      "displayWidth": 952,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "001728",
+      "id": 11,
+      "kind": "peticion",
+      "http": 400,
+      "ms": 16,
+      "suiteId": 11,
+      "row": 18,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 001728.png",
+      "label": "API-011",
+      "cell": "F18",
+      "width": 1363,
+      "height": 655,
+      "displayWidth": 992,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "001733",
+      "id": 11,
+      "kind": "respuesta",
+      "http": 400,
+      "ms": 16,
+      "suiteId": 11,
+      "row": 18,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001733.png",
+      "label": "API-011",
+      "cell": "K18",
+      "width": 1362,
+      "height": 657,
+      "displayWidth": 951,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "001810",
+      "id": 12,
+      "kind": "peticion",
+      "http": 201,
+      "ms": 1184,
+      "suiteId": 12,
+      "row": 19,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 001810.png",
+      "label": "API-012",
+      "cell": "F19",
+      "width": 1365,
+      "height": 658,
+      "displayWidth": 989,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "001816",
+      "id": 12,
+      "kind": "respuesta",
+      "http": 201,
+      "ms": 1184,
+      "visible": [
+        12,
+        13,
+        14
+      ],
+      "suiteId": 12,
+      "row": 19,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001816.png",
+      "label": "API-012",
+      "cell": "K19",
+      "width": 1365,
+      "height": 654,
+      "displayWidth": 958,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "001826",
+      "id": 13,
+      "kind": "peticion",
+      "http": 400,
+      "ms": 12,
+      "suiteId": 13,
+      "row": 20,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 001826.png",
+      "label": "API-013",
+      "cell": "F20",
+      "width": 1365,
+      "height": 661,
+      "displayWidth": 985,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "001832",
+      "id": 13,
+      "kind": "respuesta",
+      "http": 400,
+      "ms": 12,
+      "suiteId": 13,
+      "row": 20,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001832.png",
+      "label": "API-013",
+      "cell": "K20",
+      "width": 1365,
+      "height": 654,
+      "displayWidth": 958,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "001849",
+      "id": 14,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 149,
+      "suiteId": 14,
+      "row": 21,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001849.png",
+      "label": "API-014",
+      "cell": "K21",
+      "width": 1364,
+      "height": 655,
+      "displayWidth": 989,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "001905",
+      "id": 15,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 72,
+      "suiteId": 15,
+      "row": 22,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001905.png",
+      "label": "API-015",
+      "cell": "K22",
+      "width": 1360,
+      "height": 655,
+      "displayWidth": 986,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "001916",
+      "id": 16,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 53,
+      "suiteId": 16,
+      "row": 23,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001916.png",
+      "label": "API-016",
+      "cell": "K23",
+      "width": 1365,
+      "height": 660,
+      "displayWidth": 982,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "001923",
+      "id": 17,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 53,
+      "suiteId": 17,
+      "row": 24,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001923.png",
+      "label": "API-017",
+      "cell": "K24",
+      "width": 1365,
+      "height": 657,
+      "displayWidth": 986,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "001929",
+      "id": 18,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 69,
+      "suiteId": 18,
+      "row": 25,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001929.png",
+      "label": "API-018",
+      "cell": "K25",
+      "width": 1365,
+      "height": 658,
+      "displayWidth": 985,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "001935",
+      "id": 19,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 50,
+      "suiteId": 19,
+      "row": 26,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001935.png",
+      "label": "API-019",
+      "cell": "K26",
+      "width": 1361,
+      "height": 658,
+      "displayWidth": 982,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "001943",
+      "id": 20,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 60,
+      "visible": [
+        19,
+        20,
+        21,
+        22
+      ],
+      "suiteId": 20,
+      "row": 27,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001943.png",
+      "label": "API-020",
+      "cell": "K27",
+      "width": 1365,
+      "height": 652,
+      "displayWidth": 994,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "001954",
+      "id": 21,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 132,
+      "suiteId": 21,
+      "row": 28,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 001954.png",
+      "label": "API-021",
+      "cell": "K28",
+      "width": 1365,
+      "height": 670,
+      "displayWidth": 967,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "002012",
+      "id": 23,
+      "kind": "respuesta",
+      "http": 404,
+      "ms": 35,
+      "visible": [
+        23,
+        24,
+        25,
+        26
+      ],
+      "suiteId": 23,
+      "row": 30,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002012.png",
+      "label": "API-023",
+      "cell": "K30",
+      "width": 1365,
+      "height": 657,
+      "displayWidth": 986,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "002105",
+      "id": 30,
+      "kind": "peticion",
+      "http": 200,
+      "ms": 201,
+      "suiteId": 30,
+      "row": 37,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 002105.png",
+      "label": "API-030",
+      "cell": "F37",
+      "width": 1365,
+      "height": 652,
+      "displayWidth": 998,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "002112",
+      "id": 30,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 201,
+      "visible": [
+        30,
+        31,
+        32
+      ],
+      "suiteId": 30,
+      "row": 37,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002112.png",
+      "label": "API-030",
+      "cell": "K37",
+      "width": 1365,
+      "height": 652,
+      "displayWidth": 960,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "002131",
+      "id": 33,
+      "kind": "peticion",
+      "http": 400,
+      "ms": 30,
+      "suiteId": 33,
+      "row": 40,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 002131.png",
+      "label": "API-033",
+      "cell": "F40",
+      "width": 1365,
+      "height": 656,
+      "displayWidth": 992,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "002136",
+      "id": 33,
+      "kind": "respuesta",
+      "http": 400,
+      "ms": 30,
+      "visible": [
+        33,
+        34,
+        35
+      ],
+      "suiteId": 33,
+      "row": 40,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002136.png",
+      "label": "API-033",
+      "cell": "K40",
+      "width": 1365,
+      "height": 659,
+      "displayWidth": 950,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "002151",
+      "id": 34,
+      "kind": "peticion",
+      "http": 400,
+      "ms": 30,
+      "suiteId": 34,
+      "row": 41,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 002151.png",
+      "label": "API-034",
+      "cell": "F41",
+      "width": 1365,
+      "height": 664,
+      "displayWidth": 980,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "002156",
+      "id": 34,
+      "kind": "respuesta",
+      "http": 400,
+      "ms": 30,
+      "visible": [
+        34,
+        35,
+        36
+      ],
+      "suiteId": 34,
+      "row": 41,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002156.png",
+      "label": "API-034",
+      "cell": "K41",
+      "width": 1365,
+      "height": 659,
+      "displayWidth": 950,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "002203",
+      "id": 35,
+      "kind": "peticion",
+      "http": 400,
+      "ms": 26,
+      "suiteId": 35,
+      "row": 42,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 002203.png",
+      "label": "API-035",
+      "cell": "F42",
+      "width": 1365,
+      "height": 652,
+      "displayWidth": 998,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "002209",
+      "id": 35,
+      "kind": "respuesta",
+      "http": 400,
+      "ms": 26,
+      "suiteId": 35,
+      "row": 42,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002209.png",
+      "label": "API-035",
+      "cell": "K42",
+      "width": 1365,
+      "height": 656,
+      "displayWidth": 955,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "002229",
+      "id": 39,
+      "kind": "respuesta",
+      "http": 409,
+      "ms": 53,
+      "visible": [
+        39,
+        40,
+        41
+      ],
+      "suiteId": 39,
+      "row": 46,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002229.png",
+      "label": "API-039",
+      "cell": "K46",
+      "width": 1365,
+      "height": 657,
+      "displayWidth": 986,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "002259",
+      "id": 45,
+      "kind": "peticion",
+      "http": 401,
+      "ms": 763,
+      "suiteId": 44,
+      "row": 51,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 002259.png",
+      "label": "API-045",
+      "cell": "F51",
+      "width": 1365,
+      "height": 654,
+      "displayWidth": 995,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "002305",
+      "id": 45,
+      "kind": "respuesta",
+      "http": 401,
+      "ms": 763,
+      "visible": [
+        45,
+        46,
+        47
+      ],
+      "suiteId": 44,
+      "row": 51,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002305.png",
+      "label": "API-045",
+      "cell": "K51",
+      "width": 1365,
+      "height": 659,
+      "displayWidth": 915,
+      "displayHeight": 442,
+      "captionHeight": 93,
+      "rowHeight": 545
+    },
+    {
+      "time": "002327",
+      "id": 48,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 78,
+      "visible": [
+        48,
+        49,
+        50,
+        51
+      ],
+      "suiteId": 48,
+      "row": 55,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002327.png",
+      "label": "API-048",
+      "cell": "K55",
+      "width": 1365,
+      "height": 657,
+      "displayWidth": 986,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "002338",
+      "id": 49,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 27,
+      "suiteId": 49,
+      "row": 56,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002338.png",
+      "label": "API-049",
+      "cell": "K56",
+      "width": 1365,
+      "height": 662,
+      "displayWidth": 979,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "002356",
+      "id": 51,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 39,
+      "visible": [
+        51,
+        52,
+        53,
+        54
+      ],
+      "suiteId": 51,
+      "row": 58,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002356.png",
+      "label": "API-051",
+      "cell": "K58",
+      "width": 1365,
+      "height": 665,
+      "displayWidth": 975,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "002407",
+      "id": 52,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 28,
+      "visible": [
+        52,
+        53,
+        54,
+        55
+      ],
+      "suiteId": 52,
+      "row": 59,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002407.png",
+      "label": "API-052",
+      "cell": "K59",
+      "width": 1365,
+      "height": 652,
+      "displayWidth": 994,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "002415",
+      "id": 53,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 27,
+      "visible": [
+        53,
+        54,
+        55,
+        56
+      ],
+      "suiteId": 53,
+      "row": 60,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002415.png",
+      "label": "API-053",
+      "cell": "K60",
+      "width": 1365,
+      "height": 668,
+      "displayWidth": 970,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "002433",
+      "id": 58,
+      "kind": "respuesta",
+      "http": 404,
+      "ms": 19,
+      "visible": [
+        58,
+        59,
+        60,
+        61
+      ],
+      "suiteId": 58,
+      "row": 65,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002433.png",
+      "label": "API-058",
+      "cell": "K65",
+      "width": 1365,
+      "height": 664,
+      "displayWidth": 976,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "002448",
+      "id": 67,
+      "kind": "peticion",
+      "http": 200,
+      "ms": 44,
+      "suiteId": 67,
+      "row": 74,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 002448.png",
+      "label": "API-067",
+      "cell": "F74",
+      "width": 1365,
+      "height": 662,
+      "displayWidth": 983,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "002453",
+      "id": 67,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 44,
+      "visible": [
+        67,
+        68,
+        69
+      ],
+      "suiteId": 67,
+      "row": 74,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002453.png",
+      "label": "API-067",
+      "cell": "K74",
+      "width": 1365,
+      "height": 661,
+      "displayWidth": 947,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "002506",
+      "id": 68,
+      "kind": "respuesta",
+      "http": 200,
+      "ms": 42,
+      "visible": [
+        68,
+        69
+      ],
+      "suiteId": 68,
+      "row": 75,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002506.png",
+      "label": "API-068",
+      "cell": "K75",
+      "width": 1365,
+      "height": 650,
+      "displayWidth": 963,
+      "displayHeight": 459,
+      "captionHeight": 76,
+      "rowHeight": 545
+    },
+    {
+      "time": "002513",
+      "id": 68,
+      "kind": "peticion",
+      "http": 200,
+      "ms": 42,
+      "suiteId": 68,
+      "row": 75,
+      "col": "F",
+      "filename": "Captura de pantalla 2026-10-09 002513.png",
+      "label": "API-068",
+      "cell": "F75",
+      "width": 1365,
+      "height": 657,
+      "displayWidth": 991,
+      "displayHeight": 477,
+      "captionHeight": 58,
+      "rowHeight": 545
+    },
+    {
+      "time": "002534",
+      "id": 70,
+      "kind": "ejecucion",
+      "http": 204,
+      "ms": 38,
+      "visible": [
+        70,
+        71
+      ],
+      "suiteId": 70,
+      "row": 77,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002534.png",
+      "label": "API-070",
+      "cell": "K77",
+      "width": 1365,
+      "height": 657,
+      "displayWidth": 986,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    },
+    {
+      "time": "002601",
+      "id": 72,
+      "kind": "respuesta",
+      "http": 409,
+      "ms": 23,
+      "visible": [
+        72,
+        73,
+        74
+      ],
+      "suiteId": 72,
+      "row": 79,
+      "col": "K",
+      "filename": "Captura de pantalla 2026-10-09 002601.png",
+      "label": "API-072",
+      "cell": "K79",
+      "width": 1365,
+      "height": 664,
+      "displayWidth": 976,
+      "displayHeight": 475,
+      "captionHeight": 60,
+      "rowHeight": 545
+    }
+  ]
+}

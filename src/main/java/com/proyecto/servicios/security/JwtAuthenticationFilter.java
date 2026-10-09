@@ -1,6 +1,5 @@
 package com.proyecto.servicios.security;
 import com.auth0.jwt.exceptions.JWTVerificationException;
-import com.proyecto.servicios.entity.sf.Usuario;
 import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
@@ -27,8 +26,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if(header!=null && header.startsWith("Bearer ")) {
             try {
                 Integer id=Integer.valueOf(tokens.validar(header.substring(7)).getSubject());
-                Usuario usuario=usuarios.findById(id).orElse(null);
-                if(usuario==null || !usuario.isActivo() || !usuario.getCliente().isActivo()) {
+                if(!usuarios.existsByIdAndActivoTrueAndClienteActivoTrue(id)) {
                     rechazar(response,"Usuario inactivo o inexistente"); return;
                 }
                 SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(

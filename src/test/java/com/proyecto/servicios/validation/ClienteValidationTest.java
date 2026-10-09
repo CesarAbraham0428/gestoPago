@@ -9,6 +9,9 @@ import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import com.proyecto.servicios.model.ClienteActualizacionRequest;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ClienteValidationTest {
@@ -63,5 +66,27 @@ class ClienteValidationTest {
         assertTrue(errores.stream().anyMatch(v -> v.getPropertyPath().toString().equals("primerNombre")));
         assertTrue(errores.stream().anyMatch(v -> v.getPropertyPath().toString().equals("correoElectronico")));
         assertTrue(errores.stream().anyMatch(v -> v.getPropertyPath().toString().equals("domicilio.codigoPostal")));
+    }
+    @ParameterizedTest
+    @ValueSource(strings={"curp", "rfc", "numeroCuenta"})
+    void actualizacionRechazaIdentificadoresInmutables(String campo) throws Exception {
+        ObjectNode body = registro();
+        body.remove("curp"); body.remove("rfc"); body.remove("password");
+        body.put(campo, "no-permitido");
+        assertThrows(JsonProcessingException.class, () -> mapper.treeToValue(body, ClienteActualizacionRequest.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings={"ABC900101AB1", "PERA900101AB1"})
+    void aceptaAmbasLongitudesDeRfcConFormatoValido(String rfc) throws Exception {
+        var request = mapper.treeToValue(registro().put("rfc", rfc), ClienteRequest.class);
+        assertTrue(validator.validate(request).isEmpty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints={2, 50})
+    void aceptaLosLimitesInclusivosDeLongitudDelNombre(int longitud) throws Exception {
+        var request = mapper.treeToValue(registro().put("primerNombre", "A".repeat(longitud)), ClienteRequest.class);
+        assertTrue(validator.validate(request).isEmpty());
     }
 }

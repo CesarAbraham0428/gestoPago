@@ -5,7 +5,6 @@ import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import com.proyecto.servicios.security.JwtTokenService;
 import com.proyecto.servicios.service.Impl.AutenticacionServiceImpl;
 import com.proyecto.servicios.service.exception.AutenticacionException;
-import com.proyecto.servicios.validation.PasswordValidator;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -29,8 +28,11 @@ class AutenticacionServiceTest {
     @Test void loginNormalizaCorreoYUsaIdEstable() {
         when(usuarios.findByCorreoIgnoreCase("ana@example.com")).thenReturn(Optional.of(usuario()));
         when(tokens.emitir("7")).thenReturn("jwt");
+        when(tokens.getExpirationMs()).thenReturn(60000L);
         var r=service.iniciarSesion(new LoginRequest(" ANA@EXAMPLE.COM ","Segura123!"));
         assertEquals("ana@example.com",r.usuario()); assertEquals("Ana Pérez Ruiz",r.nombreCompleto()); assertEquals("jwt",r.token());
+        assertEquals("Bearer", r.tipo());
+        assertEquals(60000, r.expiraEnMs());
     }
     @Test void passwordIncorrectoNoEmiteToken() {
         when(usuarios.findByCorreoIgnoreCase("ana@example.com")).thenReturn(Optional.of(usuario()));
@@ -48,12 +50,15 @@ class AutenticacionServiceTest {
     @Test void usuarioInactivoNoPuedeIniciarSesion() {
         Usuario u=usuario(); u.setActivo(false);
         when(usuarios.findByCorreoIgnoreCase("ana@example.com")).thenReturn(Optional.of(u));
-        assertThrows(AutenticacionException.class,() -> service.iniciarSesion(new LoginRequest("ana@example.com","Segura123!")));
+        assertEquals(AutenticacionException.Tipo.CUENTA_INACTIVA, assertThrows(AutenticacionException.class,
+            () -> service.iniciarSesion(new LoginRequest("ana@example.com","Segura123!"))).getTipo());
         verifyNoInteractions(tokens);
     }
-    @Test void passwordExigeComplejidadYLimiteDeBytes() {
-        assertDoesNotThrow(() -> PasswordValidator.validar("Segura123!"));
-        for(String p:new String[]{"Ab1!","segura123!","SEGURA123!","Seguraabc!","Segura123","Aa1!"+"ñ".repeat(35)})
-            assertThrows(RuntimeException.class,() -> PasswordValidator.validar(p));
+    @Test void usuarioInexistenteNoEmiteToken() {
+        when(usuarios.findByCorreoIgnoreCase("nadie@example.com")).thenReturn(Optional.empty());
+        var exception = assertThrows(AutenticacionException.class,
+            () -> service.iniciarSesion(new LoginRequest("nadie@example.com", "Segura123!")));
+        assertEquals(AutenticacionException.Tipo.CREDENCIALES_INVALIDAS, exception.getTipo());
+        verifyNoInteractions(tokens);
     }
 }
