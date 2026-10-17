@@ -1,11 +1,23 @@
 package com.proyecto.servicios.service;
-import com.proyecto.servicios.entity.sf.*;
-import com.proyecto.servicios.model.*;
-import com.proyecto.servicios.repositorys.sf.*;
-import com.proyecto.servicios.service.exception.*;
+
+import com.proyecto.servicios.entity.sf.Cliente;
+import com.proyecto.servicios.entity.sf.Usuario;
+import com.proyecto.servicios.mapper.ClienteMapper;
+import com.proyecto.servicios.models.request.CambioPasswordRequest;
+import com.proyecto.servicios.models.request.UsuarioConsultaRequest;
+import com.proyecto.servicios.models.response.ListaGenericResponse;
+import com.proyecto.servicios.models.response.UsuarioResponse;
+import com.proyecto.servicios.repositorys.sf.ClientesRepository;
+import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
+import com.proyecto.servicios.service.exception.ClienteNoEncontradoException;
+import com.proyecto.servicios.service.exception.CredencialesInvalidasException;
+import com.proyecto.servicios.service.exception.UsuarioInactivoException;
+import com.proyecto.servicios.service.exception.UsuarioNoEncontradoException;
 import com.proyecto.servicios.validation.PasswordValidator;
 import jakarta.persistence.EntityManager;
-import org.springframework.http.HttpStatus;
+import java.util.Locale;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,29 +29,59 @@ public class UsuarioService {
     private final ClientesRepository clientes;
     private final PasswordEncoder encoder;
     private final EntityManager em;
-    
-    public UsuarioService(UsuarioRepository usuarios,ClientesRepository clientes,PasswordEncoder encoder,EntityManager em) {
-        this.usuarios=usuarios; this.clientes=clientes; this.encoder=encoder; this.em=em;
+    private final AutorizacionService autorizacion;
+
+    public UsuarioService(UsuarioRepository usuarios, ClientesRepository clientes, PasswordEncoder encoder,
+            EntityManager em, AutorizacionService autorizacion) {
+        this.usuarios = usuarios;
+        this.clientes = clientes;
+        this.encoder = encoder;
+        this.em = em;
+        this.autorizacion = autorizacion;
     }
-    @Transactional(readOnly=true)
-    public UsuarioResponse obtener(Integer id,Integer solicitante) {
-        autorizar(id,solicitante); return ClienteMapper.usuario(buscar(id));
+
+    @Transactional(readOnly = true)
+    public ListaGenericResponse<UsuarioResponse> consultar(UsuarioConsultaRequest request,
+            Integer usuarioAutenticadoId) {
+        Integer propietarioId = autorizacion.clienteIdParaConsulta(usuarioAutenticadoId);
+        String rfc = request.rfc() == null ? null : request.rfc().trim().toUpperCase(Locale.ROOT);
+        String curp = request.curp() == null ? null : request.curp().trim().toUpperCase(Locale.ROOT);
+        String correo = request.correo() == null ? null : request.correo().trim().toLowerCase(Locale.ROOT);
+        String nombre = request.nombre() == null ? null : "%" + request.nombre().trim().toLowerCase(Locale.ROOT) + "%";
+        var pagina = PageRequest.of(request.pagina(), request.tamanio(), Sort.by("id"));
+        return ListaGenericResponse.desde(usuarios.consultar(rfc, curp, correo,
+                nombre, request.activo(), propietarioId, pagina));
     }
+
+    @Transactional(readOnly = true)
+    public UsuarioResponse obtener(Integer usuarioAutenticadoId) {
+        Usuario usuario = buscar(usuarioAutenticadoId);
+        validarActivo(usuario, usuario.getCliente());
+        return ClienteMapper.usuario(usuario);
+    }
+
     @Transactional
-    public void cambiarPassword(Integer id,Integer solicitante,CambioPasswordRequest r) {
-        autorizar(id,solicitante); PasswordValidator.validar(r.passwordNueva());
-        Usuario u=buscar(id);
-        Cliente c=clientes.bloquearPorId(u.getCliente().getId()).orElseThrow(() -> new ClienteNoEncontradoException());
-        em.refresh(u);
-        if(!c.isActivo() || !u.isActivo()) throw new UsuarioInactivoException();
-        if(!encoder.matches(r.passwordActual(),u.getPasswordHash())) throw new CredencialesInvalidasException();
-        u.setPasswordHash(encoder.encode(r.passwordNueva())); em.flush();
+    public void cambiarPassword(Integer usuarioAutenticadoId, CambioPasswordRequest request) {
+        PasswordValidator.validar(request.passwordNueva());
+        Usuario usuario = buscar(usuarioAutenticadoId);
+        Cliente cliente = clientes.bloquearPorId(usuario.getCliente().getId())
+                .orElseThrow(ClienteNoEncontradoException::new);
+        em.refresh(usuario);
+        validarActivo(usuario, cliente);
+        if (!encoder.matches(request.passwordActual(), usuario.getPasswordHash())) {
+            throw new CredencialesInvalidasException();
+        }
+        usuario.setPasswordHash(encoder.encode(request.passwordNueva()));
+        em.flush();
     }
-    private Usuario buscar(Integer id) {
-        return usuarios.findById(id).orElseThrow(() -> new UsuarioNoEncontradoException());
+
+    private Usuario buscar(Integer usuarioAutenticadoId) {
+        return usuarios.findById(usuarioAutenticadoId).orElseThrow(UsuarioNoEncontradoException::new);
     }
-    private void autorizar(Integer id,Integer solicitante) {
-        if(!id.equals(solicitante)) throw error(HttpStatus.FORBIDDEN,"Solo puedes acceder a tu usuario");
+
+    private void validarActivo(Usuario usuario, Cliente cliente) {
+        if (!usuario.isActivo() || !cliente.isActivo()) {
+            throw new UsuarioInactivoException();
+        }
     }
-    private NegocioException error(HttpStatus s,String m) { return new NegocioException(s,m); }
 }

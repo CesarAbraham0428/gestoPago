@@ -13,13 +13,17 @@ public final class PasswordValidator {
     private PasswordValidator() {}
 
     public static void validar(String password) {
-        if (password == null || password.length() < 8 || password.length() > 72
-            || password.getBytes(StandardCharsets.UTF_8).length > 72
-            || !MAYUSCULA.matcher(password).find()
-            || !MINUSCULA.matcher(password).find()
-            || !NUMERO.matcher(password).find()
-            || !ESPECIAL.matcher(password).find()) {
+        if (!esValida(password)) {
             throw new PasswordInvalidaException();
         }
+    }
+
+    public static boolean esValida(String password) {
+        return password != null && password.length() >= 8 && password.length() <= 72
+                && password.getBytes(StandardCharsets.UTF_8).length <= 72
+                && MAYUSCULA.matcher(password).find()
+                && MINUSCULA.matcher(password).find()
+                && NUMERO.matcher(password).find()
+                && ESPECIAL.matcher(password).find();
     }
 }

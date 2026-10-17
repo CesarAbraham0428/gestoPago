@@ -1,6 +1,6 @@
 package com.proyecto.servicios.client;
 
-import com.proyecto.servicios.model.gestopago.GestoPagoCatalogResponse;
+import com.proyecto.servicios.models.response.gestopago.GestoPagoCatalogResponse;
 import feign.FeignException;
 import feign.Response;
 import jakarta.xml.bind.JAXBContext;

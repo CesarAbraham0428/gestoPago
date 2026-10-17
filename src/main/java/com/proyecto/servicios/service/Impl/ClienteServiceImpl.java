@@ -1,21 +1,51 @@
 package com.proyecto.servicios.service.Impl;
-import com.proyecto.servicios.entity.sf.*;
-import com.proyecto.servicios.model.*;
-import com.proyecto.servicios.repositorys.sf.*;
+import com.proyecto.servicios.entity.sf.Cliente;
+import com.proyecto.servicios.entity.sf.Cuenta;
+import com.proyecto.servicios.entity.sf.Domicilio;
+import com.proyecto.servicios.entity.sf.Usuario;
+import com.proyecto.servicios.models.request.ClienteActualizacionPorIdentidadRequest;
+import com.proyecto.servicios.models.request.ClienteActualizacionRequest;
+import com.proyecto.servicios.models.request.ClienteConsultaRequest;
+import com.proyecto.servicios.models.request.ClienteIdentificacionRequest;
+import com.proyecto.servicios.models.request.ClienteRequest;
+import com.proyecto.servicios.models.request.DomicilioRequest;
+import com.proyecto.servicios.models.response.ClienteResponse;
+import com.proyecto.servicios.models.response.ListaGenericResponse;
+import com.proyecto.servicios.mapper.ClienteMapper;
+import com.proyecto.servicios.repositorys.sf.ClientesRepository;
+import com.proyecto.servicios.repositorys.sf.CuentaRepository;
+import com.proyecto.servicios.repositorys.sf.DomicilioRepository;
+import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import com.proyecto.servicios.service.ClienteService;
-import com.proyecto.servicios.service.exception.*;
+import com.proyecto.servicios.service.AutorizacionService;
+import com.proyecto.servicios.service.exception.ClienteNoEncontradoException;
+import com.proyecto.servicios.service.exception.CorreoDuplicadoException;
+import com.proyecto.servicios.service.exception.CurpDuplicadaException;
+import com.proyecto.servicios.service.exception.NegocioException;
+import com.proyecto.servicios.service.exception.RfcDuplicadoException;
+import com.proyecto.servicios.service.exception.UsuarioNoEncontradoException;
+import com.proyecto.servicios.service.exception.ValidacionException;
 import com.proyecto.servicios.validation.PasswordValidator;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
-import java.time.*;
-import java.util.*;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly=true)
@@ -30,13 +60,16 @@ public class ClienteServiceImpl implements ClienteService {
     private final EntityManager em;
     private final com.fasterxml.jackson.databind.ObjectMapper mapper;
     private final jakarta.validation.Validator validator;
+    private final AutorizacionService autorizacion;
 
     public ClienteServiceImpl(ClientesRepository clientes, DomicilioRepository domicilios,
         CuentaRepository cuentas, UsuarioRepository usuarios, PasswordEncoder encoder, EntityManager em,
-        com.fasterxml.jackson.databind.ObjectMapper mapper, jakarta.validation.Validator validator) {
+        com.fasterxml.jackson.databind.ObjectMapper mapper, jakarta.validation.Validator validator,
+        AutorizacionService autorizacion) {
         this.clientes=clientes; this.domicilios=domicilios; this.cuentas=cuentas;
         this.usuarios=usuarios; this.encoder=encoder; this.em=em;
         this.mapper=mapper; this.validator=validator;
+        this.autorizacion = autorizacion;
     }
     @Override @Transactional
     public ClienteResponse registrar(ClienteRequest r) {
@@ -69,38 +102,75 @@ public class ClienteServiceImpl implements ClienteService {
         return ClienteMapper.cliente(c, d, u, List.of(cuenta));
     }
 
-    @Override public ClienteResponse obtener(Integer id) { return respuesta(buscar(id)); }
     @Override
-    public Page<?> consultar(Integer id, String curp,String rfc,String correo,String numeroCuenta,
-        Boolean activo,LocalDate desde,LocalDate hasta,int pagina,int tamanio) {
-        if (pagina<0 || tamanio<1 || tamanio>100) invalido("Página inválida; tamaño permitido: 1 a 100");
-        if (desde!=null && hasta!=null && desde.isAfter(hasta)) invalido("Rango de fechas inválido");
-        Integer cuentaCliente = numeroCuenta==null ? null : cuentas.findClienteIdByNumeroCuenta(numeroCuenta.trim())
-            .orElseThrow(CuentaNoEncontradaException::new);
-        Specification<Cliente> filtrosConsulta = (c,q,cb) -> {
-            List<Predicate> filtros=new ArrayList<>();
-            if(id!=null) filtros.add(cb.equal(c.get("id"),id));
-            if(curp!=null) filtros.add(cb.equal(c.get("curp"),curp.trim().toUpperCase(Locale.ROOT)));
-            if(rfc!=null) filtros.add(cb.equal(c.get("rfc"),rfc.trim().toUpperCase(Locale.ROOT)));
-            if(correo!=null) filtros.add(cb.equal(cb.lower(c.get("correoElectronico")),normalizarCorreo(correo)));
-            if(cuentaCliente!=null) filtros.add(cb.equal(c.get("id"),cuentaCliente));
-            if(activo!=null) filtros.add(cb.equal(c.get("activo"),activo));
-            if(desde!=null) filtros.add(cb.greaterThanOrEqualTo(c.get("fechaCreacion"),desde.atStartOfDay(ZONA).toInstant()));
-            if(hasta!=null) filtros.add(cb.lessThan(c.get("fechaCreacion"),hasta.plusDays(1).atStartOfDay(ZONA).toInstant()));
-            return cb.and(filtros.toArray(Predicate[]::new));
+    public ListaGenericResponse<ClienteResponse> consultar(ClienteConsultaRequest request,
+            Integer usuarioAutenticadoId) {
+        validarEntrada(request);
+        Integer propietarioId = autorizacion.clienteIdParaConsulta(usuarioAutenticadoId);
+        Specification<Cliente> filtrosConsulta = (cliente, consulta, builder) -> {
+            List<Predicate> filtros = new ArrayList<>();
+            if (propietarioId != null) filtros.add(builder.equal(cliente.get("id"), propietarioId));
+            if (request.getRfc() != null) {
+                filtros.add(builder.equal(builder.upper(cliente.get("rfc")), normalizarIdentidad(request.getRfc())));
+            }
+            if (request.getCurp() != null) {
+                filtros.add(builder.equal(builder.upper(cliente.get("curp")), normalizarIdentidad(request.getCurp())));
+            }
+            if (request.getNombre() != null) {
+                String nombre = "%" + request.getNombre().trim().toLowerCase(Locale.ROOT) + "%";
+                filtros.add(builder.or(
+                        builder.like(builder.lower(cliente.get("primerNombre")), nombre),
+                        builder.like(builder.lower(cliente.get("segundoNombre")), nombre),
+                        builder.like(builder.lower(cliente.get("apellidoPaterno")), nombre),
+                        builder.like(builder.lower(cliente.get("apellidoMaterno")), nombre)));
+            }
+            if (request.getCorreo() != null) {
+                filtros.add(builder.equal(builder.lower(cliente.get("correoElectronico")),
+                        normalizarCorreo(request.getCorreo())));
+            }
+            if (request.getNumeroCuenta() != null) {
+                var cuentasDelCliente = consulta.subquery(Integer.class);
+                var cuenta = cuentasDelCliente.from(Cuenta.class);
+                cuentasDelCliente.select(cuenta.get("cliente").get("id"))
+                        .where(builder.equal(cuenta.get("numeroCuenta"), request.getNumeroCuenta()));
+                filtros.add(cliente.get("id").in(cuentasDelCliente));
+            }
+            if (request.getActivo() != null) filtros.add(builder.equal(cliente.get("activo"), request.getActivo()));
+            if (request.getDesde() != null) {
+                filtros.add(builder.greaterThanOrEqualTo(cliente.get("fechaCreacion"),
+                        request.getDesde().atStartOfDay(ZONA).toInstant()));
+            }
+            if (request.getHasta() != null) {
+                filtros.add(builder.lessThan(cliente.get("fechaCreacion"),
+                        request.getHasta().plusDays(1).atStartOfDay(ZONA).toInstant()));
+            }
+            return builder.and(filtros.toArray(Predicate[]::new));
         };
-        if (id != null || curp != null || rfc != null || correo != null || numeroCuenta != null
-            || activo != null || desde != null || hasta != null) {
-            Page<Cliente> resultado = clientes.findAll(filtrosConsulta,
-                PageRequest.of(pagina, tamanio, Sort.by("id")));
-            if (resultado.getTotalElements() == 0) throw new ClienteNoEncontradoException();
-            return respuestas(resultado);
+        Pageable pageable = PageRequest.of(request.getPagina(), request.getTamanio(), Sort.by("id"));
+        Page<Cliente> pagina = clientes.findAll(filtrosConsulta, pageable);
+        if (pagina.isEmpty()) {
+            return ListaGenericResponse.desde(pagina.map(this::respuesta));
         }
-        return clientes.findBy(filtrosConsulta, query -> query.as(ClienteResumenProjection.class)
-            .page(PageRequest.of(pagina, tamanio, Sort.by("id"))))
-            .map(c -> new ClienteResumenResponse(c.getId(), c.getPrimerNombre(), c.getSegundoNombre(),
-                c.getApellidoPaterno(), c.getApellidoMaterno(), c.isActivo(), c.getFechaCreacion()));
+        // Cargar las relaciones de toda la página evita consultas adicionales por cada cliente.
+        List<Integer> ids = pagina.stream().map(Cliente::getId).toList();
+        var domiciliosPorCliente = domicilios.findByClienteIdIn(ids).stream()
+                .collect(Collectors.toMap(d -> d.getCliente().getId(), Function.identity()));
+        var usuariosPorCliente = usuarios.findByClienteIdIn(ids).stream()
+                .collect(Collectors.toMap(u -> u.getCliente().getId(), Function.identity()));
+        var cuentasPorCliente = cuentas.findByClienteIdInOrderByIdAsc(ids).stream()
+                .collect(Collectors.groupingBy(c -> c.getCliente().getId()));
+        Page<ClienteResponse> resultado = pagina.map(cliente -> {
+            Domicilio domicilio = domiciliosPorCliente.get(cliente.getId());
+            if (domicilio == null) throw error(HttpStatus.NOT_FOUND, "Domicilio no encontrado");
+            Usuario usuario = usuariosPorCliente.get(cliente.getId());
+            if (usuario == null) throw new UsuarioNoEncontradoException();
+            return ClienteMapper.cliente(cliente, domicilio, usuario,
+                    cuentasPorCliente.getOrDefault(cliente.getId(), List.of()));
+        });
+        return ListaGenericResponse.desde(resultado);
     }
+
+
     private ClienteResponse aplicarActualizacion(Cliente c, ClienteActualizacionRequest r) {
         Integer id = c.getId();
         validarEdad(r.fechaNacimiento());
@@ -116,11 +186,17 @@ public class ClienteServiceImpl implements ClienteService {
         Domicilio d=domicilios.findByClienteId(id).orElseThrow(() -> error(HttpStatus.NOT_FOUND,"Domicilio no encontrado"));
         aplicarDomicilio(d,r.domicilio());
         // El trigger sincroniza el correo del usuario. Vaciar el contexto evita datos obsoletos.
-        em.flush(); em.clear(); return obtener(id);
+        em.flush(); em.clear(); return respuesta(buscar(id));
     }
     @Override @Transactional
-    public ClienteResponse actualizarParcial(Integer id, com.fasterxml.jackson.databind.JsonNode cambios) {
+    public ClienteResponse actualizarParcial(ClienteActualizacionPorIdentidadRequest request,
+            Integer usuarioAutenticadoId) {
+        validarEntrada(request);
+        com.fasterxml.jackson.databind.JsonNode cambios = request.cambios();
         if (cambios == null || !cambios.isObject()) invalido("PATCH requiere un objeto JSON");
+        Cliente identificado = buscar(request.identificacion());
+        autorizacion.autorizarCliente(identificado.getId(), usuarioAutenticadoId);
+        Integer id = identificado.getId();
         Cliente c = bloquear(id);
         Domicilio d = domicilios.findByClienteId(id)
             .orElseThrow(() -> error(HttpStatus.NOT_FOUND, "Domicilio no encontrado"));
@@ -134,13 +210,9 @@ public class ClienteServiceImpl implements ClienteService {
         com.fasterxml.jackson.databind.node.ObjectNode combinado = mapper.valueToTree(actual);
         combinar(combinado, cambios, "");
         try {
-            ClienteActualizacionRequest request = mapper.treeToValue(combinado, ClienteActualizacionRequest.class);
-            var errores = validator.validate(request);
-            if (!errores.isEmpty()) {
-                var primero = errores.iterator().next();
-                invalido(primero.getPropertyPath() + ": " + primero.getMessage());
-            }
-            return aplicarActualizacion(c, request);
+            ClienteActualizacionRequest actualizacion = mapper.treeToValue(combinado, ClienteActualizacionRequest.class);
+            validarEntrada(actualizacion);
+            return aplicarActualizacion(c, actualizacion);
         } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
             throw new ValidacionException("Solicitud inválida: revisa los tipos y valores de los campos");
         }
@@ -161,8 +233,12 @@ public class ClienteServiceImpl implements ClienteService {
     }
 
     @Override @Transactional
-    public void desactivar(Integer id) {
-        Cliente c=bloquear(id); c.setActivo(false);
+    public void desactivar(ClienteIdentificacionRequest request, Integer usuarioAutenticadoId) {
+        validarEntrada(request);
+        Cliente identificado = buscar(request);
+        autorizacion.autorizarCliente(identificado.getId(), usuarioAutenticadoId);
+        Cliente c = bloquear(identificado.getId());
+        c.setActivo(false);
         // Los triggers desactivan usuario y cuentas en esta misma transacción.
         em.flush(); em.clear();
     }
@@ -170,30 +246,37 @@ public class ClienteServiceImpl implements ClienteService {
         return clientes.findById(id).orElseThrow(() -> new ClienteNoEncontradoException());
     }
     private Cliente bloquear(Integer id) {
-        return clientes.bloquearPorId(id).orElseThrow(() -> new ClienteNoEncontradoException());
+        Cliente cliente = clientes.bloquearPorId(id).orElseThrow(ClienteNoEncontradoException::new);
+        // La búsqueda por identidad puede haber cargado la entidad antes de esperar el bloqueo.
+        em.refresh(cliente);
+        return cliente;
+    }
+    private Cliente buscar(ClienteIdentificacionRequest request) {
+        Optional<Cliente> encontrado;
+        if (request.rfc() != null && request.curp() != null) {
+            encontrado = clientes.findByRfcIgnoreCaseAndCurpIgnoreCase(
+                    normalizarIdentidad(request.rfc()), normalizarIdentidad(request.curp()));
+        } else if (request.rfc() != null) {
+            encontrado = clientes.findByRfcIgnoreCase(normalizarIdentidad(request.rfc()));
+        } else {
+            encontrado = clientes.findByCurpIgnoreCase(normalizarIdentidad(request.curp()));
+        }
+        return encontrado.orElseThrow(ClienteNoEncontradoException::new);
+    }
+
+    private void validarEntrada(Object request) {
+        if (request == null) throw new ValidacionException("La solicitud es obligatoria");
+        var errores = validator.validate(request);
+        if (!errores.isEmpty()) throw new jakarta.validation.ConstraintViolationException(errores);
+    }
+
+    private static String normalizarIdentidad(String identidad) {
+        return identidad.trim().toUpperCase(Locale.ROOT);
     }
     private ClienteResponse respuesta(Cliente c) {
         Domicilio d=domicilios.findByClienteId(c.getId()).orElseThrow(() -> error(HttpStatus.NOT_FOUND,"Domicilio no encontrado"));
         Usuario u=usuarios.findByClienteId(c.getId()).orElseThrow(UsuarioNoEncontradoException::new);
         return ClienteMapper.cliente(c, d, u, cuentas.findByClienteIdOrderByIdAsc(c.getId()));
-    }
-    private Page<ClienteResponse> respuestas(Page<Cliente> pagina) {
-        if (pagina.isEmpty()) return pagina.map(this::respuesta);
-        List<Integer> ids = pagina.map(Cliente::getId).getContent();
-        Map<Integer,Domicilio> direcciones = new HashMap<>();
-        domicilios.findByClienteIdIn(ids).forEach(d -> direcciones.put(d.getCliente().getId(), d));
-        Map<Integer,Usuario> accesos = new HashMap<>();
-        usuarios.findByClienteIdIn(ids).forEach(u -> accesos.put(u.getCliente().getId(), u));
-        Map<Integer,List<Cuenta>> cuentasPorCliente = new HashMap<>();
-        cuentas.findByClienteIdInOrderByIdAsc(ids).forEach(c ->
-            cuentasPorCliente.computeIfAbsent(c.getCliente().getId(), id -> new ArrayList<>()).add(c));
-        return pagina.map(c -> {
-            Domicilio d = direcciones.get(c.getId());
-            Usuario u = accesos.get(c.getId());
-            if (d == null) throw error(HttpStatus.NOT_FOUND, "Domicilio no encontrado");
-            if (u == null) throw new UsuarioNoEncontradoException();
-            return ClienteMapper.cliente(c, d, u, cuentasPorCliente.getOrDefault(c.getId(), List.of()));
-        });
     }
     private void aplicarDomicilio(Domicilio d,DomicilioRequest r) {
         d.setCalle(r.calle().trim()); d.setNumeroExterior(r.numeroExterior().trim());
