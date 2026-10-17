@@ -1,7 +1,7 @@
 package com.proyecto.servicios.service;
 
-import com.proyecto.servicios.model.CatalogoProductosResponse;
-import com.proyecto.servicios.model.ProductoResponse;
+import com.proyecto.servicios.models.response.CatalogoProductosResponse;
+import com.proyecto.servicios.models.response.ProductoResponse;
 
 import java.util.List;
 

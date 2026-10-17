@@ -1,6 +1,7 @@
 package com.proyecto.servicios.service.Impl;
 import com.proyecto.servicios.entity.sf.*;
-import com.proyecto.servicios.model.*;
+import com.proyecto.servicios.models.request.LoginRequest;
+import com.proyecto.servicios.models.response.AuthResponse;
 import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import com.proyecto.servicios.security.JwtTokenService;
 import com.proyecto.servicios.service.AutenticacionService;

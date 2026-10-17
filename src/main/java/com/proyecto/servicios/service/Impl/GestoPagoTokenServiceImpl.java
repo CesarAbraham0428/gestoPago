@@ -4,7 +4,7 @@ import com.proyecto.servicios.client.GestoPagoAuthException;
 import com.proyecto.servicios.client.GestoPagoAuthClient;
 import com.proyecto.servicios.entity.gestopago.GestoPagoToken;
 import com.proyecto.servicios.mapper.GestoPagoTokenMapper;
-import com.proyecto.servicios.model.gestopago.GestoPagoAuthResponse;
+import com.proyecto.servicios.models.response.gestopago.GestoPagoAuthResponse;
 import com.proyecto.servicios.repositorys.gestopago.GestoPagoTokenRepository;
 import com.proyecto.servicios.service.GestoPagoTokenService;
 import feign.FeignException;

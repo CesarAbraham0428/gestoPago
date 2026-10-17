@@ -7,9 +7,9 @@ import com.proyecto.servicios.client.GestoPagoCatalogClient;
 import com.proyecto.servicios.client.GestoPagoCatalogException;
 import com.proyecto.servicios.entity.gestopago.GestoPagoToken;
 import com.proyecto.servicios.mapper.ProductoMapper;
-import com.proyecto.servicios.model.CatalogoProductosResponse;
-import com.proyecto.servicios.model.ProductoResponse;
-import com.proyecto.servicios.model.gestopago.GestoPagoCatalogResponse;
+import com.proyecto.servicios.models.response.CatalogoProductosResponse;
+import com.proyecto.servicios.models.response.ProductoResponse;
+import com.proyecto.servicios.models.response.gestopago.GestoPagoCatalogResponse;
 import com.proyecto.servicios.service.CatalogoProductosPersistenceService;
 import com.proyecto.servicios.service.CatalogoProductosPersistenceService.ResultadoActualizacion;
 import com.proyecto.servicios.service.GestoPagoTokenService;
@@ -71,7 +71,14 @@ public class ProductoServiceImpl implements ProductoService {
         long startedAt = System.nanoTime();
         log.info("Inicia resolución del catálogo para la petición del cliente");
         try {
-            return obtenerProductosInterno();
+            CatalogoProductosResponse respuesta = obtenerProductosInterno();
+            if (Integer.valueOf(1).equals(respuesta.getCodigo())) {
+                throw new GestoPagoCatalogException("No fue posible obtener un catálogo válido del proveedor");
+            }
+            if (Integer.valueOf(2).equals(respuesta.getCodigo())) {
+                throw new CatalogoPersistenciaException("No fue posible recuperar o guardar el catálogo");
+            }
+            return respuesta;
         } finally {
             log.info("Finaliza resolución del catálogo para la petición del cliente: duraciónMs={}",
                     duracionMs(startedAt));

@@ -1,6 +1,6 @@
 package com.proyecto.servicios.client;
 
-import com.proyecto.servicios.model.gestopago.GestoPagoAuthResponse;
+import com.proyecto.servicios.models.response.gestopago.GestoPagoAuthResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;

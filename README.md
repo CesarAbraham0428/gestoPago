@@ -8,7 +8,7 @@ El registro valida los datos y guarda **cliente, domicilio, cuenta bancaria y us
 
 La aplicación separa controladores REST, servicios de negocio y repositorios JPA. PostgreSQL almacena las tablas `clientes` (datos personales, de contacto y laborales), `domicilios` (dirección), `cuentas` (número, saldo y estado) y `usuarios` (correo y hash de contraseña). Flyway administra el esquema; las restricciones y los triggers refuerzan la unicidad, la integridad y la baja lógica.
 
-Las contraseñas se almacenan como **hash BCrypt**, nunca en texto plano. El login verifica las credenciales y que usuario y cliente estén activos antes de emitir un JWT. Los servicios protegidos requieren `Authorization: Bearer <token>`; la consulta y el cambio de contraseña de un usuario solo se permiten a su propietario.
+Las contraseñas se almacenan como **hash BCrypt**, nunca en texto plano. El login verifica las credenciales y que usuario y cliente estén activos antes de emitir un JWT. Los servicios protegidos requieren `Authorization: Bearer <token>`; las operaciones de usuario se limitan al propietario y las de clientes/cuentas verifican propietario o administrador.
 
 El catálogo se consulta en el orden Redis → PostgreSQL → GestoPago. Los datos obtenidos de GestoPago se guardan en PostgreSQL y después en Redis. Una tarea diaria sincroniza el catálogo y otra revisa la renovación del token de GestoPago, que es distinto del JWT de acceso a esta API. La sincronización reemplaza el catálogo si no existe uno previo o si el nuevo contiene más productos.
 
@@ -31,45 +31,121 @@ URL local predeterminada: `http://localhost:8080`. El registro y el login son p�
 
 | Método | Ruta | Función |
 | --- | --- | --- |
-| POST | `/clientes` | Registrar cliente, domicilio, cuenta y usuario; incluye `password` en el cuerpo. |
-| POST | `/auth/login` | Iniciar sesión con `correo` y `password`; devuelve el token JWT. |
-| GET | `/clientes` | Listar clientes o buscar mediante filtros. |
-| GET | `/clientes/{id}` | Consultar el detalle de un cliente por ID. |
-| PATCH | `/clientes/{id}` | Actualizar solo los campos enviados, incluido el domicilio. |
-| DELETE | `/clientes/{id}` | Dar de baja lógica al cliente, sus cuentas y su usuario. |
-| GET | `/cuentas` | Listar cuentas o buscar mediante filtros. |
-| GET | `/cuentas/id/{id}` | Consultar una cuenta por su ID interno. |
-| GET | `/cuentas/{numeroCuenta}` | Consultar una cuenta por su número. |
-| GET | `/cuentas/{numeroCuenta}/saldo` | Consultar el saldo disponible. |
-| PUT | `/cuentas/{numeroCuenta}/estado` | Activar o desactivar con `{"activa": true}` o `{"activa": false}`. |
-| DELETE | `/cuentas/{numeroCuenta}` | Desactivar la cuenta mediante baja lógica. |
-| GET | `/usuarios/{id}` | Consultar el propio usuario. |
-| PUT | `/usuarios/{id}/password` | Cambiar la propia contraseña con `passwordActual` y `passwordNueva`. |
+| POST | `/clientes` | Registrar cliente, domicilio, cuenta y usuario. |
+| POST | `/auth/login` | Iniciar sesión con `correo` y `password`. |
+| POST | `/clientes/consultar` | Consultar clientes completos con filtros en un request JSON. |
+| PATCH | `/clientes` | Identificar por RFC/CURP y modificar solo los campos enviados. |
+| POST | `/clientes/desactivar` | Dar de baja lógica mediante RFC o CURP. |
+| POST | `/cuentas/consultar` | Consultar cuentas completas con filtros JSON. |
+| PATCH | `/cuentas/estado` | Activar/desactivar con `numeroCuenta` y `activa`. |
+| GET | `/usuarios/me` | Consultar el usuario autenticado. |
+| POST | `/usuarios/consultar` | Consultar usuarios mediante filtros combinables en JSON. |
+| PUT | `/usuarios/me/password` | Cambiar su contraseña con `passwordActual` y `passwordNueva`. |
 | GET | `/productos` | Consultar el catálogo de GestoPago. |
 
-**Filtros de clientes:** `id`, `curp`, `rfc`, `correo`, `numeroCuenta`, `activo`, `desde` y `hasta`. Se pueden combinar; las fechas usan `YYYY-MM-DD` y filtran la fecha de registro, incluyendo ambos días en la zona `America/Mexico_City`.
+Los controladores no utilizan `@PathVariable`, `@RequestParam` ni `@ModelAttribute`: todas las entradas y criterios se reciben mediante Request DTO con `@Valid @RequestBody`. Cada recurso tiene un único endpoint de búsqueda con filtros combinables. RFC, CURP y número de cuenta identifican el recurso, pero no conceden acceso: `AutorizacionService` consulta el usuario y el rol reales en la base. Un cliente solo puede acceder a sus propios datos, usuario y cuentas; un administrador activo puede administrar otros clientes. Las listas aplican el permiso antes de paginar y contar. La consulta y contraseña de `/usuarios/me` siempre corresponden al usuario autenticado, incluso para administradores.
 
-```http
-GET /clientes?curp=VALOR_CURP
-GET /clientes?rfc=VALOR_RFC
-GET /clientes?correo=cliente%40ejemplo.com
-GET /clientes?numeroCuenta=000000000000000001
-GET /clientes?activo=true
-GET /clientes?desde=2026-10-01&hasta=2026-10-09
+**Filtros de clientes:** `rfc`, `curp`, `nombre`, `correo`, `numeroCuenta`, `activo`, `desde`, `hasta`, `pagina` y `tamanio`. Los filtros presentes se combinan con AND; nombre busca una coincidencia parcial en nombres o apellidos. RFC y CURP se comparan completos sin distinguir mayúsculas. Las fechas usan `YYYY-MM-DD`, años de 1 a 9999 y filtran la fecha de registro incluyendo ambos días en `America/Mexico_City`. No se admite filtrar por `id`.
+
+```json
+{
+  "nombre": "Ana",
+  "pagina": 0,
+  "tamanio": 20
+}
 ```
 
-**Filtros de cuentas:** `id`, `saldo` (coincidencia exacta) y `activo`; también se admite `activa` como alias de `activo`. Por ejemplo: `GET /cuentas?activo=true`.
+Envíalo a `POST /clientes/consultar` con JWT y `Content-Type: application/json`. Se retiró `GET /clientes`; los filtros se envían exclusivamente en el cuerpo JSON.
 
-Ambos listados aceptan `pagina` (desde 0, por defecto 0) y `tamanio` (por defecto 20, de 1 a 100). Los resultados están en `content`: los listados sin filtros devuelven resúmenes y las búsquedas con filtros devuelven información completa. Una búsqueda filtrada sin coincidencias devuelve `404`.
+**Filtros de cuentas:** `activo`, `saldo` (coincidencia exacta), `numeroCuenta`, `pagina` y `tamanio`. La página inicia en cero y el tamaño admitido es de 1 a 100. Un filtro sin coincidencias devuelve una lista vacía con HTTP 200.
 
-Swagger y la especificación OpenAPI son públicos y permiten consultar los cuerpos y respuestas:
+**Filtros de usuarios:** `rfc`, `curp`, `correo`, `nombre`, `activo`, `pagina` y `tamanio`. Se envían a `POST /usuarios/consultar`. Los filtros se combinan con AND; `nombre` busca coincidencias parciales en nombres o apellidos. RFC y CURP corresponden al cliente asociado; ambos y el correo se comparan completos sin distinguir mayúsculas. Un usuario normal solo obtiene su propio registro, incluso al buscar por los datos de otro cliente. Los administradores pueden consultar todos los registros, incluidos los inactivos. Nunca se devuelve el hash de contraseña. Los filtros `id` y `clienteId` se rechazan con HTTP 400; los IDs se conservan internamente para relaciones y autorización.
 
-- [Swagger UI](http://localhost:8080/swagger-ui/index.html)
-- [OpenAPI](http://localhost:8080/v3/api-docs)
+```json
+{
+  "rfc": "PERA900101AB1",
+  "curp": "PERA900101MDFRZN01",
+  "correo": "ana@example.com",
+  "nombre": "Ana",
+  "activo": true,
+  "pagina": 0,
+  "tamanio": 20
+}
+```
+
+Las listas mantienen un contrato uniforme y conservan la paginación. Cada cliente devuelve identidad, contacto, información laboral, rol, estado, fechas, domicilio, cuentas completas y usuario sin credenciales. Cada cuenta incluye `id`, `clienteId`, `numeroCuenta`, `saldo`, `estaActiva`, `fechaCreacion` y `fechaActualizacion`. Las búsquedas siguen limitadas a los datos autorizados para el usuario autenticado; un administrador puede consultar todos los clientes y cuentas. Los hashes de contraseña nunca se devuelven.
+
+Ejemplo de la estructura de una lista:
+
+```json
+{
+  "codigo": 0,
+  "mensaje": "Consulta de usuarios realizada",
+  "datos": {
+    "datos": [],
+    "pagina": 0,
+    "tamanoPagina": 20,
+    "totalElementos": 0,
+    "totalPaginas": 0
+  }
+}
+```
+
+Para consultar un cliente específico, envía `{"rfc":"PERA900101AB1"}` o `{"curp":"PERA900101MDFRZN01"}` a `POST /clientes/consultar`. Para consultar una cuenta específica, envía `{"numeroCuenta":"000000000000000001"}` a `POST /cuentas/consultar`. Ambos devuelven una lista paginada con los datos completos; si no hay coincidencias, devuelven una lista vacía con HTTP 200.
+
+Para desactivar un cliente, envía RFC o CURP a `POST /clientes/desactivar`. Debe existir al menos un identificador; si envías ambos, tienen que corresponder al mismo cliente. Esta operación devuelve HTTP 404 si no existe.
+
+La actualización parcial usa un request que separa identificación y cambios:
+
+```json
+{
+  "identificacion": {"rfc": "PERA900101AB1"},
+  "cambios": {
+    "empresa": "Nueva empresa",
+    "telefonoMovil": "5598765432",
+    "domicilio": {"calle": "Insurgentes"}
+  }
+}
+```
+
+Envíalo a `PATCH /clientes`. Los campos omitidos conservan su valor; `null` explícito limpia un campo opcional y se rechaza para los obligatorios. RFC, CURP, rol, estado, contraseña y cuentas no se pueden cambiar por este endpoint. La actualización conserva el bloqueo del cliente y valida el resultado completo antes de modificar entidades.
+
+El saldo se obtiene dentro de cada cuenta devuelta por `POST /cuentas/consultar`; puedes filtrar por `numeroCuenta`. Para cambiar su estado, envía `{"numeroCuenta":"000000000000000001","activa":false}` a `PATCH /cuentas/estado`. Un cliente no puede consultar, activar ni desactivar cuentas ajenas.
+
+## Organización de DTO y errores
+
+Los DTO de entrada están en `models/request`; los de salida en `models/response`, incluidos los DTO de integración en `models/response/gestopago`. `ClienteMapper` pertenece a `mapper`; las entidades JPA permanecen en `entity/sf`.
+
+`controller/advice/GlobalExceptionHandler.java` es el único manejador MVC con `@RestControllerAdvice` y métodos específicos con `@ExceptionHandler`. Centraliza errores de Bean Validation (`MethodArgumentNotValidException`, `ConstraintViolationException` y validación de parámetros), JSON, tipos, métodos HTTP, rutas, permisos, reglas de negocio y persistencia. Reemplaza los dos advice anteriores y reutiliza los estados y encabezados HTTP de Spring, incluido `Allow` para HTTP 405. Los controladores solo delegan en servicios y construyen respuestas; no contienen validaciones manuales ni bloques `try-catch`. Los repositorios Spring Data JPA consultan y persisten las entidades; los controladores reciben y devuelven DTO.
+
+`GenericResponse<T>` define dos formas del contrato público: los éxitos contienen únicamente `codigo`, `mensaje` y `datos`; los fallos contienen únicamente `codigo` y `mensaje`. Se conserva `codigo` numérico (0 en éxitos y 1 en errores). Los errores omiten `datos` y no existe una propiedad pública `errores`. Las validaciones describen los campos incorrectos dentro de `mensaje`, sin incluir los valores rechazados. El login devuelve el token dentro de `datos`; el saldo forma parte de cada cuenta en `datos.datos`. Desactivar un cliente y cambiar una contraseña devuelven HTTP 200 con mensaje de confirmación y `datos: null`; el registro devuelve HTTP 201. Los consumidores deben leer los resultados exitosos dentro de `datos`.
+
+`ApiSecurityErrorWriter` aplica el mismo contrato a los errores de autenticación y autorización que ocurren en los filtros, antes de MVC. Los códigos internos de recuperación del catálogo se procesan en el servicio; el contrato público del catálogo solo incluye `total` y `productos` dentro de `datos`.
+
+Los endpoints declaran JSON como formato de salida. Si `Accept` exige un formato no admitido, la API devuelve HTTP 406 antes de ejecutar la operación. El manejador global fija `Content-Type: application/json` también en los errores, conservando su estado y encabezados, para que el cuerpo uniforme pueda serializarse incluso con un `Accept` incompatible.
+
+Los errores usan, por ejemplo, `{"codigo":1,"mensaje":"Correo electrónico duplicado"}` con HTTP 409. Se utiliza HTTP 400 para datos inválidos, 401 para autenticación requerida, 403 para permisos insuficientes y 404 para recursos inexistentes/no disponibles. Las validaciones identifican todos los campos inválidos dentro de `mensaje`, también en DTO anidados y en la actualización parcial:
+
+```json
+{
+  "codigo": 1,
+  "mensaje": "Verifique la información capturada e intente nuevamente. correoElectronico: El correo electrónico no tiene un formato válido.; primerNombre: Es obligatorio y no puede contener solo espacios."
+}
+```
+
+Los errores internos se registran con logging para diagnóstico. Las respuestas al cliente no exponen SQL, nombres de restricciones, contraseñas, trazas ni respuestas del proveedor externo.
+
+Los mensajes generales de Bean Validation se definen una sola vez en `src/main/resources/ValidationMessages.properties`, en español. Las anotaciones conservan los mensajes específicos cuando una regla lo requiere.
+
+Los Request DTO excluyen ID generado, rol, saldo, número de cuenta, estado inicial y fechas de auditoría del registro y de las actualizaciones generales. Los campos desconocidos se rechazan también en DTO anidados. El estado de las cuentas solo cambia mediante la operación autorizada `/cuentas/estado`. `@PasswordSegura` ejecuta las reglas de contraseña mediante Bean Validation al registrar o cambiar una contraseña; reutiliza la misma regla que los servicios.
 
 ## Manejo de errores
 
-Las excepciones personalizadas distinguen cliente ya registrado, CURP/RFC/correo duplicados, cliente o cuenta no encontrados, validaciones y errores de autenticación. El manejador central responde con `codigo` y `mensaje`.
+Las excepciones personalizadas distinguen cliente ya registrado, CURP/RFC/correo duplicados, cliente/cuenta/usuario no encontrados, validaciones y errores de autenticación. El manejador central responde con el contrato `GenericResponse`.
+
+`@ExceptionHandler({ExcepcionA.class, ExcepcionB.class})` permite compartir un manejador entre varias excepciones; la anotación recibe un arreglo de clases. Los errores de JSON y de tipos comparten HTTP 400. Los demás errores HTTP de Spring reutilizan su estado y encabezados mediante `ErrorResponse`, y los errores inesperados y de persistencia comparten el manejador 500 con logging.
+
+Las excepciones de negocio conservan mensajes específicos para correos, RFC y CURP duplicados. Cuando la base de datos detecta directamente una restricción, la respuesta usa un mensaje general controlado: HTTP 400 para restricciones de validación/nulos y 409 para los demás conflictos. No se interpretan nombres internos de restricciones para construir mensajes públicos.
 
 | HTTP | Motivo |
 | --- | --- |
@@ -78,6 +154,7 @@ Las excepciones personalizadas distinguen cliente ya registrado, CURP/RFC/correo
 | 403 | Usuario o cliente inactivo en el login, o acceso a otro usuario. |
 | 404 | Cliente, cuenta o usuario no encontrado. |
 | 409 | Registro duplicado o conflicto con el estado del cliente. |
+| 405 / 406 / 415 | Método HTTP, formato de respuesta o tipo de contenido no admitido. |
 | 500 | Error interno o de persistencia. |
 | 502 | Error al comunicarse con GestoPago. |
 

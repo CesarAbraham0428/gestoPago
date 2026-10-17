@@ -2,7 +2,7 @@ package com.proyecto.servicios.cache;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.proyecto.servicios.model.CatalogoProductosResponse;
+import com.proyecto.servicios.models.response.CatalogoProductosResponse;
 import com.proyecto.servicios.validation.CatalogoProductosValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

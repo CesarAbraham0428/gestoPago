@@ -1,8 +1,8 @@
 package com.proyecto.servicios.cache;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.proyecto.servicios.model.CatalogoProductosResponse;
-import com.proyecto.servicios.model.ProductoResponse;
+import com.proyecto.servicios.models.response.CatalogoProductosResponse;
+import com.proyecto.servicios.models.response.ProductoResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

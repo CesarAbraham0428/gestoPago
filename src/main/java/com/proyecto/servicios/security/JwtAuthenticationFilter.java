@@ -3,7 +3,9 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
-import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
+import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.TransactionException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -13,8 +15,9 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenService tokens;
     private final UsuarioRepository usuarios;
-    public JwtAuthenticationFilter(JwtTokenService tokens,UsuarioRepository usuarios) {
-        this.tokens=tokens; this.usuarios=usuarios;
+    private final ApiSecurityErrorWriter errores;
+    public JwtAuthenticationFilter(JwtTokenService tokens,UsuarioRepository usuarios, ApiSecurityErrorWriter errores) {
+        this.tokens=tokens; this.usuarios=usuarios; this.errores=errores;
     }
     @Override protected boolean shouldNotFilter(HttpServletRequest request) {
         return "POST".equals(request.getMethod()) &&
@@ -33,13 +36,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     id.toString(),null,List.of(new SimpleGrantedAuthority("ROLE_USER"))));
             } catch(JWTVerificationException | IllegalArgumentException ex) {
                 rechazar(response,"Token inválido o vencido"); return;
+            } catch (DataAccessException | TransactionException ex) {
+                SecurityContextHolder.clearContext();
+                errores.escribir(response, HttpStatus.INTERNAL_SERVER_ERROR,
+                        "No fue posible verificar la sesión; intenta nuevamente");
+                return;
             }
         }
         chain.doFilter(request,response);
     }
     private void rechazar(HttpServletResponse response,String mensaje) throws IOException {
-        SecurityContextHolder.clearContext(); response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE); response.setCharacterEncoding("UTF-8");
-        response.getWriter().write("{\"codigo\":1,\"mensaje\":\""+mensaje+"\"}");
+        SecurityContextHolder.clearContext();
+        errores.escribir(response, HttpStatus.UNAUTHORIZED, mensaje);
     }
 }

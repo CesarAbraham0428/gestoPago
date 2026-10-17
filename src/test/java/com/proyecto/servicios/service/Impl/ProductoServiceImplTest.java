@@ -6,11 +6,11 @@ import com.proyecto.servicios.client.GestoPagoCatalogException;
 import com.proyecto.servicios.entity.gestopago.Producto;
 import com.proyecto.servicios.entity.gestopago.GestoPagoToken;
 import com.proyecto.servicios.mapper.ProductoMapper;
-import com.proyecto.servicios.model.CatalogoProductosResponse;
-import com.proyecto.servicios.model.ProductoResponse;
-import com.proyecto.servicios.model.gestopago.GestoPagoCatalogMessage;
-import com.proyecto.servicios.model.gestopago.GestoPagoCatalogResponse;
-import com.proyecto.servicios.model.gestopago.GestoPagoProduct;
+import com.proyecto.servicios.models.response.CatalogoProductosResponse;
+import com.proyecto.servicios.models.response.ProductoResponse;
+import com.proyecto.servicios.models.response.gestopago.GestoPagoCatalogMessage;
+import com.proyecto.servicios.models.response.gestopago.GestoPagoCatalogResponse;
+import com.proyecto.servicios.models.response.gestopago.GestoPagoProduct;
 import com.proyecto.servicios.service.CatalogoProductosPersistenceService;
 import com.proyecto.servicios.service.CatalogoProductosPersistenceService.ResultadoActualizacion;
 import com.proyecto.servicios.service.GestoPagoTokenService;
@@ -31,6 +31,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import com.proyecto.servicios.service.exception.CatalogoPersistenciaException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -167,10 +169,7 @@ class ProductoServiceImplTest {
     void obtenerProductos_respuestaVaciaDeGestoPagoNoEscribeEnPostgresNiRedis() {
         mockEmptySourcesAndProvider(providerCatalog());
 
-        CatalogoProductosResponse result = service.obtenerProductos();
-
-        assertEquals(1, result.getCodigo());
-        assertEquals(0, result.getTotal());
+        assertThrows(GestoPagoCatalogException.class, service::obtenerProductos);
         verify(persistence, never()).persistirCatalogoRecuperado(any());
         verify(persistence, never()).actualizarSiHayMasProductos(any());
         verify(cache, never()).guardar(any());
@@ -181,25 +180,19 @@ class ProductoServiceImplTest {
         GestoPagoProduct invalid = validProviderProduct(" ");
         mockEmptySourcesAndProvider(providerCatalog(invalid));
 
-        CatalogoProductosResponse result = service.obtenerProductos();
-
-        assertEquals(1, result.getCodigo());
-        assertEquals(0, result.getTotal());
+        assertThrows(GestoPagoCatalogException.class, service::obtenerProductos);
         verify(persistence, never()).persistirCatalogoRecuperado(any());
         verify(persistence, never()).actualizarSiHayMasProductos(any());
         verify(cache, never()).guardar(any());
     }
 
     @Test
-    void obtenerProductos_errorDelClienteExternoSeTraduceACodigoUnoSinEscrituras() {
+    void obtenerProductos_errorDelClienteExternoSePropagaSinEscrituras() {
         mockEmptySourcesAndToken();
         when(catalogClient.consultarCatalogo("token-test"))
                 .thenThrow(new GestoPagoCatalogException("Fallo externo", new RuntimeException("timeout")));
 
-        CatalogoProductosResponse result = service.obtenerProductos();
-
-        assertEquals(1, result.getCodigo());
-        assertEquals(0, result.getTotal());
+        assertThrows(GestoPagoCatalogException.class, service::obtenerProductos);
         verify(persistence, never()).persistirCatalogoRecuperado(any());
         verify(persistence, never()).actualizarSiHayMasProductos(any());
         verify(cache, never()).guardar(any());
@@ -211,10 +204,7 @@ class ProductoServiceImplTest {
         when(persistence.persistirCatalogoRecuperado(any()))
                 .thenThrow(new DataAccessResourceFailureException("database unavailable"));
 
-        CatalogoProductosResponse result = service.obtenerProductos();
-
-        assertEquals(2, result.getCodigo());
-        assertEquals(0, result.getTotal());
+        assertThrows(CatalogoPersistenciaException.class, service::obtenerProductos);
         verify(cache, never()).guardar(any());
     }
 
@@ -270,10 +260,7 @@ class ProductoServiceImplTest {
         when(tokenService.renovarToken()).thenReturn(refreshedToken);
         when(catalogClient.consultarCatalogo("renewed-token")).thenThrow(authRejected());
 
-        CatalogoProductosResponse result = service.obtenerProductos();
-
-        assertEquals(1, result.getCodigo());
-        assertEquals(0, result.getTotal());
+        assertThrows(GestoPagoCatalogException.class, service::obtenerProductos);
         verify(catalogClient, times(1)).consultarCatalogo("token-test");
         verify(tokenService, times(1)).renovarToken();
         verify(catalogClient, times(1)).consultarCatalogo("renewed-token");
