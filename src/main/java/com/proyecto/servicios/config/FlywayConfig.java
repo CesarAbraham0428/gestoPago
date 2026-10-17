@@ -22,6 +22,10 @@ public class FlywayConfig {
     @Value("${spring.flyway.schemas:public}")
     private String schema;
 
+    // Una instalacion manual completa V1-V5 requiere baseline 5; una BD vacia usa 0.
+    @Value("${spring.flyway.baseline-version:0}")
+    private String baselineVersion;
+
     @Bean(name = "flyway")
     public Flyway flyway(@Qualifier("sfDatasource") DataSource dataSource) {
         log.info("Iniciando migraciones Flyway en schema '{}'", schema);
@@ -31,7 +35,7 @@ public class FlywayConfig {
                 .table(historyTable)
                 .schemas(schema)
                 .baselineOnMigrate(true)
-                .baselineVersion("0")
+                .baselineVersion(baselineVersion)
                 .load();
         flyway.migrate();
         return flyway;

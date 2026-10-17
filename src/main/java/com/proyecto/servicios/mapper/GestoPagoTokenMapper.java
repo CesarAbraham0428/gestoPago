@@ -1,7 +1,7 @@
 package com.proyecto.servicios.mapper;
 
 import com.proyecto.servicios.entity.gestopago.GestoPagoToken;
-import com.proyecto.servicios.model.gestopago.GestoPagoAuthResponse;
+import com.proyecto.servicios.models.response.gestopago.GestoPagoAuthResponse;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

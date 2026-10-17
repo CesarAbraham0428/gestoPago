@@ -2,6 +2,7 @@ services:
   - type: web
     name: gestopago-api
     runtime: docker
+    branch: feat/deploy
     plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /actuator/health

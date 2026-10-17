@@ -1,6 +1,7 @@
 package com.proyecto.servicios.security;
 
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import jakarta.servlet.FilterChain;
@@ -29,7 +30,7 @@ class JwtAuthenticationFilterTest {
         request.addHeader("Authorization", "Bearer token");
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
-        new JwtAuthenticationFilter(tokens, usuarios).doFilter(request, response, chain);
+        new JwtAuthenticationFilter(tokens, usuarios, new ApiSecurityErrorWriter(new ObjectMapper())).doFilter(request, response, chain);
         verify(usuarios, never()).findById(1);
         if (activo) {
             verify(chain).doFilter(request, response);
@@ -52,12 +53,41 @@ class JwtAuthenticationFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
-        new JwtAuthenticationFilter(tokens, usuarios).doFilter(request, response, chain);
+        new JwtAuthenticationFilter(tokens, usuarios, new ApiSecurityErrorWriter(new ObjectMapper())).doFilter(request, response, chain);
 
         assertEquals(401, response.getStatus());
         assertTrue(response.getContentAsString().contains("Token inválido o vencido"));
+        var body = new ObjectMapper().readTree(response.getContentAsString());
+        assertEquals(2, body.size());
+        assertEquals(1, body.get("codigo").asInt());
+        assertFalse(body.has("datos"));
+        assertFalse(body.has("errores"));
         assertNull(SecurityContextHolder.getContext().getAuthentication());
         verifyNoInteractions(usuarios, chain);
+    }
+
+    @Test void errorDeBaseDeDatosDuranteAutenticacionUsaFormatoUniformeSinSql() throws Exception {
+        JwtTokenService tokens = mock(JwtTokenService.class);
+        UsuarioRepository usuarios = mock(UsuarioRepository.class);
+        DecodedJWT jwt = mock(DecodedJWT.class);
+        when(tokens.validar("token")).thenReturn(jwt);
+        when(jwt.getSubject()).thenReturn("1");
+        when(usuarios.existsByIdAndActivoTrueAndClienteActivoTrue(1))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("SELECT password_hash FROM usuarios"));
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/usuarios/me");
+        request.addHeader("Authorization", "Bearer token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+        new JwtAuthenticationFilter(tokens, usuarios, new ApiSecurityErrorWriter(new ObjectMapper()))
+                .doFilter(request, response, chain);
+        assertEquals(500, response.getStatus());
+        var body = new ObjectMapper().readTree(response.getContentAsString());
+        assertEquals(1, body.get("codigo").asInt());
+        assertFalse(body.has("datos"));
+        assertFalse(body.has("errores"));
+        assertEquals(2, body.size());
+        assertFalse(response.getContentAsString().contains("SELECT"));
+        verifyNoInteractions(chain);
     }
 
     @Test void loginPublicoOmiteLaVerificacionDeUnBearerAnterior() throws Exception {
@@ -69,7 +99,7 @@ class JwtAuthenticationFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
-        new JwtAuthenticationFilter(tokens, usuarios).doFilter(request, response, chain);
+        new JwtAuthenticationFilter(tokens, usuarios, new ApiSecurityErrorWriter(new ObjectMapper())).doFilter(request, response, chain);
 
         verify(chain).doFilter(request, response);
         verifyNoInteractions(tokens, usuarios);

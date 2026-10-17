@@ -1,8 +1,8 @@
 package com.proyecto.servicios.mapper;
 
 import com.proyecto.servicios.entity.gestopago.Producto;
-import com.proyecto.servicios.model.ProductoResponse;
-import com.proyecto.servicios.model.gestopago.GestoPagoProduct;
+import com.proyecto.servicios.models.response.ProductoResponse;
+import com.proyecto.servicios.models.response.gestopago.GestoPagoProduct;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

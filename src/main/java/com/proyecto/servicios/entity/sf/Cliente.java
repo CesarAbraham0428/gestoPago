@@ -7,6 +7,7 @@ import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 @Entity @Table(name="clientes") @Getter @Setter
+
 public class Cliente extends Auditado {
     @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Integer id;
     @Column(name="primer_nombre", nullable=false, length=50) private String primerNombre;

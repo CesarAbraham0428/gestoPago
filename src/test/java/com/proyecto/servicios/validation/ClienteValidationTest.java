@@ -2,7 +2,7 @@ package com.proyecto.servicios.validation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.proyecto.servicios.model.ClienteRequest;
+import com.proyecto.servicios.models.request.ClienteRequest;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
@@ -10,7 +10,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import com.proyecto.servicios.model.ClienteActualizacionRequest;
+import com.proyecto.servicios.models.request.ClienteActualizacionRequest;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import static org.junit.jupiter.api.Assertions.*;
 

@@ -1,49 +1,59 @@
 package com.proyecto.servicios.controller;
 
-import com.proyecto.servicios.model.*;
+import com.proyecto.servicios.models.request.ClienteActualizacionPorIdentidadRequest;
+import com.proyecto.servicios.models.request.ClienteConsultaRequest;
+import com.proyecto.servicios.models.request.ClienteIdentificacionRequest;
+import com.proyecto.servicios.models.request.ClienteRequest;
+import com.proyecto.servicios.models.response.ClienteResponse;
+import com.proyecto.servicios.models.response.ListaGenericResponse;
+import com.proyecto.servicios.models.response.GenericResponse;
 import com.proyecto.servicios.service.ClienteService;
 import jakarta.validation.Valid;
-import org.springframework.data.domain.Page;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.*;
-import org.springframework.web.bind.annotation.*;
-import java.time.LocalDate;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/clientes")
+@RequestMapping(value = "/clientes", produces = MediaType.APPLICATION_JSON_VALUE)
 
 public class ClienteController {
-
     private final ClienteService service;
 
-    public ClienteController(ClienteService service) { this.service=service; }
-
-    @PostMapping public ResponseEntity<ClienteResponse> registrar(@Valid @RequestBody ClienteRequest request) {
-        ClienteResponse c=service.registrar(request);
-        return ResponseEntity.created(java.net.URI.create("/clientes/"+c.id())).body(c);
+    public ClienteController(ClienteService service) {
+        this.service = service;
     }
 
-    @GetMapping public Page<?> consultar(
-        @RequestParam(required=false) Integer id,
-        @RequestParam(required=false) String curp, @RequestParam(required=false) String rfc,
-        @RequestParam(required=false) String correo, @RequestParam(required=false) String numeroCuenta,
-        @RequestParam(required=false) Boolean activo,
-        @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate desde,
-        @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate hasta,
-        @RequestParam(defaultValue="0") int pagina,@RequestParam(defaultValue="20") int tamanio, @RequestParam java.util.Map<String,String> parametros) {
-        if (!java.util.Set.of("id", "curp", "rfc", "correo", "numeroCuenta", "activo", "desde", "hasta", "pagina", "tamanio")
-            .containsAll(parametros.keySet())) {
-            throw new com.proyecto.servicios.service.exception.ValidacionException("Filtro de cliente no permitido");
-        }
-        return service.consultar(id,curp,rfc,correo,numeroCuenta,activo,desde,hasta,pagina,tamanio);
+    @PostMapping
+    public ResponseEntity<GenericResponse<ClienteResponse>> registrar(@Valid @RequestBody ClienteRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(GenericResponse.exito("Cliente registrado", service.registrar(request)));
     }
 
-    @GetMapping("/{id}") public ClienteResponse obtener(@PathVariable Integer id) { return service.obtener(id); }
-    @PatchMapping("/{id}") public ClienteResponse actualizarParcial(@PathVariable Integer id,
-        @RequestBody com.fasterxml.jackson.databind.JsonNode cambios) {
-        return service.actualizarParcial(id, cambios);
+    @PostMapping("/consultar")
+    public GenericResponse<ListaGenericResponse<ClienteResponse>> consultar(
+            @Valid @RequestBody ClienteConsultaRequest request, Authentication authentication) {
+        return GenericResponse.exito("Consulta de clientes realizada",
+                service.consultar(request, Integer.valueOf(authentication.getName())));
     }
 
-    @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void desactivar(@PathVariable Integer id) { service.desactivar(id); }
+    @PatchMapping
+    public GenericResponse<ClienteResponse> actualizarParcial(
+            @Valid @RequestBody ClienteActualizacionPorIdentidadRequest request,
+            Authentication authentication) {
+        return GenericResponse.exito("Cliente actualizado",
+                service.actualizarParcial(request, Integer.valueOf(authentication.getName())));
+    }
+
+    @PostMapping("/desactivar")
+    public GenericResponse<Void> desactivar(@Valid @RequestBody ClienteIdentificacionRequest request,
+            Authentication authentication) {
+        service.desactivar(request, Integer.valueOf(authentication.getName()));
+        return GenericResponse.exito("Cliente desactivado", null);
+    }
 }

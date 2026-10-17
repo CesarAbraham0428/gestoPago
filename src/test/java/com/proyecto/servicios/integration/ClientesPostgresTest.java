@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.proyecto.servicios.config.*;
 import com.proyecto.servicios.controller.*;
-import com.proyecto.servicios.controller.advice.ApiExceptionHandler;
+import com.proyecto.servicios.controller.advice.GlobalExceptionHandler;
 import com.proyecto.servicios.security.*;
 import com.proyecto.servicios.service.*;
 import com.proyecto.servicios.service.Impl.*;
@@ -42,9 +42,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class ClientesPostgresTest {
     @SpringBootConfiguration @EnableAutoConfiguration
-    @Import({ConfigDB.class, FlywayConfig.class, SecurityConfiguration.class, JwtTokenService.class,
+    @Import({ConfigDB.class, FlywayConfig.class, SecurityConfiguration.class, JwtTokenService.class, ApiSecurityErrorWriter.class,
         ClienteController.class, CuentaController.class, UsuarioController.class, AutenticacionController.class,
-        ApiExceptionHandler.class, ClienteServiceImpl.class, CuentaService.class,
+        GlobalExceptionHandler.class,
+        ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class,
         UsuarioService.class, AutenticacionServiceImpl.class})
     static class Config {}
 
@@ -68,6 +69,13 @@ class ClientesPostgresTest {
             "La limpieza solo está permitida en una BD temporal de pruebas");
         // No se usa rollback de test: necesitamos comprobar commits, triggers diferidos y rollback del servicio.
         jdbc.execute("TRUNCATE TABLE usuarios, cuentas, domicilios, clientes RESTART IDENTITY CASCADE");
+    }
+
+    @Test void healthDeRenderEsPublicoYVerificaPostgresSinExponerDetalles() throws Exception {
+        mvc.perform(get("/actuator/health"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("status").value("UP"))
+            .andExpect(jsonPath("components").doesNotHaveJsonPath());
     }
 
     @Test void registroPersisteClienteDomicilioCuentaActivaYUsuarioConBCrypt() throws Exception {
@@ -128,63 +136,106 @@ class ClientesPostgresTest {
             .andExpect(status().isBadRequest());
         assertEquals(0, jdbc.queryForObject("select count(*) from clientes", Integer.class));
     }
-    @ParameterizedTest @ValueSource(strings={"id", "curp", "rfc", "correo", "numeroCuenta"})
-    void consultaPorFiltroDevuelveAlClienteCorrectoConDetalle(String filtro) throws Exception {
+    @ParameterizedTest @ValueSource(strings={"curp", "rfc", "correo", "numeroCuenta"})
+    void consultaPorFiltroDevuelveInformacionCompletaDelClienteCorrecto(String filtro) throws Exception {
         JsonNode c = crear(registro("1")); crear(registro("2"));
         String valor = switch(filtro) {
             case "correo" -> "ANA1@EXAMPLE.COM";
             case "numeroCuenta" -> numero(c);
             default -> c.get(filtro).asText();
         };
-        mvc.perform(get("/clientes").param(filtro, valor).header("Authorization", bearer("1")))
-            .andExpect(status().isOk()).andExpect(jsonPath("totalElements").value(1))
-            .andExpect(jsonPath("content[0].id").value(c.get("id").asInt()))
-            .andExpect(jsonPath("content[0].domicilio.calle").value("Reforma"))
-            .andExpect(jsonPath("content[0].cuentas[0].saldo").value(0));
+        mvc.perform(post("/clientes/consultar").contentType("application/json")
+            .content(mapper.createObjectNode().put(filtro, valor).toString()).header("Authorization", bearer("1")))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(1))
+            .andExpect(jsonPath("datos.datos[0].id").value(c.get("id").asInt()))
+            .andExpect(jsonPath("datos.datos[0].curp").value(c.get("curp").asText()))
+            .andExpect(jsonPath("datos.datos[0].rfc").value(c.get("rfc").asText()))
+            .andExpect(jsonPath("datos.datos[0].correoElectronico").value("ana1@example.com"))
+            .andExpect(jsonPath("datos.datos[0].telefonoMovil").value("5512345678"))
+            .andExpect(jsonPath("datos.datos[0].fechaNacimiento").value("1990-01-01"))
+            .andExpect(jsonPath("datos.datos[0].ingresoMensual").value(12000.50))
+            .andExpect(jsonPath("datos.datos[0].empresa").value("Empresa"))
+            .andExpect(jsonPath("datos.datos[0].fechaCreacion").isNotEmpty())
+            .andExpect(jsonPath("datos.datos[0].fechaActualizacion").isNotEmpty())
+            .andExpect(jsonPath("datos.datos[0].domicilio.calle").value("Reforma"))
+            .andExpect(jsonPath("datos.datos[0].domicilio.codigoPostal").value("06000"))
+            .andExpect(jsonPath("datos.datos[0].cuentas[0].numeroCuenta").value(numero(c)))
+            .andExpect(jsonPath("datos.datos[0].cuentas[0].saldo").value(0))
+            .andExpect(jsonPath("datos.datos[0].cuentas[0].fechaCreacion").isNotEmpty())
+            .andExpect(jsonPath("datos.datos[0].cuentas[0].fechaActualizacion").isNotEmpty())
+            .andExpect(jsonPath("datos.datos[0].usuario.correo").value("ana1@example.com"))
+            .andExpect(jsonPath("datos.datos[0].usuario.activo").value(true))
+            .andExpect(jsonPath("datos.datos[0].usuario.passwordHash").doesNotExist())
+            .andExpect(jsonPath("datos.datos[0].usuario.password").doesNotExist());
     }
-    @Test void consultaGlobalPaginaTodosLosClientesSinCredenciales() throws Exception {
+    @Test void administradorPaginaTodosLosClientesConInformacionCompleta() throws Exception {
         JsonNode primero = crear(registro("1")); JsonNode segundo = crear(registro("2"));
+        promoverAdministrador(primero);
         String token = bearer("1");
-        mvc.perform(get("/clientes").param("tamanio", "1").header("Authorization", token))
-            .andExpect(status().isOk()).andExpect(jsonPath("totalElements").value(2))
-            .andExpect(jsonPath("content[0].id").value(primero.get("id").asInt()))
-            .andExpect(jsonPath("content[0].curp").doesNotExist());
-        mvc.perform(get("/clientes").param("pagina", "1").param("tamanio", "1").header("Authorization", token))
-            .andExpect(status().isOk()).andExpect(jsonPath("content[0].id").value(segundo.get("id").asInt()));
+        mvc.perform(post("/clientes/consultar").contentType("application/json")
+            .content("{\"tamanio\":1}").header("Authorization", token))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(2))
+            .andExpect(jsonPath("datos.pagina").value(0)).andExpect(jsonPath("datos.tamanoPagina").value(1))
+            .andExpect(jsonPath("datos.totalPaginas").value(2))
+            .andExpect(jsonPath("datos.datos[0].id").value(primero.get("id").asInt()))
+            .andExpect(jsonPath("datos.datos[0].curp").value(primero.get("curp").asText()))
+            .andExpect(jsonPath("datos.datos[0].usuario.correo").value("ana1@example.com"));
+        mvc.perform(post("/clientes/consultar").contentType("application/json")
+            .content("{\"pagina\":1,\"tamanio\":1}").header("Authorization", token))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.datos[0].id").value(segundo.get("id").asInt()))
+            .andExpect(jsonPath("datos.datos[0].curp").value(segundo.get("curp").asText()))
+            .andExpect(jsonPath("datos.datos[0].usuario.correo").value("ana2@example.com"))
+            .andExpect(jsonPath("datos.datos[0].cuentas[0].numeroCuenta").value(numero(segundo)));
+    }
+    @Test void consultaPorRequestAdmiteNombreYRestringeResultadosAlPropietario() throws Exception {
+        JsonNode propio = crear(registro("1")); crear(registro("2"));
+        mvc.perform(post("/clientes/consultar").header("Authorization", bearer("1"))
+            .contentType("application/json").content("{\"nombre\":\"Ana\",\"pagina\":0,\"tamanio\":20}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(1))
+            .andExpect(jsonPath("datos.datos[0].id").value(propio.get("id").asInt()));
     }
     @Test void filtroActivoExcluyeClientesDesactivados() throws Exception {
         JsonNode activo = crear(registro("1")); JsonNode inactivo = crear(registro("2"));
+        promoverAdministrador(activo);
         String token = bearer("1");
-        mvc.perform(delete("/clientes/" + inactivo.get("id").asInt()).header("Authorization", token))
-            .andExpect(status().isNoContent());
-        mvc.perform(get("/clientes").param("activo", "true").header("Authorization", token))
-            .andExpect(status().isOk()).andExpect(jsonPath("totalElements").value(1))
-            .andExpect(jsonPath("content[0].id").value(activo.get("id").asInt()));
+        mvc.perform(post("/clientes/desactivar").header("Authorization", token)
+            .contentType("application/json").content(identificacion(inactivo).toString()))
+            .andExpect(status().isOk());
+        mvc.perform(post("/clientes/consultar").contentType("application/json")
+            .content("{\"activo\":true}").header("Authorization", token))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(1))
+            .andExpect(jsonPath("datos.datos[0].id").value(activo.get("id").asInt()));
     }
     @Test void rangoDeFechasIncluyeElDiaDeRegistroYExcluyeDiasAnteriores() throws Exception {
         crear(registro("1")); String token = bearer("1");
-        mvc.perform(get("/clientes").param("desde", hoy().toString()).param("hasta", hoy().toString())
-            .header("Authorization", token)).andExpect(status().isOk()).andExpect(jsonPath("totalElements").value(1));
-        mvc.perform(get("/clientes").param("hasta", hoy().minusDays(1).toString()).header("Authorization", token))
-            .andExpect(status().isNotFound());
-        mvc.perform(get("/clientes").param("desde", hoy().toString()).param("hasta", hoy().minusDays(1).toString())
+        mvc.perform(post("/clientes/consultar").contentType("application/json")
+            .content(mapper.createObjectNode().put("desde", hoy().toString()).put("hasta", hoy().toString()).toString())
+            .header("Authorization", token)).andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(1));
+        mvc.perform(post("/clientes/consultar").contentType("application/json")
+            .content(mapper.createObjectNode().put("hasta", hoy().minusDays(1).toString()).toString()).header("Authorization", token))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.datos").isEmpty());
+        mvc.perform(post("/clientes/consultar").contentType("application/json")
+            .content(mapper.createObjectNode().put("desde", hoy().toString()).put("hasta", hoy().minusDays(1).toString()).toString())
             .header("Authorization", token)).andExpect(status().isBadRequest());
     }
     @Test void patchPersisteSoloLosCambiosYActualizaElCorreoDeAcceso() throws Exception {
         JsonNode c = crear(registro("1")); String token = bearer("1"); int id = c.get("id").asInt();
-        mvc.perform(patch("/clientes/" + id).header("Authorization", token).contentType("application/json")
-            .content("""
+        JsonNode cambios = mapper.readTree("""
                 {"primerNombre":"Luisa","correoElectronico":"NUEVA@example.com","empresa":"Nueva empresa",
                  "domicilio":{"calle":"Insurgentes"}}
-                """))
-            .andExpect(status().isOk()).andExpect(jsonPath("correoElectronico").value("nueva@example.com"));
+                """);
+        mvc.perform(patch("/clientes").header("Authorization", token).contentType("application/json")
+            .content(actualizacion(c, cambios).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.correoElectronico").value("nueva@example.com"));
         // Nueva petición y consulta JDBC: no basta con devolver una entidad cambiada en memoria.
-        mvc.perform(get("/clientes/" + id).header("Authorization", token))
-            .andExpect(status().isOk()).andExpect(jsonPath("primerNombre").value("Luisa"))
-            .andExpect(jsonPath("empresa").value("Nueva empresa"))
-            .andExpect(jsonPath("domicilio.calle").value("Insurgentes"))
-            .andExpect(jsonPath("domicilio.codigoPostal").value("06000"))
-            .andExpect(jsonPath("curp").value(c.get("curp").asText()));
+        mvc.perform(post("/clientes/consultar").header("Authorization", token)
+            .contentType("application/json").content(identificacion(c).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(1))
+            .andExpect(jsonPath("datos.datos[0].primerNombre").value("Luisa"))
+            .andExpect(jsonPath("datos.datos[0].empresa").value("Nueva empresa"))
+            .andExpect(jsonPath("datos.datos[0].domicilio.calle").value("Insurgentes"))
+            .andExpect(jsonPath("datos.datos[0].domicilio.codigoPostal").value("06000"))
+            .andExpect(jsonPath("datos.datos[0].curp").value(c.get("curp").asText()));
         assertEquals("nueva@example.com", jdbc.queryForObject("select correo from usuarios where cliente_id=?", String.class, id));
         login("nueva@example.com", "Segura123!");
     }
@@ -192,91 +243,318 @@ class ClientesPostgresTest {
     void patchRechazaIdentificadoresSinGuardarOtrosCampos(String campo) throws Exception {
         JsonNode c = crear(registro("1"));
         var body = mapper.createObjectNode().put("empresa", "No guardar").put(campo, "cambio");
-        mvc.perform(patch("/clientes/" + c.get("id").asInt()).header("Authorization", bearer("1"))
-            .contentType("application/json").content(body.toString())).andExpect(status().isBadRequest());
+        mvc.perform(patch("/clientes").header("Authorization", bearer("1"))
+            .contentType("application/json").content(actualizacion(c, body).toString()))
+            .andExpect(status().isBadRequest());
         assertEquals("Empresa", jdbc.queryForObject("select empresa from clientes where id=?", String.class, c.get("id").asInt()));
     }
     @Test void bajaLogicaConservaDatosDesactivaRelacionadosEInvalidaJwt() throws Exception {
         JsonNode c = crear(registro("1")); String token = bearer("1"); int id = c.get("id").asInt();
-        mvc.perform(delete("/clientes/" + id).header("Authorization", token)).andExpect(status().isNoContent());
+        mvc.perform(post("/clientes/desactivar").header("Authorization", token)
+            .contentType("application/json").content(identificacion(c).toString()))
+            .andExpect(status().isOk());
         assertEquals(1, jdbc.queryForObject("select count(*) from clientes where id=?", Integer.class, id));
         assertFalse(jdbc.queryForObject("select activo from clientes where id=?", Boolean.class, id));
         assertFalse(jdbc.queryForObject("select activo from usuarios where cliente_id=?", Boolean.class, id));
         assertFalse(jdbc.queryForObject("select esta_activa from cuentas where cliente_id=?", Boolean.class, id));
-        mvc.perform(get("/clientes/" + id).header("Authorization", token)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/clientes/consultar").header("Authorization", token)
+            .contentType("application/json").content(identificacion(c).toString()))
+            .andExpect(status().isUnauthorized());
         mvc.perform(post("/auth/login").contentType("application/json").content(credenciales("ana1@example.com", "Segura123!")))
             .andExpect(status().isForbidden());
     }
     @Test void cuentaInactivaNoSeReactivaSiElClienteEstaInactivo() throws Exception {
-        JsonNode c = crear(registro("1")); crear(registro("2")); String token = bearer("2");
-        mvc.perform(delete("/clientes/" + c.get("id").asInt()).header("Authorization", token)).andExpect(status().isNoContent());
-        mvc.perform(put("/cuentas/" + numero(c) + "/estado").header("Authorization", token)
-            .contentType("application/json").content("{\"activa\":true}"))
+        JsonNode c = crear(registro("1")); JsonNode administrador = crear(registro("2"));
+        promoverAdministrador(administrador);
+        String token = bearer("2");
+        mvc.perform(post("/clientes/desactivar").header("Authorization", token)
+            .contentType("application/json").content(identificacion(c).toString()))
+            .andExpect(status().isOk());
+        mvc.perform(patch("/cuentas/estado").header("Authorization", token)
+            .contentType("application/json").content(estadoCuenta(c, true).toString()))
             .andExpect(status().isConflict());
         assertFalse(jdbc.queryForObject("select esta_activa from cuentas where numero_cuenta=?", Boolean.class, numero(c)));
     }
     @Test void consultaCuentaYSaldoPersistidos() throws Exception {
         JsonNode c = crear(registro("1")); String token = bearer("1");
-        mvc.perform(get("/cuentas/" + numero(c)).header("Authorization", token))
-            .andExpect(status().isOk()).andExpect(jsonPath("clienteId").value(c.get("id").asInt()))
-            .andExpect(jsonPath("saldo").value(0)).andExpect(jsonPath("estaActiva").value(true));
-        mvc.perform(get("/cuentas/" + numero(c) + "/saldo").header("Authorization", token))
-            .andExpect(status().isOk()).andExpect(content().string("0.00"));
+        mvc.perform(post("/cuentas/consultar").header("Authorization", token)
+            .contentType("application/json").content(identificacionCuenta(c).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(1))
+            .andExpect(jsonPath("datos.datos[0].clienteId").value(c.get("id").asInt()))
+            .andExpect(jsonPath("datos.datos[0].numeroCuenta").value(numero(c)))
+            .andExpect(jsonPath("datos.datos[0].saldo").value(0))
+            .andExpect(jsonPath("datos.datos[0].estaActiva").value(true));
     }
     @Test void filtroDeCuentasActivasExcluyeCuentasDesactivadas() throws Exception {
-        JsonNode activa = crear(registro("1")); JsonNode inactiva = crear(registro("2")); String token = bearer("1");
-        mvc.perform(delete("/cuentas/" + numero(inactiva)).header("Authorization", token)).andExpect(status().isNoContent());
-        mvc.perform(get("/cuentas").param("activa", "true").header("Authorization", token))
-            .andExpect(status().isOk()).andExpect(jsonPath("totalElements").value(1))
-            .andExpect(jsonPath("content[0].numeroCuenta").value(numero(activa)));
+        JsonNode activa = crear(registro("1")); JsonNode inactiva = crear(registro("2"));
+        promoverAdministrador(activa);
+        String token = bearer("1");
+        mvc.perform(patch("/cuentas/estado").header("Authorization", token)
+            .contentType("application/json").content(estadoCuenta(inactiva, false).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.estaActiva").value(false));
+        mvc.perform(post("/cuentas/consultar").header("Authorization", token)
+            .contentType("application/json").content("{\"activo\":true}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(1))
+            .andExpect(jsonPath("datos.datos[0].numeroCuenta").value(numero(activa)));
     }
-    @ParameterizedTest @ValueSource(strings={"id", "saldo"})
+    @ParameterizedTest @ValueSource(strings={"numeroCuenta", "saldo"})
     void filtrosDeCuentaDevuelvenLaCuentaCorrecta(String filtro) throws Exception {
         JsonNode primero = crear(registro("1")); JsonNode segundo = crear(registro("2"));
         jdbc.update("update cuentas set saldo=20 where numero_cuenta=?", numero(segundo));
-        String valor = filtro.equals("id") ? primero.get("cuentas").get(0).get("id").asText() : "0";
-        mvc.perform(get("/cuentas").param(filtro, valor).header("Authorization", bearer("1")))
-            .andExpect(status().isOk()).andExpect(jsonPath("totalElements").value(1))
-            .andExpect(jsonPath("content[0].numeroCuenta").value(numero(primero)))
-            .andExpect(jsonPath("content[0].saldo").value(0));
+        promoverAdministrador(primero);
+        String valor = filtro.equals("numeroCuenta") ? numero(primero) : "0";
+        mvc.perform(post("/cuentas/consultar").header("Authorization", bearer("1"))
+            .contentType("application/json").content(mapper.createObjectNode().put(filtro, valor).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(1))
+            .andExpect(jsonPath("datos.datos[0].numeroCuenta").value(numero(primero)))
+            .andExpect(jsonPath("datos.datos[0].clienteId").value(primero.get("id").asInt()))
+            .andExpect(jsonPath("datos.datos[0].saldo").value(0))
+            .andExpect(jsonPath("datos.datos[0].estaActiva").value(true))
+            .andExpect(jsonPath("datos.datos[0].fechaCreacion").isNotEmpty())
+            .andExpect(jsonPath("datos.datos[0].fechaActualizacion").isNotEmpty());
     }
-    @ParameterizedTest @ValueSource(strings={"/clientes/2147483647", "/clientes?curp=inexistente",
-        "/clientes?rfc=inexistente", "/clientes?correo=inexistente", "/clientes?numeroCuenta=inexistente",
-        "/cuentas/inexistente", "/cuentas/inexistente/saldo", "/cuentas/id/2147483647",
-        "/cuentas?id=2147483647", "/cuentas?saldo=9999999999999999.99"})
-    void consultasSinCoincidenciasDevuelven404(String ruta) throws Exception {
+    @ParameterizedTest @ValueSource(strings={"{\"curp\":\"PERA900101MDFRZN09\"}",
+        "{\"rfc\":\"PERA900101AB9\"}", "{\"correo\":\"inexistente@example.com\"}",
+        "{\"numeroCuenta\":\"999999999999999999\"}"})
+    void listasSinCoincidenciasDevuelvenUnaPaginaVacia(String body) throws Exception {
         crear(registro("1"));
-        mvc.perform(get(ruta).header("Authorization", bearer("1")))
+        mvc.perform(post("/clientes/consultar").contentType("application/json").content(body)
+            .header("Authorization", bearer("1")))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.datos").isEmpty())
+            .andExpect(jsonPath("datos.totalElementos").value(0));
+    }
+    @ParameterizedTest @ValueSource(strings={"numeroCuenta", "saldo"})
+    void listasDeCuentasSinCoincidenciasDevuelvenUnaPaginaVacia(String filtro) throws Exception {
+        crear(registro("1"));
+        ObjectNode body = mapper.createObjectNode();
+        if (filtro.equals("numeroCuenta")) {
+            body.put("numeroCuenta", "999999999999999999");
+        } else {
+            body.put("saldo", new java.math.BigDecimal("9999999999999999.99"));
+        }
+        mvc.perform(post("/cuentas/consultar").header("Authorization", bearer("1"))
+            .contentType("application/json").content(body.toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.datos").isEmpty())
+            .andExpect(jsonPath("datos.totalElementos").value(0));
+    }
+    @ParameterizedTest @ValueSource(strings={"/clientes/desactivar", "/cuentas/estado"})
+    void operacionesConIdentidadValidaInexistenteDevuelven404(String ruta) throws Exception {
+        crear(registro("1"));
+        String body = ruta.startsWith("/clientes")
+            ? "{\"rfc\":\"PERA900101AB9\"}" : "{\"numeroCuenta\":\"999999999999999999\",\"activa\":false}";
+        mvc.perform((ruta.startsWith("/cuentas") ? patch(ruta) : post(ruta)).header("Authorization", bearer("1"))
+            .contentType("application/json").content(body))
             .andExpect(status().isNotFound()).andExpect(jsonPath("codigo").value(1));
     }
-    @ParameterizedTest @ValueSource(strings={"/clientes?tamanio=101", "/clientes?pagina=-1",
-        "/cuentas?saldo=-1", "/cuentas?curp=inexistente", "/cuentas?rfc=inexistente",
-        "/cuentas?clienteId=1", "/cuentas?numeroCuenta=1", "/cuentas?activa=true&activo=false"})
-    void filtrosInvalidosDevuelven400(String ruta) throws Exception {
+    @ParameterizedTest @ValueSource(strings={"{\"tamanio\":101}", "{\"pagina\":-1}", "{\"id\":7}", "{\"clienteId\":7}"})
+    void filtrosInvalidosDevuelven400(String body) throws Exception {
         crear(registro("1"));
-        mvc.perform(get(ruta).header("Authorization", bearer("1")))
+        mvc.perform(post("/clientes/consultar").contentType("application/json").content(body)
+            .header("Authorization", bearer("1")))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("codigo").value(1));
     }
+
+    @Test void consultaClientesCombinaRfcCurpYCorreoConAnd() throws Exception {
+        JsonNode primero = crear(registro("1")); JsonNode segundo = crear(registro("2"));
+        promoverAdministrador(primero);
+        String token = bearer("1");
+        ObjectNode filtros = mapper.createObjectNode().put("rfc", segundo.get("rfc").asText())
+                .put("curp", segundo.get("curp").asText()).put("correo", "ANA2@EXAMPLE.COM");
+        mvc.perform(post("/clientes/consultar").contentType("application/json")
+                .header("Authorization", token).content(filtros.toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(1))
+                .andExpect(jsonPath("datos.datos[0].id").value(segundo.get("id").asInt()));
+        filtros.put("curp", primero.get("curp").asText());
+        mvc.perform(post("/clientes/consultar").contentType("application/json")
+                .header("Authorization", token).content(filtros.toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(0));
+    }
+    @ParameterizedTest @ValueSource(strings={"{\"saldo\":-1}", "{\"curp\":\"PERA900101MDFRZN01\"}",
+        "{\"rfc\":\"PERA900101AB1\"}", "{\"clienteId\":1}", "{\"numeroCuenta\":\"1\"}",
+        "{\"activa\":true,\"activo\":false}"})
+    void filtrosDeCuentaInvalidosDevuelven400(String body) throws Exception {
+        crear(registro("1"));
+        mvc.perform(post("/cuentas/consultar").header("Authorization", bearer("1"))
+            .contentType("application/json").content(body))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("codigo").value(1));
+    }
+    @ParameterizedTest @ValueSource(strings={"/clientes/detalle", "/cuentas/detalle", "/cuentas/saldo"})
+    void endpointsDeConsultaRetiradosDevuelven404(String ruta) throws Exception {
+        crear(registro("1"));
+        mvc.perform(post(ruta).header("Authorization", bearer("1"))
+            .contentType("application/json").content("{}"))
+            .andExpect(status().isNotFound()).andExpect(jsonPath("codigo").value(1));
+    }
+    @ParameterizedTest @ValueSource(strings={"/clientes/desactivar", "/cuentas/estado"})
+    void requestsSinIdentificacionDevuelven400(String ruta) throws Exception {
+        crear(registro("1"));
+        mvc.perform((ruta.startsWith("/cuentas") ? patch(ruta) : post(ruta)).header("Authorization", bearer("1"))
+            .contentType("application/json").content("{}"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("codigo").value(1));
+    }
+    @Test void jsonInvalidoDevuelveUnErrorEstandarSinModificarDatos() throws Exception {
+        crear(registro("1"));
+        mvc.perform(patch("/clientes").header("Authorization", bearer("1"))
+            .contentType("application/json").content("{\"identificacion\":"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("codigo").value(1))
+            .andExpect(jsonPath("mensaje").isNotEmpty());
+        assertEquals("Empresa", jdbc.queryForObject("select empresa from clientes", String.class));
+    }
+
+    @Test void validacionDevuelveMensajesEnEspanolPorCampoSinGuardarDatos() throws Exception {
+        ObjectNode body = registro("1").put("primerNombre", " ").put("correoElectronico", "correo-invalido");
+        ((ObjectNode) body.get("domicilio")).put("codigoPostal", "123");
+        mvc.perform(post("/clientes").contentType("application/json").content(body.toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("codigo").value(1))
+                .andExpect(jsonPath("$").value(org.hamcrest.Matchers.aMapWithSize(2)))
+                .andExpect(jsonPath("datos").doesNotHaveJsonPath())
+                .andExpect(jsonPath("errores").doesNotHaveJsonPath())
+                .andExpect(jsonPath("mensaje").value(org.hamcrest.Matchers.containsString("primerNombre:")))
+                .andExpect(jsonPath("mensaje").value(org.hamcrest.Matchers.containsString("Es obligatorio")))
+                .andExpect(jsonPath("mensaje").value(org.hamcrest.Matchers.containsString("correoElectronico: El correo electrónico no tiene un formato válido.")))
+                .andExpect(jsonPath("mensaje").value(org.hamcrest.Matchers.containsString("domicilio.codigoPostal: El valor no tiene el formato permitido.")));
+        assertEquals(0, jdbc.queryForObject("select count(*) from clientes", Integer.class));
+    }
+    @Test void usuarioNormalNoPuedeConsultarModificarNiDesactivarUnClienteAjeno() throws Exception {
+        JsonNode propio = crear(registro("1")); JsonNode ajeno = crear(registro("2"));
+        String token = bearer("1");
+        mvc.perform(patch("/clientes").header("Authorization", token).contentType("application/json")
+            .content(actualizacion(ajeno, mapper.createObjectNode().put("empresa", "No autorizado")).toString()))
+            .andExpect(status().isForbidden());
+        mvc.perform(post("/clientes/desactivar").header("Authorization", token)
+            .contentType("application/json").content(identificacion(ajeno).toString()))
+            .andExpect(status().isForbidden());
+        mvc.perform(post("/clientes/consultar").header("Authorization", token)
+            .contentType("application/json").content(identificacion(ajeno).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.datos").isEmpty());
+        mvc.perform(post("/clientes/consultar").contentType("application/json").content("{}")
+            .header("Authorization", token))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(1))
+            .andExpect(jsonPath("datos.datos[0].id").value(propio.get("id").asInt()));
+        assertEquals("Empresa", jdbc.queryForObject("select empresa from clientes where id=?",
+            String.class, ajeno.get("id").asInt()));
+        assertTrue(jdbc.queryForObject("select activo from clientes where id=?",
+            Boolean.class, ajeno.get("id").asInt()));
+    }
+    @Test void usuarioNormalNoPuedeConsultarNiModificarUnaCuentaAjena() throws Exception {
+        JsonNode propio = crear(registro("1")); JsonNode ajeno = crear(registro("2"));
+        String token = bearer("1");
+        mvc.perform(patch("/cuentas/estado").header("Authorization", token)
+            .contentType("application/json").content(estadoCuenta(ajeno, false).toString()))
+            .andExpect(status().isNotFound());
+        mvc.perform(post("/cuentas/consultar").header("Authorization", token)
+            .contentType("application/json").content(identificacionCuenta(ajeno).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.datos").isEmpty());
+        mvc.perform(post("/cuentas/consultar").header("Authorization", token)
+            .contentType("application/json").content("{}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(1))
+            .andExpect(jsonPath("datos.datos[0].numeroCuenta").value(numero(propio)));
+        assertTrue(jdbc.queryForObject("select esta_activa from cuentas where numero_cuenta=?",
+            Boolean.class, numero(ajeno)));
+    }
     @Test void cambioPasswordSoloAfectaAlUsuarioPropioYPermiteLoginConLaNueva() throws Exception {
-        JsonNode c = crear(registro("1")); String token = bearer("1"); int uid = c.get("usuario").get("id").asInt();
-        mvc.perform(put("/usuarios/" + uid + "/password").header("Authorization", token)
+        crear(registro("1")); crear(registro("2")); String token = bearer("1");
+        mvc.perform(put("/usuarios/me/password").header("Authorization", token)
             .contentType("application/json").content("{\"passwordActual\":\"Segura123!\",\"passwordNueva\":\"Nueva123!\"}"))
-            .andExpect(status().isNoContent());
+            .andExpect(status().isOk());
         login("ana1@example.com", "Nueva123!");
+        login("ana2@example.com", "Segura123!");
         mvc.perform(post("/auth/login").contentType("application/json").content(credenciales("ana1@example.com", "Segura123!")))
             .andExpect(status().isUnauthorized());
     }
-    @Test void consultaUsuarioPropioNoExponeHashYRechazaUsuarioAjeno() throws Exception {
+    @Test void consultaUsuarioPropioNoExponeHashNiPermiteElegirUnUsuarioAjeno() throws Exception {
         JsonNode propio = crear(registro("1")); JsonNode ajeno = crear(registro("2")); String token = bearer("1");
-        mvc.perform(get("/usuarios/" + propio.get("usuario").get("id").asInt()).header("Authorization", token))
-            .andExpect(status().isOk()).andExpect(jsonPath("correo").value("ana1@example.com"))
-            .andExpect(jsonPath("passwordHash").doesNotExist()).andExpect(jsonPath("password").doesNotExist());
-        mvc.perform(get("/usuarios/" + ajeno.get("usuario").get("id").asInt()).header("Authorization", token))
-            .andExpect(status().isForbidden());
+        mvc.perform(get("/usuarios/me").header("Authorization", token))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.correo").value("ana1@example.com"))
+            .andExpect(jsonPath("datos.id").value(propio.get("usuario").get("id").asInt()))
+            .andExpect(jsonPath("datos.passwordHash").doesNotExist()).andExpect(jsonPath("datos.password").doesNotExist());
+        mvc.perform(get("/usuarios/me").header("Authorization", bearer("2")))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.correo").value("ana2@example.com"))
+            .andExpect(jsonPath("datos.id").value(ajeno.get("usuario").get("id").asInt()));
     }
-    @ParameterizedTest @ValueSource(strings={"/clientes", "/clientes/1", "/cuentas/1", "/usuarios/1"})
+
+    @Test void administradorCombinaFiltrosDeUsuariosSinExponerCredenciales() throws Exception {
+        JsonNode administrador = crear(registro("1")); JsonNode otro = crear(registro("2"));
+        promoverAdministrador(administrador);
+        String token = bearer("1");
+        ObjectNode filtros = mapper.createObjectNode().put("correo", "ANA2@EXAMPLE.COM")
+            .put("nombre", "Perez").put("activo", true)
+            .put("rfc", otro.get("rfc").asText().toLowerCase(java.util.Locale.ROOT))
+            .put("curp", otro.get("curp").asText().toLowerCase(java.util.Locale.ROOT));
+        mvc.perform(post("/usuarios/consultar").header("Authorization", token)
+            .contentType("application/json").content(filtros.toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("codigo").value(0))
+            .andExpect(jsonPath("datos.totalElementos").value(1))
+            .andExpect(jsonPath("datos.datos[0].id").value(otro.get("usuario").get("id").asInt()))
+            .andExpect(jsonPath("datos.datos[0].passwordHash").doesNotExist())
+            .andExpect(jsonPath("datos.datos[0].password").doesNotExist());
+        filtros.put("rfc", administrador.get("rfc").asText());
+        mvc.perform(post("/usuarios/consultar").header("Authorization", token)
+            .contentType("application/json").content(filtros.toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.datos").isEmpty())
+            .andExpect(jsonPath("datos.totalElementos").value(0));
+    }
+
+    @Test void consultaUsuariosRestringeResultadosYConteoAlPropietario() throws Exception {
+        JsonNode propio = crear(registro("1")); JsonNode ajeno = crear(registro("2"));
+        String token = bearer("1");
+        mvc.perform(post("/usuarios/consultar").header("Authorization", token)
+            .contentType("application/json").content("{\"nombre\":\"Ana\",\"tamanio\":1}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(1))
+            .andExpect(jsonPath("datos.totalPaginas").value(1))
+            .andExpect(jsonPath("datos.datos[0].id").value(propio.get("usuario").get("id").asInt()));
+        mvc.perform(post("/usuarios/consultar").header("Authorization", token)
+            .contentType("application/json").content(mapper.createObjectNode()
+                .put("rfc", ajeno.get("rfc").asText()).put("curp", ajeno.get("curp").asText()).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.datos").isEmpty())
+            .andExpect(jsonPath("datos.totalElementos").value(0));
+    }
+
+    @Test void administradorPaginaUsuariosYFiltraEstadoInactivo() throws Exception {
+        JsonNode primero = crear(registro("1")); JsonNode segundo = crear(registro("2"));
+        promoverAdministrador(primero);
+        String token = bearer("1");
+        mvc.perform(post("/usuarios/consultar").header("Authorization", token)
+            .contentType("application/json").content("{\"pagina\":1,\"tamanio\":1}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(2))
+            .andExpect(jsonPath("datos.totalPaginas").value(2))
+            .andExpect(jsonPath("datos.datos[0].id").value(segundo.get("usuario").get("id").asInt()));
+        mvc.perform(post("/clientes/desactivar").header("Authorization", token)
+            .contentType("application/json").content(identificacion(segundo).toString()))
+            .andExpect(status().isOk());
+        mvc.perform(post("/usuarios/consultar").header("Authorization", token)
+            .contentType("application/json").content("{\"activo\":false}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.totalElementos").value(1))
+            .andExpect(jsonPath("datos.datos[0].activo").value(false));
+    }
+
+    @ParameterizedTest @ValueSource(strings={"id", "rol", "activo", "fechaCreacion", "saldo", "numeroCuenta"})
+    void registroRechazaCamposControladosPorElServidor(String campo) throws Exception {
+        ObjectNode body = registro("1").put(campo, "valor-no-permitido");
+        mvc.perform(post("/clientes").contentType("application/json").content(body.toString()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("codigo").value(1))
+            .andExpect(jsonPath("datos").doesNotHaveJsonPath());
+        assertEquals(0, jdbc.queryForObject("select count(*) from clientes", Integer.class));
+    }
+
+    @Test void registroRechazaIdDeDomicilioAnidado() throws Exception {
+        ObjectNode body = registro("1");
+        ((ObjectNode) body.get("domicilio")).put("id", 9);
+        mvc.perform(post("/clientes").contentType("application/json").content(body.toString()))
+            .andExpect(status().isBadRequest());
+        assertEquals(0, jdbc.queryForObject("select count(*) from clientes", Integer.class));
+    }
+    @ParameterizedTest @ValueSource(strings={"/clientes", "/usuarios/me"})
     void endpointsProtegidosRechazanSolicitudesSinJwt(String ruta) throws Exception {
         mvc.perform(get(ruta)).andExpect(status().isUnauthorized()).andExpect(jsonPath("codigo").value(1));
+    }
+    @ParameterizedTest @ValueSource(strings={"/clientes/consultar", "/clientes/desactivar",
+        "/cuentas/consultar", "/usuarios/consultar"})
+    void endpointsConRequestRechazanSolicitudesSinJwt(String ruta) throws Exception {
+        mvc.perform(post(ruta).contentType("application/json").content("{}"))
+            .andExpect(status().isUnauthorized()).andExpect(jsonPath("codigo").value(1))
+            .andExpect(jsonPath("$").value(org.hamcrest.Matchers.aMapWithSize(2)));
     }
     @ParameterizedTest @ValueSource(strings={
         "update clientes set primer_nombre='Ana1' where id=?", "update clientes set curp='PERA900101MDFRZN09' where id=?",
@@ -292,6 +570,24 @@ class ClientesPostgresTest {
 
     private LocalDate hoy() { return LocalDate.now(ZoneId.of("America/Mexico_City")); }
     private String numero(JsonNode cliente) { return cliente.get("cuentas").get(0).get("numeroCuenta").asText(); }
+    private ObjectNode identificacion(JsonNode cliente) {
+        return mapper.createObjectNode().put("rfc", cliente.get("rfc").asText());
+    }
+    private ObjectNode identificacionCuenta(JsonNode cliente) {
+        return mapper.createObjectNode().put("numeroCuenta", numero(cliente));
+    }
+    private ObjectNode actualizacion(JsonNode cliente, JsonNode cambios) {
+        ObjectNode request = mapper.createObjectNode();
+        request.set("identificacion", identificacion(cliente));
+        request.set("cambios", cambios);
+        return request;
+    }
+    private ObjectNode estadoCuenta(JsonNode cliente, boolean activa) {
+        return identificacionCuenta(cliente).put("activa", activa);
+    }
+    private void promoverAdministrador(JsonNode cliente) {
+        assertEquals(1, jdbc.update("update clientes set rol='Administrador' where id=?", cliente.get("id").asInt()));
+    }
     private ObjectNode registro(String sufijo) throws Exception {
         return ((ObjectNode) mapper.readTree("""
             {"primerNombre":"Ana","apellidoPaterno":"Perez","apellidoMaterno":"Ruiz",
@@ -305,7 +601,15 @@ class ClientesPostgresTest {
             """ )).put("curp", "PERA900101MDFRZN0" + sufijo).put("rfc", "PERA900101AB" + sufijo)
             .put("correoElectronico", "ana" + sufijo + "@example.com");
     }
-    private JsonNode json(MvcResult r) throws Exception { return mapper.readTree(r.getResponse().getContentAsString()); }
+    private JsonNode json(MvcResult r) throws Exception {
+        JsonNode respuesta = mapper.readTree(r.getResponse().getContentAsString());
+        assertEquals(0, respuesta.get("codigo").asInt());
+        assertTrue(respuesta.hasNonNull("mensaje"));
+        assertEquals(3, respuesta.size());
+        assertTrue(respuesta.has("datos"));
+        assertFalse(respuesta.has("errores"));
+        return respuesta.get("datos");
+    }
     private JsonNode crear(ObjectNode body) throws Exception {
         return json(mvc.perform(post("/clientes").contentType("application/json").content(body.toString()))
             .andExpect(status().isCreated()).andReturn());
