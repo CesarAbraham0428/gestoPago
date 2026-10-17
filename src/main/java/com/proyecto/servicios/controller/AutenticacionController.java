@@ -1,33 +1,19 @@
 package com.proyecto.servicios.controller;
-
-import com.proyecto.servicios.model.AuthResponse;
-import com.proyecto.servicios.model.LoginRequest;
-import com.proyecto.servicios.model.RegistroRequest;
+import com.proyecto.servicios.models.request.LoginRequest;
+import com.proyecto.servicios.models.response.AuthResponse;
+import com.proyecto.servicios.models.response.GenericResponse;
 import com.proyecto.servicios.service.AutenticacionService;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.*;
 
-@RestController
-@RequestMapping("/auth")
+@RestController @RequestMapping(value = "/auth", produces = MediaType.APPLICATION_JSON_VALUE)
+
 public class AutenticacionController {
-    private final AutenticacionService autenticacionService;
+    private final AutenticacionService service;
+    public AutenticacionController(AutenticacionService service) { this.service=service; }
 
-    public AutenticacionController(AutenticacionService autenticacionService) {
-        this.autenticacionService = autenticacionService;
-    }
-
-    @PostMapping("/register")
-    public ResponseEntity<AuthResponse> registrar(@Valid @RequestBody RegistroRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(autenticacionService.registrar(request));
-    }
-
-    @PostMapping("/login")
-    public AuthResponse iniciarSesion(@Valid @RequestBody LoginRequest request) {
-        return autenticacionService.iniciarSesion(request);
+    @PostMapping("/login") public GenericResponse<AuthResponse> iniciarSesion(@Valid @RequestBody LoginRequest r) {
+        return GenericResponse.exito("Sesión iniciada", service.iniciarSesion(r));
     }
 }

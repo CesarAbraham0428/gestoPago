@@ -2,14 +2,16 @@ package com.proyecto.servicios.service;
 
 import com.proyecto.servicios.entity.gestopago.Producto;
 import com.proyecto.servicios.mapper.ProductoMapper;
-import com.proyecto.servicios.model.CatalogoProductosResponse;
-import com.proyecto.servicios.model.ProductoResponse;
+import com.proyecto.servicios.models.response.CatalogoProductosResponse;
+import com.proyecto.servicios.models.response.ProductoResponse;
 import com.proyecto.servicios.repositorys.gestopago.ProductoRepository;
 import com.proyecto.servicios.service.Impl.CatalogoProductosPersistenceServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Captor;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mapstruct.factory.Mappers;
 
@@ -30,6 +32,8 @@ class CatalogoProductosPersistenceServiceTest {
 
     @Mock
     private ProductoRepository repository;
+    @Captor
+    private ArgumentCaptor<List<Producto>> productosGuardados;
 
     private CatalogoProductosPersistenceService persistence;
 
@@ -42,7 +46,7 @@ class CatalogoProductosPersistenceServiceTest {
     void actualizarSiHayMasProductos_actualizaCuandoLaNuevaCantidadEsMayor() {
         when(repository.count()).thenReturn(2L);
         when(repository.findAllByOrderByIdAsc()).thenReturn(List.of(
-                entity("Persistido-1"), entity("Persistido-2"), entity("Persistido-3")));
+                entity("Nuevo-1"), entity("Nuevo-2"), entity("Nuevo-3")));
 
         CatalogoProductosPersistenceService.ResultadoActualizacion result =
                 persistence.actualizarSiHayMasProductos(List.of(product("Nuevo-1"), product("Nuevo-2"), product("Nuevo-3")));
@@ -51,7 +55,7 @@ class CatalogoProductosPersistenceServiceTest {
         assertEquals(2, result.cantidadAnterior());
         assertEquals(3, result.catalogoPersistido().getTotal());
         verify(repository).deleteAllInBatch();
-        verify(repository).saveAllAndFlush(anyList());
+        comprobarProductosGuardados("Nuevo-1", "Nuevo-2", "Nuevo-3");
         var order = inOrder(repository);
         order.verify(repository).bloquearEscriturasCatalogo();
         order.verify(repository).count();
@@ -101,7 +105,7 @@ class CatalogoProductosPersistenceServiceTest {
         assertEquals(0, result.cantidadAnterior());
         assertEquals(1, result.catalogoPersistido().getTotal());
         verify(repository).deleteAllInBatch();
-        verify(repository).saveAllAndFlush(anyList());
+        comprobarProductosGuardados("Inicial");
     }
 
     @Test
@@ -128,6 +132,18 @@ class CatalogoProductosPersistenceServiceTest {
 
         assertNull(result);
         verify(repository).findAllByOrderByIdAsc();
+    }
+
+    private void comprobarProductosGuardados(String... nombres) {
+        verify(repository).saveAllAndFlush(productosGuardados.capture());
+        List<Producto> guardados = productosGuardados.getValue();
+        assertEquals(nombres.length, guardados.size());
+        for (int i = 0; i < nombres.length; i++) {
+            assertEquals(nombres[i], guardados.get(i).getProducto());
+            assertEquals("Servicio", guardados.get(i).getServicio());
+            assertEquals(1, guardados.get(i).getIdServicio());
+            assertEquals(2, guardados.get(i).getIdProducto());
+        }
     }
 
     private static ProductoResponse product(String name) {

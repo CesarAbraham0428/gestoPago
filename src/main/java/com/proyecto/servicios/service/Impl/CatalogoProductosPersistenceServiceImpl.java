@@ -2,8 +2,8 @@ package com.proyecto.servicios.service.Impl;
 
 import com.proyecto.servicios.entity.gestopago.Producto;
 import com.proyecto.servicios.mapper.ProductoMapper;
-import com.proyecto.servicios.model.CatalogoProductosResponse;
-import com.proyecto.servicios.model.ProductoResponse;
+import com.proyecto.servicios.models.response.CatalogoProductosResponse;
+import com.proyecto.servicios.models.response.ProductoResponse;
 import com.proyecto.servicios.repositorys.gestopago.ProductoRepository;
 import com.proyecto.servicios.service.CatalogoProductosPersistenceService;
 import com.proyecto.servicios.service.exception.CatalogoPersistenciaException;

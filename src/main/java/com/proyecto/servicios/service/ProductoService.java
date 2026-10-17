@@ -1,6 +1,6 @@
 package com.proyecto.servicios.service;
 
-import com.proyecto.servicios.model.CatalogoProductosResponse;
+import com.proyecto.servicios.models.response.CatalogoProductosResponse;
 
 public interface ProductoService {
     CatalogoProductosResponse obtenerProductos();
