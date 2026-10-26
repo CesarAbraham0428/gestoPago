@@ -11,4 +11,5 @@ public class Cuenta extends Auditado {
     @Column(name="numero_cuenta", nullable=false, unique=true, length=18, updatable=false) private String numeroCuenta;
     @Column(nullable=false, precision=18, scale=2) private BigDecimal saldo = BigDecimal.ZERO;
     @Column(name="esta_activa", nullable=false) private boolean estaActiva = true;
+    @Column(name="pin_hash", length=60) private String pinHash;
 }

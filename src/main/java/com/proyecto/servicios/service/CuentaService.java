@@ -18,6 +18,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,13 +30,15 @@ public class CuentaService {
     private final ClientesRepository clientes;
     private final EntityManager em;
     private final AutorizacionService autorizacion;
+    private final PasswordEncoder passwordEncoder;
 
     public CuentaService(CuentaRepository cuentas, ClientesRepository clientes, EntityManager em,
-            AutorizacionService autorizacion) {
+            AutorizacionService autorizacion, PasswordEncoder passwordEncoder) {
         this.cuentas = cuentas;
         this.clientes = clientes;
         this.em = em;
         this.autorizacion = autorizacion;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public ListaGenericResponse<CuentaResponse> consultar(
@@ -68,6 +71,17 @@ public class CuentaService {
         em.flush();
         em.refresh(cuenta);
         return ClienteMapper.cuenta(cuenta);
+    }
+
+    /** Registra o cambia el PIN de autorización de pagos; para cambiarlo se exige el PIN actual. */
+    @Transactional
+    public void configurarPin(String numeroCuenta, String pinActual, String pinNuevo, Integer usuarioAutenticadoId) {
+        Cuenta cuenta = buscarAutorizada(numeroCuenta, usuarioAutenticadoId);
+        if (cuenta.getPinHash() != null
+                && (pinActual == null || !passwordEncoder.matches(pinActual, cuenta.getPinHash()))) {
+            throw new NegocioException(HttpStatus.FORBIDDEN, "El PIN actual es incorrecto");
+        }
+        cuenta.setPinHash(passwordEncoder.encode(pinNuevo));
     }
 
     private Cuenta buscarAutorizada(String numeroCuenta, Integer usuarioAutenticadoId) {

@@ -92,6 +92,25 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
         }
     }
 
+    /**
+     * El token de GestoPago dura 24 horas: se renueva todos los días a las 00:00 (hora de CDMX)
+     * aunque siga vigente. La revisión periódica de arriba cubre los reinicios y las fallas de este cron.
+     */
+    @Scheduled(cron = "${gestopago.auth.renewal-cron:0 0 0 * * *}",
+            zone = "${gestopago.auth.renewal-zone:America/Mexico_City}")
+    public synchronized void renovarTokenDiariamente() {
+        log.info("Inicia renovación diaria del token de GestoPago");
+        try {
+            renovarTokenInterno();
+        } catch (GestoPagoAuthException exception) {
+            log.error("Falló la renovación diaria del token de GestoPago: tipo={}, statusHttp={}",
+                    exception.getTipo(), exception.getStatusHttp());
+        } catch (DataAccessException | TransactionException exception) {
+            log.error("Falló PostgreSQL durante la renovación diaria del token ({})",
+                    exception.getClass().getSimpleName());
+        }
+    }
+
     @Override
     public synchronized Optional<GestoPagoToken> obtenerTokenActivo(
             Integer idDistribuidor, String codigoDispositivo) {
