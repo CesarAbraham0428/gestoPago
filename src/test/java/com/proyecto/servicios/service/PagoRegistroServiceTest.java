@@ -128,7 +128,7 @@ class PagoRegistroServiceTest {
     }
 
     @Test
-    void aprobarGuardaEvidenciaYOcultaElTelefonoFijo() {
+    void aprobarGuardaEvidenciaYDevuelveElComprobanteDeGestoPago() {
         Pago pago = pagoPendiente(EstadoPago.PENDIENTE);
         pago.setTelefono("1111111111");
         pago.setReferencia("REF1");
@@ -141,7 +141,9 @@ class PagoRegistroServiceTest {
         assertEquals(EstadoPago.APROBADO, pago.getEstado());
         assertEquals(291437188L, pago.getIdTx());
         assertEquals("<RESPONSE>01</RESPONSE>", pago.getRespuesta());
-        assertNull(comprobante.telefono());
+        assertEquals("APROBADO", comprobante.estado());
+        assertEquals(291437188L, comprobante.idTx());
+        assertEquals("100024988", comprobante.numAutorizacion());
         assertEquals("REF1", comprobante.referencia());
         assertEquals(new BigDecimal("150.00"), comprobante.saldoDisponible());
     }

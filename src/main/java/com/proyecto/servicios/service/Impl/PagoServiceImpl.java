@@ -208,7 +208,7 @@ public class PagoServiceImpl implements PagoService {
         log.error("Pago sin confirmación de GestoPago; queda EN_REVISION: folio={}, upc={}",
                 pago.getId(), pago.getUpc());
         return new NegocioException(HttpStatus.GATEWAY_TIMEOUT, "No se recibió confirmación del proveedor. "
-                + "El pago con folio " + pago.getId() + " quedó en revisión y el monto permanece retenido; "
+                + "El pago (referencia " + pago.getUpc() + ") quedó en revisión y el monto permanece retenido; "
                 + "se confirmará automáticamente en unos minutos. No lo intentes de nuevo.");
     }
 

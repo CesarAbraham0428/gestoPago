@@ -143,10 +143,8 @@ public class PagoRegistroService {
 
     public PagoServicioResponse comprobante(Pago pago, GestoPagoPagosResponse respuesta,
             BigDecimal saldoDisponible) {
-        return new PagoServicioResponse(pago.getId(), EstadoPago.APROBADO.name(),
-                pago.getCuenta().getNumeroCuenta(), pago.getUpc(), respuesta.getIdTx(),
-                respuesta.getNumAutorizacion(), pago.getMonto(), respuesta.getComision(),
-                telefonoVisible(pago.getTelefono()), pago.getReferencia(), saldoDisponible,
+        return new PagoServicioResponse(EstadoPago.APROBADO.name(), respuesta.getIdTx(),
+                respuesta.getNumAutorizacion(), pago.getMonto(), pago.getReferencia(), saldoDisponible,
                 respuesta.getFecha(), respuesta.getPin(), respuesta.getLegend());
     }
 
@@ -170,11 +168,6 @@ public class PagoRegistroService {
         pago.setEstado(EstadoPago.RECHAZADO);
         pago.setCodigoRespuesta(recortar(codigoRespuesta, 4));
         pago.setMensaje(recortar(motivo, LONGITUD_MENSAJE));
-    }
-
-    // Los valores fijos de GestoPago ("1111111111", "#1111111111") no son un teléfono del cliente.
-    private String telefonoVisible(String telefono) {
-        return telefono == null || telefono.matches("#?1111111111") ? null : telefono;
     }
 
     private void validarPin(Cuenta cuenta, String pin) {

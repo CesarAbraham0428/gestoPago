@@ -4,20 +4,15 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 
 /**
- * Comprobante que recibe el cliente. No expone el SALDO de GestoPago (es el saldo del distribuidor),
- * sino el saldo disponible de la cuenta del cliente después del cargo.
+ * Comprobante que recibe el cliente, con los mismos datos que devuelve sendTx. No expone el SALDO ni la
+ * COMISION de GestoPago (son del distribuidor), sino el saldo disponible de la cuenta del cliente.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record PagoServicioResponse(
-        Integer folio,
         String estado,
-        String numeroCuenta,
-        String upc,
         Long idTx,
         String numAutorizacion,
         BigDecimal monto,
-        BigDecimal comision,
-        String telefono,
         String referencia,
         BigDecimal saldoDisponible,
         String fecha,
