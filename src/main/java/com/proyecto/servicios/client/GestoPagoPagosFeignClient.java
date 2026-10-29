@@ -22,4 +22,9 @@ public interface GestoPagoPagosFeignClient {
             consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     Response confirmarTransaccion(@RequestHeader("Authorization") String authorization,
             @RequestBody Map<String, ?> formulario);
+
+    @PostMapping(value = "${gestopago.pagos.verify-path:/sistema/service/verifyReference.do}",
+            consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    Response verificarReferencia(@RequestHeader("Authorization") String authorization,
+            @RequestBody Map<String, ?> formulario);
 }

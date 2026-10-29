@@ -11,11 +11,11 @@ import com.proyecto.servicios.repositorys.sf.CuentaRepository;
 import com.proyecto.servicios.repositorys.sf.PagoRepository;
 import com.proyecto.servicios.service.exception.CuentaNoEncontradaException;
 import com.proyecto.servicios.service.exception.NegocioException;
+import com.proyecto.servicios.service.exception.PinIncorrectoException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,18 +37,19 @@ public class PagoRegistroService {
     private final CuentaRepository cuentas;
     private final PagoRepository pagos;
     private final AutorizacionService autorizacion;
-    private final PasswordEncoder passwordEncoder;
+    private final PinAutorizacionService pinAutorizacion;
 
     public PagoRegistroService(CuentaRepository cuentas, PagoRepository pagos,
-            AutorizacionService autorizacion, PasswordEncoder passwordEncoder) {
+            AutorizacionService autorizacion, PinAutorizacionService pinAutorizacion) {
         this.cuentas = cuentas;
         this.pagos = pagos;
         this.autorizacion = autorizacion;
-        this.passwordEncoder = passwordEncoder;
+        this.pinAutorizacion = pinAutorizacion;
     }
 
-    @Transactional
-    public Pago reservar(PagoServicioRequest request, Producto producto, String telefono, String referencia,
+    /** Un PIN incorrecto no revierte la transacción: el intento fallido debe quedar guardado. */
+    @Transactional(noRollbackFor = PinIncorrectoException.class)
+    public Pago reservar(PagoServicioRequest request, Producto producto, DestinoPago destino,
             String upc, String peticion, Integer usuarioAutenticadoId) {
         Cuenta cuenta = cuentas.bloquearPorNumero(request.numeroCuenta())
                 .orElseThrow(CuentaNoEncontradaException::new);
@@ -57,16 +58,18 @@ public class PagoRegistroService {
         if (!cuenta.isEstaActiva()) {
             throw new NegocioException(HttpStatus.CONFLICT, "La cuenta no está activa");
         }
-        if (cuenta.getSaldo() == null || cuenta.getSaldo().signum() <= 0) {
-            throw new NegocioException(HttpStatus.UNPROCESSABLE_ENTITY, "La cuenta no tiene saldo disponible");
+        if (cuenta.getPinHash() == null) {
+            throw new NegocioException(HttpStatus.CONFLICT,
+                    "La cuenta no tiene un PIN de autorización configurado");
         }
-        if (cuenta.getSaldo().compareTo(request.monto()) < 0) {
+        pinAutorizacion.verificar(cuenta, request.pinAutorizacion());
+
+        BigDecimal cargo = request.monto().add(destino.comision());
+        if (cuenta.getSaldo().compareTo(cargo) < 0) {
             throw new NegocioException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Saldo insuficiente para realizar el pago");
         }
-        validarPin(cuenta, request.pinAutorizacion());
-
-        cuenta.setSaldo(cuenta.getSaldo().subtract(request.monto()));
+        cuenta.setSaldo(cuenta.getSaldo().subtract(cargo));
 
         Pago pago = new Pago();
         pago.setCuenta(cuenta);
@@ -74,9 +77,10 @@ public class PagoRegistroService {
         pago.setIdProducto(producto.getIdProducto());
         pago.setIdServicio(producto.getIdServicio());
         pago.setTipoFront(producto.getTipoFront());
-        pago.setTelefono(telefono);
-        pago.setReferencia(referencia);
+        pago.setTelefono(destino.telefono());
+        pago.setReferencia(destino.referencia());
         pago.setMonto(request.monto());
+        pago.setComisionCliente(destino.comision());
         pago.setUpc(upc);
         pago.setPeticion(peticion);
         pago.setEstado(EstadoPago.PENDIENTE);
@@ -144,7 +148,8 @@ public class PagoRegistroService {
     public PagoServicioResponse comprobante(Pago pago, GestoPagoPagosResponse respuesta,
             BigDecimal saldoDisponible) {
         return new PagoServicioResponse(EstadoPago.APROBADO.name(), respuesta.getIdTx(),
-                respuesta.getNumAutorizacion(), pago.getMonto(), pago.getReferencia(), saldoDisponible,
+                respuesta.getNumAutorizacion(), pago.getMonto(), pago.getComisionCliente(), pago.getReferencia(),
+                saldoDisponible,
                 respuesta.getFecha(), respuesta.getPin(), respuesta.getLegend());
     }
 
@@ -164,20 +169,10 @@ public class PagoRegistroService {
         }
         Cuenta cuenta = cuentas.bloquearPorId(pago.getCuenta().getId())
                 .orElseThrow(CuentaNoEncontradaException::new);
-        cuenta.setSaldo(cuenta.getSaldo().add(pago.getMonto()));
+        cuenta.setSaldo(cuenta.getSaldo().add(pago.cargo()));
         pago.setEstado(EstadoPago.RECHAZADO);
         pago.setCodigoRespuesta(recortar(codigoRespuesta, 4));
         pago.setMensaje(recortar(motivo, LONGITUD_MENSAJE));
-    }
-
-    private void validarPin(Cuenta cuenta, String pin) {
-        if (cuenta.getPinHash() == null) {
-            throw new NegocioException(HttpStatus.CONFLICT,
-                    "La cuenta no tiene un PIN de autorización configurado");
-        }
-        if (pin == null || !passwordEncoder.matches(pin, cuenta.getPinHash())) {
-            throw new NegocioException(HttpStatus.FORBIDDEN, "PIN de autorización incorrecto");
-        }
     }
 
     private Pago buscar(Integer pagoId) {

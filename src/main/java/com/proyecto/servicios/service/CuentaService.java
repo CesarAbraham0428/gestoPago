@@ -12,7 +12,9 @@ import com.proyecto.servicios.service.exception.ClienteNoEncontradoException;
 import com.proyecto.servicios.service.exception.CuentaNoEncontradaException;
 import com.proyecto.servicios.service.exception.NegocioException;
 import com.proyecto.servicios.service.exception.ValidacionException;
+import com.proyecto.servicios.service.exception.PinIncorrectoException;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -31,14 +33,17 @@ public class CuentaService {
     private final EntityManager em;
     private final AutorizacionService autorizacion;
     private final PasswordEncoder passwordEncoder;
+    private final PinAutorizacionService pinAutorizacion;
 
     public CuentaService(CuentaRepository cuentas, ClientesRepository clientes, EntityManager em,
-            AutorizacionService autorizacion, PasswordEncoder passwordEncoder) {
+            AutorizacionService autorizacion, PasswordEncoder passwordEncoder,
+            PinAutorizacionService pinAutorizacion) {
         this.cuentas = cuentas;
         this.clientes = clientes;
         this.em = em;
         this.autorizacion = autorizacion;
         this.passwordEncoder = passwordEncoder;
+        this.pinAutorizacion = pinAutorizacion;
     }
 
     public ListaGenericResponse<CuentaResponse> consultar(
@@ -74,12 +79,13 @@ public class CuentaService {
     }
 
     /** Registra o cambia el PIN de autorización de pagos; para cambiarlo se exige el PIN actual. */
-    @Transactional
+    @Transactional(noRollbackFor = PinIncorrectoException.class)
     public void configurarPin(String numeroCuenta, String pinActual, String pinNuevo, Integer usuarioAutenticadoId) {
         Cuenta cuenta = buscarAutorizada(numeroCuenta, usuarioAutenticadoId);
-        if (cuenta.getPinHash() != null
-                && (pinActual == null || !passwordEncoder.matches(pinActual, cuenta.getPinHash()))) {
-            throw new NegocioException(HttpStatus.FORBIDDEN, "El PIN actual es incorrecto");
+        // Bloqueo de la fila: intentos simultáneos no deben perder incrementos del contador de PIN.
+        em.refresh(cuenta, LockModeType.PESSIMISTIC_WRITE);
+        if (cuenta.getPinHash() != null) {
+            pinAutorizacion.verificar(cuenta, pinActual);
         }
         cuenta.setPinHash(passwordEncoder.encode(pinNuevo));
     }

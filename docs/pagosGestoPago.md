@@ -21,7 +21,7 @@ Base URL: `https://gestopago.portalventas.net/sistema/service/`
 
 `POST /sistema/service/sendTx.do`
 
-Vende cualquier producto/servicio (recarga, pago de servicio, tarjeta canjeable). Los parámetros que espera dependen del **`tipoFront`** del producto (ver sección 4).
+Vende cualquier producto/servicio (recarga, pago de servicio, tarjeta canjeable). Los parámetros que espera dependen del `tipoFront` del producto (ver sección 4).
 
 El resultado es éxito o fallo; los códigos de error deben mapearse en la aplicación.
 
@@ -41,6 +41,7 @@ El resultado es éxito o fallo; los códigos de error deben mapearse en la aplic
 ### Ejemplos de payload
 
 Recarga (`tipoFront 1`):
+
 ```json
 {
   "idProducto": 582,
@@ -53,6 +54,7 @@ Recarga (`tipoFront 1`):
 ```
 
 Pago de servicio (`tipoFront 2`):
+
 ```json
 {
   "idProducto": 205,
@@ -67,6 +69,7 @@ Pago de servicio (`tipoFront 2`):
 ```
 
 Artículo canjeable (gift card, `idCatTipoServicio` 10/11):
+
 ```json
 {
   "idProducto": 7030,
@@ -95,6 +98,7 @@ Artículo canjeable (gift card, `idCatTipoServicio` 10/11):
 | `MONTO` | Monto de la transacción. | Double |
 
 Éxito:
+
 ```xml
 <RESPONSE>
     <ID_TX>291437188</ID_TX>
@@ -114,6 +118,7 @@ Artículo canjeable (gift card, `idCatTipoServicio` 10/11):
 ```
 
 Artículo canjeable (incluye `PIN` y `legend`):
+
 ```xml
 <MENSAJE>
     <CODIGO>01</CODIGO>
@@ -123,6 +128,7 @@ Artículo canjeable (incluye `PIN` y `legend`):
     <REFERENCIA></REFERENCIA>
 </MENSAJE>
 ```
+
 El cliente final **debe** recibir PIN/folio y `legend` (se imprimen en su comprobante); ese proceso es externo a PuntoRed.
 
 ### Códigos observados
@@ -135,6 +141,7 @@ El cliente final **debe** recibir PIN/folio y `legend` (se imprimen en su compro
 | `82` | Tiempo de espera alcanzado, la transacción no ha sido registrada | Sin respuesta tras **62 s**; hay que llamar a `confirmTx`. |
 
 Respuesta de timeout:
+
 ```xml
 <RESPONSE>
     <NUM_AUTORIZACION>-1</NUM_AUTORIZACION>
@@ -154,6 +161,7 @@ Respuesta de timeout:
 Indica si una transacción fue **aplicada o no**. Es **obligatorio** invocarlo cuando `sendTx` no devolvió resultado (timeout, código `82`, desconexión) y no se pudo recibir la respuesta de la venta.
 
 Reglas:
+
 - Se envía con **exactamente los mismos parámetros** que el `sendTx` original (incluido el mismo `upc` y `horaLocal`).
 - **No** ejecutarlo antes de **62 segundos** después del `sendTx`.
 - Vida útil de **24 horas** desde el `sendTx`; pasado ese tiempo no debe ejecutarse.
@@ -170,11 +178,13 @@ Reglas:
   "unidad": "083"
 }
 ```
+
 (Para pagos de servicio se añaden también `referencia` y `montoPago`, igual que en el `sendTx`.)
 
 ### Respuestas (XML)
 
 Transacción aplicada:
+
 ```xml
 <RESPONSE>
     <NUM_AUTORIZACION>100024988</NUM_AUTORIZACION>
@@ -187,6 +197,7 @@ Transacción aplicada:
 ```
 
 Transacción no aplicada:
+
 ```xml
 <RESPONSE>
     <NUM_AUTORIZACION>0</NUM_AUTORIZACION>
@@ -263,6 +274,7 @@ Relación práctica: `tipoFront 1` ↔ `tipoReferencia a` (teléfono); `tipoFron
 | 10 | Servicios de prepago (**canjeable**) | | | |
 
 Regla para `telefono` en `sendTx`:
+
 - `tipoFront 1` → el número de teléfono (o referencia) va en `telefono`.
 - `tipoFront 2` → `telefono` fijo `"1111111111"`.
 - `idCatTipoServicio` 10 u 11 (canjeables) → `telefono` fijo `"#1111111111"`; la respuesta trae `PIN` y `legend`.

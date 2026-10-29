@@ -31,7 +31,8 @@ class PagoRegistroServiceTest {
     private final PagoRepository pagos = mock(PagoRepository.class);
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
     private final PagoRegistroService service = new PagoRegistroService(cuentas, pagos,
-            new AutorizacionService(usuarios), encoder);
+            new AutorizacionService(usuarios), new PinAutorizacionService(encoder));
+    private final DestinoPago recarga = new DestinoPago("5512345678", null, null, BigDecimal.ZERO);
     private Cuenta cuenta;
     private Producto producto;
 
@@ -60,7 +61,7 @@ class PagoRegistroServiceTest {
 
     @Test
     void reservarDescuentaSaldoYRegistraPagoPendiente() {
-        Pago pago = service.reservar(request("100.00", "1234"), producto, "5512345678", null, "UPC1234567",
+        Pago pago = service.reservar(request("100.00", "1234"), producto, recarga, "UPC1234567",
                 "{\"upc\":\"UPC1234567\"}", 7);
 
         assertEquals(new BigDecimal("50.00"), cuenta.getSaldo());
@@ -89,14 +90,33 @@ class PagoRegistroServiceTest {
 
     @Test
     void saldoIgualAlMontoSiPuedePagar() {
-        service.reservar(request("150.00", "1234"), producto, "5512345678", null, "UPC1234567", "{}", 7);
+        service.reservar(request("150.00", "1234"), producto, recarga, "UPC1234567", "{}", 7);
         assertEquals(0, cuenta.getSaldo().signum());
     }
 
     @Test
-    void pinIncorrectoNoDescuentaSaldo() {
+    void pagoDeServicioDescuentaMontoMasComision() {
+        DestinoPago servicio = new DestinoPago("1111111111", "REF1", new BigDecimal("100.00"), new BigDecimal("12.00"));
+
+        Pago pago = service.reservar(request("100.00", "1234"), producto, servicio, "UPC1234567", "{}", 7);
+
+        assertEquals(new BigDecimal("38.00"), cuenta.getSaldo());
+        assertEquals(new BigDecimal("12.00"), pago.getComisionCliente());
+    }
+
+    @Test
+    void saldoQueNoCubreLaComisionNoPuedePagar() {
+        DestinoPago servicio = new DestinoPago("1111111111", "REF1", new BigDecimal("150.00"), BigDecimal.ONE);
+        NegocioException error = assertThrows(NegocioException.class, () ->
+                service.reservar(request("150.00", "1234"), producto, servicio, "UPC1234567", "{}", 7));
+        assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, error.getStatus());
+    }
+
+    @Test
+    void pinIncorrectoNoDescuentaSaldoYCuentaElIntento() {
         assertEstado(HttpStatus.FORBIDDEN, request("10.00", "9999"));
         assertEquals(new BigDecimal("150.00"), cuenta.getSaldo());
+        assertEquals(1, cuenta.getIntentosPinFallidos());
     }
 
     @Test
@@ -111,6 +131,16 @@ class PagoRegistroServiceTest {
         otro.setId(99);
         cuenta.setCliente(otro);
         assertEstado(HttpStatus.FORBIDDEN, request("10.00", "1234"));
+    }
+
+    @Test
+    void revertirDevuelveMontoYComision() {
+        Pago pago = pagoPendiente(EstadoPago.PENDIENTE);
+        pago.setComisionCliente(new BigDecimal("12.00"));
+
+        service.revertir(55, null, "No enviado");
+
+        assertEquals(new BigDecimal("202.00"), cuenta.getSaldo());
     }
 
     @Test
@@ -201,7 +231,7 @@ class PagoRegistroServiceTest {
 
     private void assertEstado(HttpStatus estado, PagoServicioRequest request) {
         NegocioException error = assertThrows(NegocioException.class,
-                () -> service.reservar(request, producto, "5512345678", null, "UPC1234567", "{}", 7));
+                () -> service.reservar(request, producto, recarga, "UPC1234567", "{}", 7));
         assertEquals(estado, error.getStatus());
         verify(pagos, never()).saveAndFlush(any());
     }

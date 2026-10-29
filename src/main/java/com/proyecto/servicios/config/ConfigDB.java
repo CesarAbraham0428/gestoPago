@@ -3,12 +3,15 @@ package com.proyecto.servicios.config;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.cfg.AvailableSettings;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.core.env.Environment;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.orm.hibernate5.SpringBeanContainer;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
@@ -47,7 +50,7 @@ public class ConfigDB {
     @Bean(name="sfEntityManagerFactory")
     @DependsOn("flyway")
     public LocalContainerEntityManagerFactoryBean sfEntityManagerFactory(
-        @Qualifier("sfDatasource") DataSource datasource) {
+        @Qualifier("sfDatasource") DataSource datasource, ConfigurableListableBeanFactory beanFactory) {
         LocalContainerEntityManagerFactoryBean em = new LocalContainerEntityManagerFactoryBean();
         em.setDataSource(datasource);
         em.setPackagesToScan("com.proyecto.servicios.entity.sf", "com.proyecto.servicios.entity.gestopago");
@@ -57,6 +60,8 @@ public class ConfigDB {
             "hibernate.hbm2ddl.auto", "none",
             "hibernate.show_sql", false,
             "hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect",
+            // Permite que Hibernate obtenga de Spring los converters con dependencias (p. ej. la llave del token).
+            AvailableSettings.BEAN_CONTAINER, new SpringBeanContainer(beanFactory),
             "jakarta.persistence.query.timeout", env.getProperty("gestopago.db.query-timeout-ms", Integer.class, 10000)
         ));
         return em;
