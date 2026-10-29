@@ -8,9 +8,11 @@ import com.proyecto.servicios.entity.gestopago.Producto;
 import com.proyecto.servicios.entity.sf.Pago;
 import com.proyecto.servicios.models.request.PagoServicioRequest;
 import com.proyecto.servicios.models.request.gestopago.GestoPagoSendTxRequest;
+import com.proyecto.servicios.models.request.gestopago.GestoPagoVerificarReferenciaRequest;
 import com.proyecto.servicios.models.response.PagoServicioResponse;
 import com.proyecto.servicios.models.response.gestopago.GestoPagoPagosResponse;
 import com.proyecto.servicios.repositorys.gestopago.ProductoRepository;
+import com.proyecto.servicios.service.DestinoPago;
 import com.proyecto.servicios.service.GestoPagoTokenService;
 import com.proyecto.servicios.service.PagoRegistroService;
 import com.proyecto.servicios.service.PagoService;
@@ -34,6 +36,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -56,6 +59,7 @@ public class PagoServiceImpl implements PagoService {
     // Reglas de getProductList / sendTx.
     private static final int TIPO_FRONT_RECARGA = 1;
     private static final int TIPO_FRONT_SERVICIO = 2;
+    private static final int TIPO_FRONT_CONSULTA = 4;
     private static final Set<Integer> TIPOS_SERVICIO_CANJEABLES = Set.of(10, 11);
     private static final String TELEFONO_SERVICIO = "1111111111";
     private static final String TELEFONO_CANJEABLE = "#1111111111";
@@ -108,15 +112,14 @@ public class PagoServiceImpl implements PagoService {
         Producto producto = productos.findFirstByIdProductoAndIdServicio(request.idProducto(), request.idServicio())
                 .orElseThrow(() -> new NegocioException(HttpStatus.NOT_FOUND,
                         "El producto o servicio no existe en el catálogo"));
-        Destino destino = resolverDestino(producto, request);
+        DestinoPago destino = resolverDestino(producto, request);
 
         String upc = CadenaAleatoria.generar(LONGITUD_UPC);
         String peticion = firma.serializar(new GestoPagoSendTxRequest(producto.getIdProducto(),
                 producto.getIdServicio(), destino.telefono(), LocalDateTime.now(clock).format(HORA_LOCAL),
                 destino.referencia(), destino.montoPago(), upc, unidad));
 
-        Pago pago = registro.reservar(request, producto, destino.telefono(), destino.referencia(), upc,
-                peticion, usuarioAutenticadoId);
+        Pago pago = registro.reservar(request, producto, destino, upc, peticion, usuarioAutenticadoId);
         log.info("Saldo retenido para el pago: folio={}, upc={}", pago.getId(), upc);
 
         GestoPagoPagosResponse respuesta = enviar(pago, peticion);
@@ -127,6 +130,7 @@ public class PagoServiceImpl implements PagoService {
         if (respuesta.esCodigo(GestoPagoPagosResponse.CODIGO_TIEMPO_AGOTADO)) {
             throw dejarEnRevision(pago, "GestoPago agotó el tiempo de espera (82)", respuesta.getRespuestaOriginal());
         }
+        // El texto de GestoPago solo se guarda en la BD; al cliente se le responde con mensajes propios.
         registro.revertir(pago.getId(), respuesta, respuesta.getMensaje());
         log.warn("GestoPago rechazó el pago; saldo devuelto: folio={}, codigo={}", pago.getId(), respuesta.getCodigo());
         if (respuesta.esSaldoInsuficiente()) {
@@ -137,10 +141,10 @@ public class PagoServiceImpl implements PagoService {
         }
         if (respuesta.esCodigo(GestoPagoPagosResponse.CODIGO_DUPLICADO)) {
             throw new NegocioException(HttpStatus.CONFLICT, "Pago duplicado: ya se aplicó un pago igual "
-                    + "recientemente; no se realizó ningún cargo" + detalle(respuesta));
+                    + "recientemente; no se realizó ningún cargo");
         }
         throw new NegocioException(HttpStatus.UNPROCESSABLE_ENTITY,
-                "El proveedor rechazó el pago (código " + respuesta.getCodigo() + ")" + detalle(respuesta));
+                "El proveedor rechazó el pago; no se realizó ningún cargo");
     }
 
     /**
@@ -254,31 +258,62 @@ public class PagoServiceImpl implements PagoService {
     /**
      * tipoFront 1 (recargas): el teléfono es el único dato y el precio del catálogo es el precio final.
      * tipoFront 2 (pagos de servicio): referencia y montoPago obligatorios, teléfono fijo "1111111111";
-     * aquí el precio del catálogo es la comisión, no el monto.
+     * aquí el precio del catálogo es la comisión que se cobra al cliente, no el monto.
      * idCatTipoServicio 10 y 11 (artículos canjeables, p. ej. tarjetas de regalo): teléfono fijo "#1111111111".
      */
-    private Destino resolverDestino(Producto producto, PagoServicioRequest request) {
+    private DestinoPago resolverDestino(Producto producto, PagoServicioRequest request) {
         Integer tipoFront = producto.getTipoFront();
         boolean canjeable = producto.getIdCatTipoServicio() != null
                 && TIPOS_SERVICIO_CANJEABLES.contains(producto.getIdCatTipoServicio());
         if (tipoFront != null && tipoFront == TIPO_FRONT_RECARGA) {
             validarPrecioFijo(producto, request.monto());
             if (canjeable) {
-                return new Destino(TELEFONO_CANJEABLE, null, null);
+                return new DestinoPago(TELEFONO_CANJEABLE, null, null, BigDecimal.ZERO);
             }
             if (request.telefono() == null) {
                 throw new ValidacionException("telefono: este producto requiere un número de teléfono de 10 dígitos");
             }
-            return new Destino(request.telefono(), null, null);
+            return new DestinoPago(request.telefono(), null, null, BigDecimal.ZERO);
         }
         if (tipoFront != null && tipoFront == TIPO_FRONT_SERVICIO) {
             if (request.referencia() == null) {
                 throw new ValidacionException("referencia: este servicio requiere la referencia del recibo");
             }
-            return new Destino(canjeable ? TELEFONO_CANJEABLE : TELEFONO_SERVICIO, request.referencia(),
-                    request.monto());
+            validarAdeudo(producto, request);
+            BigDecimal comision = producto.getPrecio() == null
+                    ? BigDecimal.ZERO : producto.getPrecio().max(BigDecimal.ZERO);
+            return new DestinoPago(canjeable ? TELEFONO_CANJEABLE : TELEFONO_SERVICIO, request.referencia(),
+                    request.monto(), comision);
         }
-        throw new ValidacionException("idProducto: este producto no se puede pagar (tipoFront " + tipoFront + ")");
+        throw new ValidacionException("idProducto: este producto no se puede pagar");
+    }
+
+    /**
+     * Si el servicio tiene producto de consulta (tipoFront 4), verifyReference.do da el adeudo real y el monto
+     * debe coincidir con él; así no se paga un monto manipulado. No todos los servicios ofrecen la consulta.
+     */
+    private void validarAdeudo(Producto producto, PagoServicioRequest request) {
+        Optional<Producto> consulta = productos.findFirstByIdServicioAndTipoFront(producto.getIdServicio(),
+                TIPO_FRONT_CONSULTA);
+        if (consulta.isEmpty()) {
+            return;
+        }
+        String firmada = firma.firmar(new GestoPagoVerificarReferenciaRequest(consulta.get().getIdProducto(),
+                producto.getIdServicio(), request.referencia()));
+        GestoPagoPagosResponse respuesta = conRenovacion(token -> pagosClient.verificarReferencia(token, firmada));
+        if (!respuesta.esExitoso() || respuesta.getSaldo() == null) {
+            log.warn("verifyReference no confirmó el adeudo: idServicio={}, codigo={}",
+                    producto.getIdServicio(), respuesta.getCodigo());
+            throw new NegocioException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "No fue posible verificar la referencia; no se realizó ningún cargo");
+        }
+        if (respuesta.getSaldo().signum() <= 0) {
+            throw new NegocioException(HttpStatus.UNPROCESSABLE_ENTITY, "La referencia no tiene adeudo pendiente");
+        }
+        if (respuesta.getSaldo().compareTo(request.monto()) != 0) {
+            throw new ValidacionException("monto: debe ser igual al adeudo de la referencia ("
+                    + respuesta.getSaldo().toPlainString() + ")");
+        }
     }
 
     private void validarPrecioFijo(Producto producto, BigDecimal monto) {
@@ -290,12 +325,5 @@ public class PagoServiceImpl implements PagoService {
 
     private boolean autorizacionValida(String numAutorizacion) {
         return numAutorizacion != null && !numAutorizacion.equals("0") && !numAutorizacion.equals("-1");
-    }
-
-    private String detalle(GestoPagoPagosResponse respuesta) {
-        return respuesta.getMensaje() == null ? "" : ": " + respuesta.getMensaje().replaceAll("\\s+", " ");
-    }
-
-    private record Destino(String telefono, String referencia, BigDecimal montoPago) {
     }
 }

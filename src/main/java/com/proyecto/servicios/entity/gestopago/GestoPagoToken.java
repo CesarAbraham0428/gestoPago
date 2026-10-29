@@ -1,5 +1,6 @@
 package com.proyecto.servicios.entity.gestopago;
 
+import com.proyecto.servicios.utils.CifradoTokenConverter;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -22,6 +23,7 @@ public class GestoPagoToken {
     @Column(name = "codigo_dispositivo", nullable = false, length = 100)
     private String codigoDispositivo;
 
+    @Convert(converter = CifradoTokenConverter.class)
     @Column(name = "token", nullable = false, columnDefinition = "TEXT")
     private String token;
 

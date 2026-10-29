@@ -36,8 +36,9 @@ class CuentaServiceTest {
     private final ClientesRepository clientes = mock(ClientesRepository.class);
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
     private final EntityManager em = mock(EntityManager.class);
+    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
     private final CuentaService service = new CuentaService(cuentas, clientes, em,
-            new AutorizacionService(usuarios), new BCryptPasswordEncoder(4));
+            new AutorizacionService(usuarios), encoder, new PinAutorizacionService(encoder));
     private Usuario usuario;
 
     @BeforeEach

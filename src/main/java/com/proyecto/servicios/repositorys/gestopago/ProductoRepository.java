@@ -15,6 +15,8 @@ public interface ProductoRepository extends JpaRepository<Producto, Integer> {
 
     Optional<Producto> findFirstByIdProductoAndIdServicio(Integer idProducto, Integer idServicio);
 
+    Optional<Producto> findFirstByIdServicioAndTipoFront(Integer idServicio, Integer tipoFront);
+
     @Query(value = "WITH catalog_lock AS (SELECT pg_advisory_xact_lock(7412609, 1)) SELECT 1 FROM catalog_lock",
             nativeQuery = true)
     Integer bloquearEscriturasCatalogo();

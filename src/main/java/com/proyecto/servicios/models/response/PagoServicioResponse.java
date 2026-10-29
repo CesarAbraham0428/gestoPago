@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 /**
  * Comprobante que recibe el cliente, con los mismos datos que devuelve sendTx. No expone el SALDO ni la
  * COMISION de GestoPago (son del distribuidor), sino el saldo disponible de la cuenta del cliente.
+ * comision es la que se cobró al cliente (pagos de servicio); el cargo total fue monto + comision.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record PagoServicioResponse(
@@ -13,6 +14,7 @@ public record PagoServicioResponse(
         Long idTx,
         String numAutorizacion,
         BigDecimal monto,
+        BigDecimal comision,
         String referencia,
         BigDecimal saldoDisponible,
         String fecha,

@@ -11,6 +11,7 @@ import com.proyecto.servicios.models.request.PagoServicioRequest;
 import com.proyecto.servicios.models.response.PagoServicioResponse;
 import com.proyecto.servicios.models.response.gestopago.GestoPagoPagosResponse;
 import com.proyecto.servicios.repositorys.gestopago.ProductoRepository;
+import com.proyecto.servicios.service.DestinoPago;
 import com.proyecto.servicios.service.GestoPagoTokenService;
 import com.proyecto.servicios.service.PagoRegistroService;
 import com.proyecto.servicios.service.exception.NegocioException;
@@ -55,9 +56,9 @@ class PagoServiceImplTest {
         pago = new Pago();
         pago.setId(55);
         pago.setCuenta(cuenta);
-        when(registro.reservar(any(), any(), any(), any(), anyString(), anyString(), eq(7))).thenAnswer(inv -> {
-            pago.setUpc(inv.getArgument(4));
-            pago.setPeticion(inv.getArgument(5));
+        when(registro.reservar(any(), any(), any(), anyString(), anyString(), eq(7))).thenAnswer(inv -> {
+            pago.setUpc(inv.getArgument(3));
+            pago.setPeticion(inv.getArgument(4));
             return pago;
         });
         GestoPagoToken token = new GestoPagoToken();
@@ -86,8 +87,8 @@ class PagoServiceImplTest {
     }
 
     @Test
-    void pagoDeServicioEnviaTelefonoFijoReferenciaYMonto() throws Exception {
-        // Con tipoFront 2 el precio del catálogo es la comisión: no debe compararse con el monto.
+    void pagoDeServicioEnviaTelefonoFijoReferenciaYMontoYCobraLaComision() throws Exception {
+        // Con tipoFront 2 el precio del catálogo es la comisión: no se compara con el monto, se cobra aparte.
         producto(2, 5, new BigDecimal("10.00"));
         when(pagosClient.enviar(any(), any())).thenReturn(respuesta("01"));
 
@@ -97,6 +98,64 @@ class PagoServiceImplTest {
         assertEquals("1111111111", peticion.get("telefono"));
         assertEquals("REF999", peticion.get("referencia"));
         assertEquals(100.00, ((Number) peticion.get("montoPago")).doubleValue());
+        verify(registro).reservar(any(), any(), eq(new DestinoPago("1111111111", "REF999",
+                new BigDecimal("100.00"), new BigDecimal("10.00"))), anyString(), anyString(), eq(7));
+        verify(pagosClient, never()).verificarReferencia(any(), any());
+    }
+
+    @Test
+    void pagoDeServicioConConsultaDisponibleVerificaElAdeudoAntesDeCobrar() throws Exception {
+        producto(2, 5, null);
+        productoDeConsulta();
+        when(pagosClient.verificarReferencia(eq("tok-1"), anyString())).thenReturn(adeudo("100.00"));
+        when(pagosClient.enviar(any(), any())).thenReturn(respuesta("01"));
+
+        service.pagar(request(null, "REF999"), 7);
+
+        ArgumentCaptor<String> firmada = ArgumentCaptor.forClass(String.class);
+        verify(pagosClient).verificarReferencia(eq("tok-1"), firmada.capture());
+        Map<?, ?> consulta = mapper.readValue(firma.descifrar(firmada.getValue()), Map.class);
+        assertEquals(Map.of("idProducto", 40, "idServicio", 30, "referencia", "REF999"), consulta);
+        verify(registro).reservar(any(), any(), any(), anyString(), anyString(), eq(7));
+    }
+
+    @Test
+    void montoDistintoAlAdeudoSeRechazaSinCobrar() {
+        producto(2, 5, null);
+        productoDeConsulta();
+        when(pagosClient.verificarReferencia(any(), any())).thenReturn(adeudo("250.50"));
+
+        ValidacionException error = assertThrows(ValidacionException.class,
+                () -> service.pagar(request(null, "REF999"), 7));
+
+        assertEquals("monto: debe ser igual al adeudo de la referencia (250.50)", error.getMessage());
+        verifyNoInteractions(registro);
+    }
+
+    @Test
+    void referenciaSinAdeudoSeRechazaSinCobrar() {
+        producto(2, 5, null);
+        productoDeConsulta();
+        when(pagosClient.verificarReferencia(any(), any())).thenReturn(adeudo("0"));
+
+        NegocioException error = assertThrows(NegocioException.class,
+                () -> service.pagar(request(null, "REF999"), 7));
+
+        assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, error.getStatus());
+        verifyNoInteractions(registro);
+    }
+
+    @Test
+    void consultaDeAdeudoFallidaNoCobra() {
+        producto(2, 5, null);
+        productoDeConsulta();
+        when(pagosClient.verificarReferencia(any(), any())).thenReturn(respuesta("15"));
+
+        NegocioException error = assertThrows(NegocioException.class,
+                () -> service.pagar(request(null, "REF999"), 7));
+
+        assertEquals("No fue posible verificar la referencia; no se realizó ningún cargo", error.getMessage());
+        verifyNoInteractions(registro);
     }
 
     @Test
@@ -126,15 +185,32 @@ class PagoServiceImplTest {
     }
 
     @Test
-    void codigo06DuplicadoDevuelveSaldoYResponde409() {
+    void codigo06DuplicadoDevuelveSaldoYResponde409SinTextoDelProveedor() {
         producto(2, 5, null);
-        when(pagosClient.enviar(any(), any())).thenReturn(respuesta("06"));
+        GestoPagoPagosResponse respuesta = respuesta("06");
+        respuesta.setMensaje("No es posible pagar la misma factura 2 veces");
+        when(pagosClient.enviar(any(), any())).thenReturn(respuesta);
 
         NegocioException error = assertThrows(NegocioException.class,
                 () -> service.pagar(request(null, "REF999"), 7));
 
         assertEquals(HttpStatus.CONFLICT, error.getStatus());
-        verify(registro).revertir(eq(55), any(), any());
+        assertFalse(error.getMessage().contains("factura"), "el texto de GestoPago no se expone");
+        verify(registro).revertir(55, respuesta, "No es posible pagar la misma factura 2 veces");
+    }
+
+    @Test
+    void rechazoDelProveedorRespondeMensajePropio() {
+        producto(1, 2, null);
+        GestoPagoPagosResponse respuesta = respuesta("15");
+        respuesta.setMensaje("Error interno PR-15 nodo 3");
+        when(pagosClient.enviar(any(), any())).thenReturn(respuesta);
+
+        NegocioException error = assertThrows(NegocioException.class,
+                () -> service.pagar(request("5512345678", null), 7));
+
+        assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, error.getStatus());
+        assertEquals("El proveedor rechazó el pago; no se realizó ningún cargo", error.getMessage());
     }
 
     @Test
@@ -313,6 +389,20 @@ class PagoServiceImplTest {
         producto.setIdCatTipoServicio(idCatTipoServicio);
         producto.setPrecio(precio);
         when(productos.findFirstByIdProductoAndIdServicio(20, 30)).thenReturn(Optional.of(producto));
+    }
+
+    private void productoDeConsulta() {
+        Producto consulta = new Producto();
+        consulta.setIdProducto(40);
+        consulta.setIdServicio(30);
+        consulta.setTipoFront(4);
+        when(productos.findFirstByIdServicioAndTipoFront(30, 4)).thenReturn(Optional.of(consulta));
+    }
+
+    private GestoPagoPagosResponse adeudo(String saldo) {
+        GestoPagoPagosResponse respuesta = respuesta("01");
+        respuesta.setSaldo(new BigDecimal(saldo));
+        return respuesta;
     }
 
     private PagoServicioRequest request(String telefono, String referencia) {

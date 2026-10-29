@@ -15,6 +15,7 @@ public class Pago extends Auditado {
     @Column(length=20, updatable=false) private String telefono;
     @Column(length=100, updatable=false) private String referencia;
     @Column(nullable=false, precision=18, scale=2, updatable=false) private BigDecimal monto;
+    @Column(name="comision_cliente", nullable=false, precision=18, scale=2, updatable=false) private BigDecimal comisionCliente = BigDecimal.ZERO;
     @Column(nullable=false, unique=true, length=15, updatable=false) private String upc;
     @Enumerated(EnumType.STRING) @Column(nullable=false, length=20) private EstadoPago estado;
     @Column(name="codigo_respuesta", length=4) private String codigoRespuesta;
@@ -24,5 +25,9 @@ public class Pago extends Auditado {
     @Column(length=250) private String mensaje;
     @Column(columnDefinition="TEXT", updatable=false) private String peticion;
     @Column(columnDefinition="TEXT") private String respuesta;
+    @Version private Long version;
     @Column(name="respuesta_confirmacion", columnDefinition="TEXT") private String respuestaConfirmacion;
+
+    /** Lo que se descontó al cliente y lo que se le devuelve si el pago no se aplica. */
+    public BigDecimal cargo() { return monto.add(comisionCliente); }
 }

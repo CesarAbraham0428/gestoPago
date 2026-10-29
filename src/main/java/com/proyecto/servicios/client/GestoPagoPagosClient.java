@@ -33,7 +33,8 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 /**
- * Envía la transacción firmada a sendTx.do y la confirma con confirmTx.do. GestoPago responde XML
+ * Envía la transacción firmada a sendTx.do, la confirma con confirmTx.do y consulta adeudos con
+ * verifyReference.do. GestoPago responde XML
  * (un token vencido responde 403 con JSON); los campos se buscan por nombre en cualquier nivel.
  */
 @Component
@@ -61,6 +62,12 @@ public class GestoPagoPagosClient {
     /** confirmTx.do: se invoca con los mismos parámetros de sendTx cuando no hubo respuesta. */
     public GestoPagoPagosResponse confirmar(String token, String peticionFirmada) {
         return ejecutar("confirmTx", () -> feignClient.confirmarTransaccion("Bearer " + token,
+                formulario(peticionFirmada)));
+    }
+
+    /** verifyReference.do: consulta el adeudo de una referencia (SALDO mayor a 0 es el adeudo). No es una venta. */
+    public GestoPagoPagosResponse verificarReferencia(String token, String peticionFirmada) {
+        return ejecutar("verifyReference", () -> feignClient.verificarReferencia("Bearer " + token,
                 formulario(peticionFirmada)));
     }
 
