@@ -2,6 +2,7 @@ package com.proyecto.servicios.repositorys.sf;
 
 import com.proyecto.servicios.entity.sf.Cuenta;
 import com.proyecto.servicios.models.response.CuentaResponse;
+import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
@@ -10,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -18,6 +20,15 @@ public interface CuentaRepository extends JpaRepository<Cuenta, Integer>, JpaSpe
     List<Cuenta> findByClienteIdInOrderByIdAsc(Collection<Integer> ids);
 
     Optional<Cuenta> findByNumeroCuenta(String numeroCuenta);
+
+    /** Bloquea la fila para que dos pagos simultáneos no descuenten el mismo saldo. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from Cuenta c join fetch c.cliente where c.numeroCuenta = :numero")
+    Optional<Cuenta> bloquearPorNumero(@Param("numero") String numeroCuenta);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from Cuenta c where c.id = :id")
+    Optional<Cuenta> bloquearPorId(@Param("id") Integer id);
 
     Optional<Cuenta> findByNumeroCuentaAndClienteId(String numeroCuenta, Integer clienteId);
 
