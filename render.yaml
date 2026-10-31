@@ -21,3 +21,12 @@ services:
         sync: false
       - key: GESTOPAGO_AUTH_PASSWORD
         sync: false
+      # Pagos con GestoPago. Sin estas tres variables la API no arranca; cargar los valores en el panel de Render.
+      - key: GESTOPAGO_TOKEN_KEY
+        sync: false
+      - key: GESTOPAGO_PAGOS_SECRET_KEY
+        sync: false
+      - key: GESTOPAGO_PAGOS_IV
+        sync: false
+      # Opcional: con REDIS_HOST y REDIS_PORT se activa el límite de solicitudes de pago por usuario;
+      # sin Redis los pagos funcionan, pero ese límite no se aplica.

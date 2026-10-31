@@ -2,6 +2,7 @@ package com.proyecto.servicios.controller.advice;
 
 import com.proyecto.servicios.client.GestoPagoAuthException;
 import com.proyecto.servicios.client.GestoPagoCatalogException;
+import com.proyecto.servicios.client.GestoPagoPagoException;
 import com.proyecto.servicios.models.response.GenericResponse;
 import com.proyecto.servicios.service.exception.AutenticacionException;
 import com.proyecto.servicios.service.exception.NegocioException;
@@ -102,7 +103,7 @@ public class GlobalExceptionHandler {
         return respuesta(HttpStatus.BAD_REQUEST, SOLICITUD_INVALIDA);
     }
 
-    @ExceptionHandler({GestoPagoCatalogException.class, GestoPagoAuthException.class})
+    @ExceptionHandler({GestoPagoCatalogException.class, GestoPagoAuthException.class, GestoPagoPagoException.class})
     ResponseEntity<GenericResponse<Void>> proveedorExterno(RuntimeException exception) {
         log.error("Error del proveedor externo ({})", exception.getClass().getSimpleName());
         return respuesta(HttpStatus.BAD_GATEWAY, "No fue posible comunicarse con el proveedor de servicios");

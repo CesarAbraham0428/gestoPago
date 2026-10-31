@@ -46,7 +46,7 @@ class ClientesPostgresTest {
         ClienteController.class, CuentaController.class, UsuarioController.class, AutenticacionController.class,
         GlobalExceptionHandler.class,
         ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class,
-        UsuarioService.class, AutenticacionServiceImpl.class})
+        UsuarioService.class, AutenticacionServiceImpl.class, PinAutorizacionService.class})
     static class Config {}
 
     @DynamicPropertySource static void propiedades(DynamicPropertyRegistry r) {
@@ -54,6 +54,7 @@ class ClientesPostgresTest {
         r.add("spring.datasource.username", () -> System.getenv("TEST_DB_USERNAME"));
         r.add("spring.datasource.password", () -> System.getenv("TEST_DB_PASSWORD"));
         r.add("gestopago.app.jwt.secret", () -> "test-only-secret-012345678901234567890123456789");
+        r.add("gestopago.auth.token-key", () -> "HPo7OLqB4Fkk4E2yGOtwqw8H5fHR9kNx67OR4g4UdlA=");
     }
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;

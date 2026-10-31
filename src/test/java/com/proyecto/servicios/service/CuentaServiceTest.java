@@ -23,6 +23,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -35,8 +36,9 @@ class CuentaServiceTest {
     private final ClientesRepository clientes = mock(ClientesRepository.class);
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
     private final EntityManager em = mock(EntityManager.class);
+    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
     private final CuentaService service = new CuentaService(cuentas, clientes, em,
-            new AutorizacionService(usuarios));
+            new AutorizacionService(usuarios), encoder, new PinAutorizacionService(encoder));
     private Usuario usuario;
 
     @BeforeEach

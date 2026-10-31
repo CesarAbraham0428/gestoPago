@@ -1,6 +1,6 @@
 # GestoAPI
 
-API REST para registrar y administrar clientes, domicilios, cuentas bancarias y usuarios de acceso. Incluye autenticación con JWT y consulta del catálogo de productos de GestoPago. Está desarrollada con Java 17, Spring Boot, PostgreSQL y Redis; el backend se ejecuta de forma independiente del contenido de `frontend/`.
+API REST para registrar y administrar clientes, domicilios, cuentas bancarias y usuarios de acceso. Incluye autenticación con JWT, consulta del catálogo de productos de GestoPago y pago de recargas y servicios con el saldo de la cuenta. Está desarrollada con Java 17, Spring Boot, PostgreSQL y Redis; el backend se ejecuta de forma independiente del contenido de `frontend/`.
 
 ## Solución implementada
 
@@ -42,6 +42,9 @@ URL local predeterminada: `http://localhost:8080`. El registro y el login son p�
 | POST | `/usuarios/consultar` | Consultar usuarios mediante filtros combinables en JSON. |
 | PUT | `/usuarios/me/password` | Cambiar su contraseña con `passwordActual` y `passwordNueva`. |
 | GET | `/productos` | Consultar el catálogo de GestoPago. |
+| PUT | `/cuentas/pin` | Configurar o cambiar el PIN de autorización de pagos de una cuenta. |
+| POST | `/pagos` | Pagar una recarga (`tipoFront 1`) o un servicio con referencia (`tipoFront 2`) con el saldo de la cuenta. |
+| POST | `/pagos/consulta` | Consultar el estado de un pago con su `upc`. |
 
 Los controladores no utilizan `@PathVariable`, `@RequestParam` ni `@ModelAttribute`: todas las entradas y criterios se reciben mediante Request DTO con `@Valid @RequestBody`. Cada recurso tiene un único endpoint de búsqueda con filtros combinables. RFC, CURP y número de cuenta identifican el recurso, pero no conceden acceso: `AutorizacionService` consulta el usuario y el rol reales en la base. Un cliente solo puede acceder a sus propios datos, usuario y cuentas; un administrador activo puede administrar otros clientes. Las listas aplican el permiso antes de paginar y contar. La consulta y contraseña de `/usuarios/me` siempre corresponden al usuario autenticado, incluso para administradores.
 
@@ -112,6 +115,155 @@ Envíalo a `PATCH /clientes`. Los campos omitidos conservan su valor; `null` exp
 
 El saldo se obtiene dentro de cada cuenta devuelta por `POST /cuentas/consultar`; puedes filtrar por `numeroCuenta`. Para cambiar su estado, envía `{"numeroCuenta":"000000000000000001","activa":false}` a `PATCH /cuentas/estado`. Un cliente no puede consultar, activar ni desactivar cuentas ajenas.
 
+## Pagos con GestoPago
+
+`POST /pagos` descuenta el saldo de la cuenta del cliente y envía la operación a GestoPago (`sendTx.do`). El cliente no indica si es recarga o servicio: la API lo decide con el `tipoFront` del producto en el catálogo local.
+
+| Campo | Regla |
+| --- | --- |
+| `numeroCuenta` | Obligatorio, 18 dígitos; debe pertenecer al usuario autenticado y estar activa. |
+| `idProducto`, `idServicio` | Obligatorios; deben existir juntos en el catálogo. |
+| `monto` | Obligatorio, mayor a cero y con máximo 2 decimales. En recargas debe ser igual al precio del catálogo; en servicios con consulta de adeudo, igual al adeudo de la referencia. |
+| `telefono` | 10 dígitos. Obligatorio en recargas (`tipoFront 1`); no se usa en servicios. |
+| `referencia` | Alfanumérica. Obligatoria en servicios (`tipoFront 2`); no se usa en recargas. |
+| `pinAutorizacion` | Obligatorio, de 4 a 6 dígitos. |
+
+Cualquier campo no listado se rechaza. El estado de un pago es `PENDIENTE`, `APROBADO`, `RECHAZADO` o `EN_REVISION`; los pagos aprobados devuelven los mismos datos que GestoPago (`idTx`, `numAutorizacion`, `fecha`) y, en artículos canjeables, `pin` y `legend`. El detalle del flujo está en [docs/pagosApi.md](docs/pagosApi.md) y el contrato del proveedor en [docs/pagosGestoPago.md](docs/pagosGestoPago.md).
+
+### Ejemplos
+
+Recarga sin referencia (`tipoFront 1`):
+
+```json
+{
+  "numeroCuenta": "000000000000000002",
+  "idProducto": 307,
+  "idServicio": 116,
+  "monto": 100,
+  "telefono": "4181500241",
+  "referencia": null,
+  "pinAutorizacion": "123456"
+}
+```
+
+Respuesta:
+
+```json
+{
+    "codigo": 0,
+    "mensaje": "Pago realizado correctamente",
+    "datos": {
+        "estado": "APROBADO",
+        "idTx": 950755597,
+        "numAutorizacion": "100061757",
+        "monto": 100,
+        "comision": 0,
+        "saldoDisponible": 999900,
+        "fecha": "29/Oct/2026 13:37:43"
+    }
+}
+```
+
+Artículo canjeable (por ejemplo, una tarjeta de regalo): la respuesta incluye además el `pin` y el `legend` con las instrucciones de uso.
+
+```json
+{
+    "codigo": 0,
+    "mensaje": "Pago realizado correctamente",
+    "datos": {
+        "estado": "APROBADO",
+        "idTx": 950766454,
+        "numAutorizacion": "100018520",
+        "monto": 100.00,
+        "comision": 0.00,
+        "saldoDisponible": 999670.00,
+        "fecha": "29/Oct/2026 13:46:59",
+        "pin": "343942",
+        "legend": "Para usar tu tarjeta ingresa a www.amazon.com.mx/gc/redeem/ e ingresa el código de tu tarjeta. Las tarjetas de regalo de Amazon.com.mx pueden ser utilizadas únicamente en la compra de productos participantes en Amazon.com.mx. Salvo que sea requerido por la ley, las tarjetas de regalo no pueden ser transferidas o redimidas por dinero en efectivo. Las compras son descontadas del saldo de la tarjeta de regalo. Para redimir o consultar el saldo de la tarjeta de regalo visita ´´Tu cuenta´´ en Amazon.com.mx. Amazon.com.mx no es responsable por la pérdida, robo, destrucción o uso no autorizado de la tarjeta de regalo. Para consultar los términos y condiciones completos de las tarjetas de regalo visita www.amazon.com.mx/terminos_tr. Conserva tu comprobante de pago."
+    }
+}
+```
+
+Pago de servicio con referencia (`tipoFront 2`):
+
+```json
+{
+  "numeroCuenta": "000000000000000002",
+  "idProducto": 530,
+  "idServicio": 158,
+  "monto": 100,
+  "telefono": "4181500241",
+  "referencia": "5555555555",
+  "pinAutorizacion": "123456"
+}
+```
+
+Respuesta:
+
+```json
+{
+    "codigo": 0,
+    "mensaje": "Pago realizado correctamente",
+    "datos": {
+        "estado": "APROBADO",
+        "idTx": 950787320,
+        "numAutorizacion": "100027590",
+        "monto": 100,
+        "comision": 0,
+        "referencia": "5555555555",
+        "saldoDisponible": 999570,
+        "fecha": "29/Oct/2026 14:05:29",
+        "pin": "102735",
+        "legend": "Consulte los Términos & Condiciones específicos de su producto."
+    }
+}
+```
+
+En pagos de servicio, el cargo a la cuenta es `monto + comision`, y la comisión es el precio del producto en el catálogo; en recargas es cero.
+
+### Consultar un pago
+
+Si GestoPago no responde a tiempo, `POST /pagos` devuelve HTTP 504 con la referencia (`upc`) del pago, que queda `EN_REVISION` con el monto retenido hasta que se concilie con `confirmTx.do`. El cliente no debe reintentar el pago; puede consultar su estado enviando el `upc` a `POST /pagos/consulta`:
+
+```json
+{
+  "upc": "ABCDEFGHIJ12345"
+}
+```
+
+Respuesta de ejemplo:
+
+```json
+{
+    "codigo": 0,
+    "mensaje": "Consulta realizada correctamente",
+    "datos": {
+        "upc": "ABCDEFGHIJ12345",
+        "estado": "APROBADO",
+        "mensaje": "El pago fue aplicado correctamente",
+        "monto": 100.00,
+        "comision": 0.00,
+        "idTx": 950755597,
+        "numAutorizacion": "100061757"
+    }
+}
+```
+
+`idTx` y `numAutorizacion` solo aparecen cuando el pago está `APROBADO`. La consulta lee el registro local, no llama a GestoPago, y un `upc` inexistente o de otro usuario responde 404.
+
+### Diseño de seguridad e integridad
+
+- **Validación de entrada y montos:** los Request DTO validan formato y rechazan campos desconocidos. El producto debe existir en el catálogo; el monto se compara con el precio del catálogo (recargas, que deben tener precio positivo) o con el adeudo real de la referencia (`verifyReference.do`, en los servicios que ofrecen la consulta). Una petición inválida, incompleta o con monto manipulado se rechaza antes de tocar el saldo.
+- **Identidad y autorización:** el usuario sale del JWT, nunca del body. Antes de cobrar se comprueba que la cuenta sea del usuario, que usuario y cliente estén activos, que la cuenta esté activa, que el PIN sea correcto (guardado como hash; se bloquea 15 minutos tras 5 intentos fallidos) y que el saldo alcance.
+- **Descuento del saldo:** el saldo se retiene antes de llamar a GestoPago y se devuelve solo cuando hay certeza de que el proveedor no cobró. Cada paso de base de datos es una transacción corta, para no mantener bloqueada la cuenta durante la llamada externa.
+- **Concurrencia y duplicados:** la cuenta se bloquea con `SELECT ... FOR UPDATE`, por lo que dos pagos simultáneos no gastan el mismo saldo. Cada pago lleva un `upc` aleatorio y único que identifica la operación ante GestoPago; además hay un límite de solicitudes por usuario (5 por minuto, configurable, contador en Redis) y GestoPago rechaza con código `06` los pagos duplicados.
+- **Fallos y tiempos de espera:** un timeout no se interpreta como pago fallido. El pago queda `EN_REVISION` con el monto retenido y un proceso programado lo resuelve con `confirmTx.do` (mismos parámetros, a partir de 62 s y dentro de 24 h); solo entonces se confirma o se devuelve el saldo. Si el token de GestoPago vence, se renueva y se reintenta una sola vez con el mismo `upc`.
+- **Secretos:** credenciales, llaves de firma y de cifrado se leen de variables de entorno (`.env` está en `.gitignore`). El token Bearer de GestoPago se guarda cifrado con AES-256-GCM, se envía solo en la cabecera `Authorization` y no aparece en respuestas ni en logs. La petición a GestoPago se firma con AES-256.
+- **Sin información sensible:** al cliente se le responde con mensajes propios, nunca con el texto del proveedor (que solo se guarda en la base de datos). Los logs omiten el token, el PIN y el cuerpo firmado.
+- **Errores centralizados:** `GlobalExceptionHandler` (`@RestControllerAdvice`) traduce cada escenario a su código HTTP (ver la tabla de errores).
+- **Capas:** `PagoController` solo recibe y delega; `PagoServiceImpl` orquesta el pago, apoyado en `ResolutorDestinoPago` (reglas por `tipoFront`), `VerificadorAdeudo`, `GestoPagoPagosGateway` (token y llamadas a GestoPago) y `ConciliacionPagoService`; `PagoRegistroService` y `PagoRepository` persisten el estado.
+- **Pruebas:** pruebas unitarias por componente, pruebas del controller y pruebas de integración contra PostgreSQL que incluyen pagos simultáneos, timeout con conciliación y bloqueo del PIN.
+
 ## Organización de DTO y errores
 
 Los DTO de entrada están en `models/request`; los de salida en `models/response`, incluidos los DTO de integración en `models/response/gestopago`. `ClienteMapper` pertenece a `mapper`; las entidades JPA permanecen en `entity/sf`.
@@ -153,10 +305,15 @@ Las excepciones de negocio conservan mensajes específicos para correos, RFC y C
 | 401 | Credenciales incorrectas o falta de autenticación válida. |
 | 403 | Usuario o cliente inactivo en el login, o acceso a otro usuario. |
 | 404 | Cliente, cuenta o usuario no encontrado. |
-| 409 | Registro duplicado o conflicto con el estado del cliente. |
+| 409 | Registro duplicado o conflicto con el estado del cliente, cuenta inactiva o sin PIN, o pago duplicado. |
 | 405 / 406 / 415 | Método HTTP, formato de respuesta o tipo de contenido no admitido. |
+| 422 | Pago: saldo insuficiente, referencia sin adeudo o rechazo del proveedor. |
+| 423 | El PIN de la cuenta está bloqueado por intentos fallidos. |
+| 429 | Demasiadas solicitudes de pago del mismo usuario. |
 | 500 | Error interno o de persistencia. |
 | 502 | Error al comunicarse con GestoPago. |
+| 503 | Servicio de pagos no disponible por el momento; no se realizó ningún cargo. |
+| 504 | GestoPago no confirmó el pago; queda en revisión con el monto retenido. |
 
 ## Ejecución local
 
@@ -181,7 +338,10 @@ Para configurar un servicio por primera vez:
 1. Sube `feat/deploy` a tu repositorio Git y crea un Blueprint en Render apuntando a ese repositorio. Render tomará la configuración de `render.yaml` y construirá el servicio a partir del `Dockerfile`.
 2. Crea o selecciona una base PostgreSQL en la misma región que el servicio. Configura `DB_URL` con el formato `jdbc:postgresql://HOST:PUERTO/BASE`, usando el host interno de Render, y configura por separado `DB_USERNAME` y `DB_PASSWORD`. El usuario de base de datos necesita permisos para que Flyway ejecute las migraciones durante el arranque.
 3. Proporciona `GESTOPAGO_AUTH_ID_DISTRIBUIDOR`, `GESTOPAGO_AUTH_CODIGO_DISPOSITIVO` y `GESTOPAGO_AUTH_PASSWORD` cuando Render lo solicite. Render generará `APP_JWT_SECRET`; consérvalo entre despliegues para que los JWT ya emitidos sigan validándose.
-4. Redis es opcional para la API: sin Redis, el catálogo utiliza el respaldo en PostgreSQL y no se sirve desde caché.
+4. Para los pagos, proporciona `GESTOPAGO_TOKEN_KEY` (llave AES-256 en Base64; genérala con `openssl rand -base64 32` y consérvala entre despliegues) y `GESTOPAGO_PAGOS_SECRET_KEY` y `GESTOPAGO_PAGOS_IV`, que entrega GestoPago. Sin estas tres variables la API no arranca. Nunca las escribas en el repositorio.
+5. Redis es opcional para la API: sin Redis, el catálogo utiliza el respaldo en PostgreSQL y no se sirve desde caché, y los pagos funcionan pero no se aplica el límite de solicitudes por usuario. Para activarlo, configura `REDIS_HOST` y `REDIS_PORT`.
+
+Las migraciones de pagos (V6 a V8) se aplican solas en el siguiente arranque.
 
 Spring Boot escucha en el `PORT` que Render asigna. El chequeo configurado en `/actuator/health` es público y comprueba la salud de la aplicación y PostgreSQL; Redis no afecta ese resultado porque solo se usa como caché opcional.
 
@@ -191,11 +351,11 @@ Spring Boot escucha en el `PORT` que Render asigna. El chequeo configurado en `/
 .\gradlew.bat test
 ```
 
-La suite cubre validación, clientes, cuentas, usuarios, autenticación, JWT y catálogo. Para verificar también PostgreSQL, instala sus herramientas cliente en `PATH` y ejecuta:
+La suite cubre validación, clientes, cuentas, usuarios, autenticación, JWT, catálogo y pagos. Para verificar también PostgreSQL, instala sus herramientas cliente en `PATH` y ejecuta:
 
 ```powershell
 .\scripts\test-postgres.ps1
 .\scripts\test-postgres.ps1 -EsquemaManual
 ```
 
-Estas ejecuciones verifican, respectivamente, las migraciones en una base vacía y la adopción del esquema manual. Crean y eliminan una base temporal, por lo que requieren permiso para crear bases. Sin `TEST_DB_URL`, las pruebas de PostgreSQL se omiten en `gradlew test`.
+Estas ejecuciones verifican, respectivamente, las migraciones en una base vacía y la adopción del esquema manual, y corren también las pruebas de integración de pagos (pagos simultáneos sobre una misma cuenta, conciliación tras un timeout y bloqueo del PIN). Crean y eliminan una base temporal, por lo que requieren permiso para crear bases. Sin `TEST_DB_URL`, las pruebas de PostgreSQL se omiten en `gradlew test`.
