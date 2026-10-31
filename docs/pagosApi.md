@@ -8,11 +8,15 @@ Documenta cómo la API de Spring Boot procesa `POST /pagos`: validaciones, cuán
 |---|---|
 | `PagoController` | `POST /pagos`. Aplica el límite de solicitudes, recibe el `PagoServicioRequest` validado y el id del usuario autenticado. |
 | `LimitePagosService` | Rate limiting por usuario: contador en Redis con ventana fija de 60 s. |
-| `PagoServiceImpl` | **Orquestador**. Resuelve el producto, arma y firma la petición, llama a GestoPago y decide el desenlace. **No es transaccional**. |
+| `PagoServiceImpl` | **Orquestador**. Busca el producto, arma y firma la petición, llama a GestoPago y decide el desenlace. También responde la consulta por UPC. **No es transaccional**. |
+| `ResolutorDestinoPago` | Reglas por `tipoFront` (sección 3.1): qué se envía a GestoPago y cuánto se cobra al cliente. |
+| `VerificadorAdeudo` | Compara el monto con el adeudo real (`verifyReference.do`) en los servicios que tienen consulta (sección 3.3). |
+| `GestoPagoPagosGateway` | Llama a `sendTx`, `confirmTx` y `verifyReference` con el token vigente; si GestoPago lo rechaza, lo renueva y reintenta **una vez**. |
+| `ConciliacionPagoService` | Resuelve con `confirmTx` los pagos sin resultado (sección 6). Lo invoca `PagoConciliacionScheduler`. |
 | `PinAutorizacionService` | Verifica el PIN y lo bloquea 15 min tras 5 intentos fallidos. Lo usan el pago y el cambio de PIN. |
 | `PagoRegistroService` | Pasos transaccionales sobre BD (`reservar`, `aprobar`, `revertir`, `marcarEnRevision`, `confirmarAplicado`, `confirmarNoAplicado`). Cada método es una transacción corta. |
 | `GestoPagoPagosClient` | Llama a `sendTx.do`, `confirmTx.do` y `verifyReference.do` (Feign), interpreta el XML y clasifica los errores en *seguros* o *inciertos*. |
-| `PagoConciliacionScheduler` | Cada 60 s llama a `confirmTx` para los pagos que quedaron sin resultado. |
+| `PagoConciliacionScheduler` | Cada 60 s ejecuta `ConciliacionPagoService`, que llama a `confirmTx` para los pagos que quedaron sin resultado. |
 | `CuentaRepository` | Consultas con bloqueo pesimista de la fila de la cuenta. |
 | `PagoRepository` | Guarda el pago; `upc` es `UNIQUE`; consulta de pagos por conciliar. |
 | `CifradoTokenConverter` | Cifra con AES-256-GCM el token Bearer de GestoPago al guardarlo en `gestopago_tokens`. |
@@ -68,7 +72,7 @@ POST /pagos
 
 | Producto | Qué se envía a GestoPago | Validación |
 |---|---|---|
-| `tipoFront 1` (recarga) | `telefono` = el del cliente; sin `referencia`/`montoPago` | Si el catálogo tiene precio fijo > 0, `monto` debe ser **igual** (400 si no). Falta `telefono` → 400. |
+| `tipoFront 1` (recarga) | `telefono` = el del cliente; sin `referencia`/`montoPago` | El catálogo debe tener un precio > 0 (si no, 400 "este producto no se puede pagar"): GestoPago cobra ese precio, no el `monto`. `monto` debe ser **igual** al precio (400 si no). Falta `telefono` → 400. |
 | `tipoFront 1` + `idCatTipoServicio` 10/11 (canjeable) | `telefono` = `#1111111111` | Igual precio fijo. |
 | `tipoFront 2` (pago de servicio) | `telefono` = `1111111111`, `referencia`, `montoPago` = monto | Falta `referencia` → 400. Si el servicio tiene consulta de adeudo, `monto` debe ser **igual** al adeudo (ver 3.3). Se cobra además la comisión (`precio` del catálogo). |
 | Cualquier otro `tipoFront` | — | 400 "este producto no se puede pagar". |
@@ -188,9 +192,21 @@ Por qué el `82` no se trata como error: GestoPago dice "la transacción no ha s
 
 **Criterio clave**: solo se devuelve el saldo cuando hay *certeza* de que GestoPago no cobró. Ante duda se deja `EN_REVISION` porque devolver el dinero podría regalar un pago que sí se aplicó.
 
+### 5.4 Consulta del estado de un pago
+
+`POST /pagos/consulta` con body `{"upc": "ABCDEFGHIJ12345"}` (requiere sesión). Lee el registro local de `pagos`; **no llama a GestoPago**, así que no interfiere con la conciliación de la sección 6. El `upc` es la referencia que se le da al cliente en el mensaje del 504.
+
+| Situación | HTTP | Respuesta |
+|---|---|---|
+| Pago del usuario | 200 | `upc`, `estado`, `mensaje` propio, `monto`, `comision`, `referencia`; `idTx` y `numAutorizacion` solo si está `APROBADO`. |
+| UPC inexistente **o** de otro usuario | 404 | Mismo mensaje en ambos casos, para no revelar que el UPC existe. |
+| UPC con formato inválido | 400 | Debe ser de 15 caracteres `A-Z0-9`. |
+
+`PENDIENTE` y `EN_REVISION` se responden igual: "en proceso, el monto permanece retenido, no lo intentes de nuevo". No lleva límite de solicitudes propio: el UPC es aleatorio de 15 caracteres y la búsqueda exige que el pago sea del usuario autenticado.
+
 ## 6. Conciliación con `confirmTx`
 
-`PagoConciliacionScheduler` (`@Scheduled`, cada `gestopago.pagos.conciliacion-ms` = 60 s, con `@EnableScheduling` en `App`) ejecuta `conciliarPendientes()`:
+`PagoConciliacionScheduler` (`@Scheduled`, cada `gestopago.pagos.conciliacion-ms` = 60 s, con `@EnableScheduling` en `App`) ejecuta `ConciliacionPagoService.conciliarPendientes()`:
 
 1. Busca (`PagoRepository.idsPorConfirmar`) pagos creados en las últimas **24 h** que sean:
    - `EN_REVISION` con ≥ **62 s** de antigüedad (regla de GestoPago), o
@@ -205,8 +221,6 @@ Por qué el `82` no se trata como error: GestoPago dice "la transacción no ha s
 | Otro / error / sin respuesta | Solo log; se reintenta en el siguiente ciclo |
 
 Un error al confirmar un pago no detiene los demás (cada uno va en su `try/catch`).
-
-**Límite**: si pasan 24 h sin resultado concluyente, el pago deja de ser candidato (GestoPago ya no acepta `confirmTx`) y queda `EN_REVISION` con el saldo retenido: requiere revisión manual. Lo mismo si `peticion` es nulo.
 
 ## 7. Mecanismos de consistencia
 
@@ -281,18 +295,7 @@ Saldo cuenta:   S ──reservar──► S − cargo ──┬─ 01 ───�
                                                        confirmTx: no aplicada ► S      (RECHAZADO)
 ```
 
-## 9. Consideraciones y limitaciones conocidas
-
-- **Varias instancias del scheduler**: pueden conciliar el mismo pago a la vez. Ambas llamarían a `confirmTx`, que solo consulta, pero `@Version` garantiza que solo una aplique el cambio de estado y la devolución del saldo (ver 7.5).
-- **Solicitudes duplicadas del cliente**: no hay clave de idempotencia del cliente. Dos envíos del mismo pago generan dos UPC y dos cargos. El rate limit (7.10) reduce el riesgo, y GestoPago rechaza con `06` el mismo servicio + monto en 24 h solo en pago de servicios.
-- **Contrato de `verifyReference.do`**: la documentación de GestoPago solo indica los parámetros (`idProducto`, `idServicio`, `referencia`) y que devuelve `SALDO`. Se asume el mismo formulario firmado y la respuesta XML de `sendTx`; hay que confirmarlo en el ambiente de pruebas de GestoPago.
-- **Comparación exacta con el adeudo**: no se permiten pagos parciales ni anticipados en servicios con consulta.
-- **Pagos > 24 h sin resolver** requieren revisión manual (ver sección 6).
-- **Saldo del distribuidor en GestoPago** agotado (código `02`) se informa al cliente como indisponibilidad temporal; hay que monitorear los logs de error y recargarlo.
-- **Respuesta 504**: el cliente no debe reintentar; el pago ya tiene registro y se resolverá solo con `confirmTx`. Un reintento crearía un pago nuevo con otro UPC y otro descuento.
-- **Artículos canjeables resueltos por `confirmTx`**: `confirmTx` solo devuelve `NUM_AUTORIZACION` e `ID_TX`, sin `PIN` ni `legend`. Si una gift card queda `EN_REVISION` y luego se confirma como aplicada, el cobro es válido pero la API no recibe el PIN; hay que pedirlo a soporte de GestoPago (no hay endpoint documentado para recuperarlo).
-
-## 10. Configuración relevante
+## 9. Configuración relevante
 
 | Propiedad | Default | Uso |
 |---|---|---|

@@ -15,7 +15,14 @@ import com.proyecto.servicios.service.Impl.*;
 import com.proyecto.servicios.utils.CifradoTokenConverter;
 import com.proyecto.servicios.utils.FirmaGestoPago;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -52,6 +59,7 @@ class PagosPostgresTest {
         PagoController.class, GlobalExceptionHandler.class,
         ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class, UsuarioService.class,
         AutenticacionServiceImpl.class, PagoServiceImpl.class, PagoRegistroService.class, PinAutorizacionService.class,
+        GestoPagoPagosGateway.class, ResolutorDestinoPago.class, VerificadorAdeudo.class, ConciliacionPagoService.class,
         FirmaGestoPago.class, CifradoTokenConverter.class})
     static class Config {}
 
@@ -66,10 +74,21 @@ class PagosPostgresTest {
         r.add("gestopago.auth.id-distribuidor", () -> "10");
         r.add("gestopago.auth.codigo-dispositivo", () -> "DISP");
     }
+    private static final String CLIENTE = """
+            {"primerNombre":"Ana","apellidoPaterno":"Perez","apellidoMaterno":"Ruiz",
+             "fechaNacimiento":"1990-01-01","curp":"PERA900101MDFRZN01","rfc":"PERA900101AB1",
+             "sexo":"Femenino","nacionalidad":"Argentina","estadoCivil":"Union libre",
+             "correoElectronico":"ana1@example.com","telefonoMovil":"5512345678",
+             "ocupacion":"Ingeniera","empresa":"Empresa","ingresoMensual":12000.50,
+             "domicilio":{"calle":"Reforma","numeroExterior":"10","colonia":"Centro",
+             "municipio":"Cuauhtemoc","estado":"Ciudad de Mexico","codigoPostal":"06000","pais":"Mexico"},
+             "password":"Segura123!"}
+            """;
+
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @Autowired DataSource datasource;
-    @Autowired PagoService pagoService;
+    @Autowired ConciliacionPagoService conciliacion;
     @MockBean GestoPagoPagosClient gestoPago;
     @MockBean GestoPagoTokenService tokens;
     @MockBean LimitePagosService limite;
@@ -141,7 +160,7 @@ class PagosPostgresTest {
 
         envejecerPagos();
         when(gestoPago.confirmar(eq("tok-1"), anyString())).thenReturn(respuesta("70", "<RESPONSE>70</RESPONSE>"));
-        pagoService.conciliarPendientes();
+        conciliacion.conciliarPendientes();
 
         assertSaldo("500.00");
         assertEquals("RECHAZADO", jdbc.queryForObject("select estado from pagos", String.class));
@@ -159,6 +178,56 @@ class PagosPostgresTest {
         assertSaldo("500.00");
         assertEquals(0, jdbc.queryForObject("select count(*) from pagos", Integer.class));
         verifyNoInteractions(gestoPago);
+    }
+
+    @Test void pagosSimultaneosNoGastanDosVecesElMismoSaldo() throws Exception {
+        jdbc.update("update cuentas set saldo = 250 where numero_cuenta = ?", numeroCuenta);
+        when(gestoPago.enviar(any(), any())).thenReturn(respuesta("01", "<RESPONSE>01</RESPONSE>"));
+        int solicitudes = 8;
+        ExecutorService hilos = Executors.newFixedThreadPool(solicitudes);
+        CountDownLatch salida = new CountDownLatch(1);
+        try {
+            List<Future<Integer>> resultados = new ArrayList<>();
+            for (int i = 0; i < solicitudes; i++) {
+                resultados.add(hilos.submit(() -> {
+                    salida.await();
+                    return pagar(recarga("1234")).andReturn().getResponse().getStatus();
+                }));
+            }
+            salida.countDown();
+            int aprobados = 0;
+            int sinSaldo = 0;
+            for (Future<Integer> resultado : resultados) {
+                int estado = resultado.get(60, TimeUnit.SECONDS);
+                if (estado == 200) aprobados++;
+                else if (estado == 422) sinSaldo++;
+            }
+            assertEquals(2, aprobados, "Con 250 de saldo solo caben dos recargas de 100");
+            assertEquals(solicitudes - 2, sinSaldo);
+        } finally {
+            hilos.shutdownNow();
+        }
+
+        assertSaldo("50.00");
+        assertEquals(2, jdbc.queryForObject("select count(*) from pagos", Integer.class));
+        verify(gestoPago, times(2)).enviar(any(), any());
+    }
+
+    @Test void consultaDevuelveElEstadoSoloAlDuenoDelPago() throws Exception {
+        when(gestoPago.enviar(any(), any())).thenReturn(respuesta("01", "<RESPONSE>01</RESPONSE>"));
+        pagar(recarga("1234")).andExpect(status().isOk());
+        String upc = jdbc.queryForObject("select upc from pagos", String.class);
+
+        mvc.perform(post("/pagos/consulta").header("Authorization", token).contentType("application/json")
+                .content("{\"upc\":\"" + upc + "\"}")).andExpect(status().isOk())
+            .andExpect(jsonPath("datos.estado").value("APROBADO"))
+            .andExpect(jsonPath("datos.numAutorizacion").value("100024988"));
+
+        String otroToken = "Bearer " + datos(registrarOtroClienteYIniciarSesion()).get("token").asText();
+        mvc.perform(post("/pagos/consulta").header("Authorization", otroToken).contentType("application/json")
+                .content("{\"upc\":\"" + upc + "\"}")).andExpect(status().isNotFound());
+        mvc.perform(post("/pagos/consulta").contentType("application/json")
+                .content("{\"upc\":\"" + upc + "\"}")).andExpect(status().isUnauthorized());
     }
 
     private ResultActions pagar(String cuerpo) throws Exception {
@@ -194,17 +263,16 @@ class PagosPostgresTest {
         return respuesta;
     }
 
+    private ResultActions registrarOtroClienteYIniciarSesion() throws Exception {
+        mvc.perform(post("/clientes").contentType("application/json").content(CLIENTE
+            .replace("PERA900101MDFRZN01", "PERA900102MDFRZN02").replace("PERA900101AB1", "PERA900102AB2")
+            .replace("ana1@example.com", "ana2@example.com"))).andExpect(status().isCreated());
+        return mvc.perform(post("/auth/login").contentType("application/json")
+            .content("{\"correo\":\"ana2@example.com\",\"password\":\"Segura123!\"}"));
+    }
+
     private JsonNode registrarCliente() throws Exception {
-        return datos(mvc.perform(post("/clientes").contentType("application/json").content("""
-            {"primerNombre":"Ana","apellidoPaterno":"Perez","apellidoMaterno":"Ruiz",
-             "fechaNacimiento":"1990-01-01","curp":"PERA900101MDFRZN01","rfc":"PERA900101AB1",
-             "sexo":"Femenino","nacionalidad":"Argentina","estadoCivil":"Union libre",
-             "correoElectronico":"ana1@example.com","telefonoMovil":"5512345678",
-             "ocupacion":"Ingeniera","empresa":"Empresa","ingresoMensual":12000.50,
-             "domicilio":{"calle":"Reforma","numeroExterior":"10","colonia":"Centro",
-             "municipio":"Cuauhtemoc","estado":"Ciudad de Mexico","codigoPostal":"06000","pais":"Mexico"},
-             "password":"Segura123!"}
-            """)).andExpect(status().isCreated()));
+        return datos(mvc.perform(post("/clientes").contentType("application/json").content(CLIENTE)).andExpect(status().isCreated()));
     }
 
     private JsonNode datos(ResultActions resultado) throws Exception {

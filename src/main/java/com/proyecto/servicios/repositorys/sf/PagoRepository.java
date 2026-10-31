@@ -3,6 +3,7 @@ package com.proyecto.servicios.repositorys.sf;
 import com.proyecto.servicios.entity.sf.Pago;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,6 +11,8 @@ import org.springframework.data.repository.query.Param;
 public interface PagoRepository extends JpaRepository<Pago, Integer> {
 
     boolean existsByUpc(String upc);
+
+    Optional<Pago> findByUpcAndUsuarioId(String upc, Integer usuarioId);
 
     /**
      * Pagos sin resultado que todavía se pueden consultar con confirmTx (vigencia de 24 horas):

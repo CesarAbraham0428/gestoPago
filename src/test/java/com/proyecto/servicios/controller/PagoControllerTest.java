@@ -1,6 +1,7 @@
 package com.proyecto.servicios.controller;
 
 import com.proyecto.servicios.controller.advice.GlobalExceptionHandler;
+import com.proyecto.servicios.models.response.ConsultaPagoResponse;
 import com.proyecto.servicios.models.response.PagoServicioResponse;
 import com.proyecto.servicios.service.LimitePagosService;
 import com.proyecto.servicios.service.PagoService;
@@ -88,6 +89,52 @@ class PagoControllerTest {
 
         pagar(PAGO).andExpect(status().isGatewayTimeout())
                 .andExpect(jsonPath("mensaje").value("No se recibió confirmación del proveedor"));
+    }
+
+    @Test
+    void consultaDevuelveElEstadoDelPagoDelUsuario() throws Exception {
+        when(service.consultar("ABCDEFGHIJ12345", 7)).thenReturn(new ConsultaPagoResponse("ABCDEFGHIJ12345",
+                "APROBADO", "El pago fue aplicado correctamente", new BigDecimal("100.00"), BigDecimal.ZERO,
+                null, 291437188L, "100024988"));
+
+        consultar("{\"upc\":\"ABCDEFGHIJ12345\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("datos.estado").value("APROBADO"))
+                .andExpect(jsonPath("datos.idTx").value(291437188L))
+                .andExpect(jsonPath("datos.numAutorizacion").value("100024988"));
+
+        verifyNoInteractions(limite);
+    }
+
+    @Test
+    void consultaDePagoAjenoOInexistenteResponde404() throws Exception {
+        when(service.consultar("ABCDEFGHIJ12345", 7))
+                .thenThrow(new NegocioException(HttpStatus.NOT_FOUND, "No existe un pago con ese UPC"));
+
+        consultar("{\"upc\":\"ABCDEFGHIJ12345\"}").andExpect(status().isNotFound());
+    }
+
+    @Test
+    void consultaConUpcInvalidoSeRechazaSinLlamarAlServicio() throws Exception {
+        consultar("{\"upc\":\"abc\"}").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("mensaje", containsString("upc")));
+        consultar("{}").andExpect(status().isBadRequest());
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void consultaConCampoNoPermitidoSeRechaza() throws Exception {
+        consultar("{\"upc\":\"ABCDEFGHIJ12345\",\"usuarioId\":9}").andExpect(status().isBadRequest());
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void consultaPorGetNoExiste() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get("/pagos/consulta").principal(usuario)).andExpect(status().isMethodNotAllowed());
+    }
+
+    private ResultActions consultar(String cuerpo) throws Exception {
+        return mvc.perform(post("/pagos/consulta").principal(usuario).contentType("application/json").content(cuerpo));
     }
 
     private ResultActions pagar(String cuerpo) throws Exception {
