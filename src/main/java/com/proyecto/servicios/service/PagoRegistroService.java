@@ -16,6 +16,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -145,6 +148,13 @@ public class PagoRegistroService {
     @Transactional(readOnly = true)
     public Optional<Pago> buscarDeUsuario(String upc, Integer usuarioId) {
         return pagos.findByUpcAndUsuarioId(upc, usuarioId);
+    }
+
+    /** Pagos aprobados del usuario, del más reciente al más antiguo. */
+    @Transactional(readOnly = true)
+    public Page<Pago> aprobadosDeUsuario(Integer usuarioId, int pagina, int tamanio) {
+        return pagos.findByUsuarioIdAndEstado(usuarioId, EstadoPago.APROBADO,
+                PageRequest.of(pagina, tamanio, Sort.by(Sort.Direction.DESC, "id")));
     }
 
     @Transactional(readOnly = true)

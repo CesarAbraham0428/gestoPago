@@ -60,7 +60,8 @@ class PagosPostgresTest {
         ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class, UsuarioService.class,
         AutenticacionServiceImpl.class, PagoServiceImpl.class, PagoRegistroService.class, PinAutorizacionService.class,
         GestoPagoPagosGateway.class, ResolutorDestinoPago.class, VerificadorAdeudo.class, ConciliacionPagoService.class,
-        FirmaGestoPago.class, CifradoTokenConverter.class})
+        FirmaGestoPago.class, CifradoTokenConverter.class,
+        CodigoVerificacionService.class, SesionService.class, EnviadorCodigoDePrueba.class})
     static class Config {}
 
     @DynamicPropertySource static void propiedades(DynamicPropertyRegistry r) {
@@ -68,6 +69,7 @@ class PagosPostgresTest {
         r.add("spring.datasource.username", () -> System.getenv("TEST_DB_USERNAME"));
         r.add("spring.datasource.password", () -> System.getenv("TEST_DB_PASSWORD"));
         r.add("gestopago.app.jwt.secret", () -> "test-only-secret-012345678901234567890123456789");
+        r.add("gestopago.app.2fa.espera-segundos", () -> "0");
         r.add("gestopago.auth.token-key", () -> "HPo7OLqB4Fkk4E2yGOtwqw8H5fHR9kNx67OR4g4UdlA=");
         r.add("gestopago.pagos.secret_key", () -> "HPo7OLqB4Fkk4E2yGOtwqw8H5fHR9kNx67OR4g4UdlA=");
         r.add("gestopago.pagos.iv", () -> "p5ldmBPdd/9pjC0bDC/nSg==");
@@ -92,6 +94,8 @@ class PagosPostgresTest {
     @MockBean GestoPagoPagosClient gestoPago;
     @MockBean GestoPagoTokenService tokens;
     @MockBean LimitePagosService limite;
+    @MockBean LimiteAutenticacionService limiteAutenticacion;
+    @Autowired EnviadorCodigoDePrueba correo;
     private JdbcTemplate jdbc;
     private String token;
     private String numeroCuenta;
@@ -109,8 +113,7 @@ class PagosPostgresTest {
         when(tokens.obtenerTokenActivo(10, "DISP")).thenReturn(Optional.of(gp));
 
         numeroCuenta = registrarCliente().get("cuentas").get(0).get("numeroCuenta").asText();
-        token = "Bearer " + datos(mvc.perform(post("/auth/login").contentType("application/json")
-            .content("{\"correo\":\"ana1@example.com\",\"password\":\"Segura123!\"}"))).get("token").asText();
+        token = "Bearer " + iniciarSesion("ana1@example.com");
         mvc.perform(put("/cuentas/pin").header("Authorization", token).contentType("application/json")
             .content("{\"numeroCuenta\":\"" + numeroCuenta + "\",\"pinNuevo\":\"1234\"}")).andExpect(status().isOk());
         jdbc.update("update cuentas set saldo = 500 where numero_cuenta = ?", numeroCuenta);
@@ -223,7 +226,7 @@ class PagosPostgresTest {
             .andExpect(jsonPath("datos.estado").value("APROBADO"))
             .andExpect(jsonPath("datos.numAutorizacion").value("100024988"));
 
-        String otroToken = "Bearer " + datos(registrarOtroClienteYIniciarSesion()).get("token").asText();
+        String otroToken = "Bearer " + registrarOtroClienteYIniciarSesion();
         mvc.perform(post("/pagos/consulta").header("Authorization", otroToken).contentType("application/json")
                 .content("{\"upc\":\"" + upc + "\"}")).andExpect(status().isNotFound());
         mvc.perform(post("/pagos/consulta").contentType("application/json")
@@ -263,12 +266,21 @@ class PagosPostgresTest {
         return respuesta;
     }
 
-    private ResultActions registrarOtroClienteYIniciarSesion() throws Exception {
+    private String registrarOtroClienteYIniciarSesion() throws Exception {
         mvc.perform(post("/clientes").contentType("application/json").content(CLIENTE
             .replace("PERA900101MDFRZN01", "PERA900102MDFRZN02").replace("PERA900101AB1", "PERA900102AB2")
             .replace("ana1@example.com", "ana2@example.com"))).andExpect(status().isCreated());
-        return mvc.perform(post("/auth/login").contentType("application/json")
-            .content("{\"correo\":\"ana2@example.com\",\"password\":\"Segura123!\"}"));
+        return iniciarSesion("ana2@example.com");
+    }
+
+    /** Inicio de sesión completo en dos pasos; devuelve el JWT. */
+    private String iniciarSesion(String usuario) throws Exception {
+        String desafio = datos(mvc.perform(post("/auth/login").contentType("application/json")
+            .content("{\"correo\":\"" + usuario + "\",\"password\":\"Segura123!\"}"))
+            .andExpect(status().isOk())).get("desafioId").asText();
+        return datos(mvc.perform(post("/auth/verificar").contentType("application/json")
+            .content("{\"desafioId\":\"" + desafio + "\",\"codigo\":\"" + correo.ultimoCodigo()
+                + "\",\"cerrarSesionAnterior\":true}")).andExpect(status().isOk())).get("token").asText();
     }
 
     private JsonNode registrarCliente() throws Exception {

@@ -1,38 +1,107 @@
 package com.proyecto.servicios.service.Impl;
-import com.proyecto.servicios.entity.sf.*;
+
+import com.proyecto.servicios.entity.sf.Cliente;
+import com.proyecto.servicios.entity.sf.Usuario;
 import com.proyecto.servicios.models.request.LoginRequest;
+import com.proyecto.servicios.models.request.VerificacionCodigoRequest;
 import com.proyecto.servicios.models.response.AuthResponse;
+import com.proyecto.servicios.models.response.DesafioResponse;
 import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import com.proyecto.servicios.security.JwtTokenService;
+import com.proyecto.servicios.security.JwtTokenService.TokenEmitido;
 import com.proyecto.servicios.service.AutenticacionService;
+import com.proyecto.servicios.service.CodigoVerificacionService;
+import com.proyecto.servicios.service.CodigoVerificacionService.Desafio;
+import com.proyecto.servicios.service.SesionService;
 import com.proyecto.servicios.service.exception.AutenticacionException;
 import com.proyecto.servicios.service.exception.AutenticacionException.Tipo;
+import com.proyecto.servicios.service.exception.NegocioException;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Stream;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.stream.Stream;
-import java.util.Objects;
+
+/**
+ * Inicio de sesión en dos pasos: 1) usuario y contraseña, 2) código enviado por correo. Solo después del
+ * segundo paso se emite el JWT y se registra la sesión única del usuario.
+ */
 @Service
 public class AutenticacionServiceImpl implements AutenticacionService {
+
     private final UsuarioRepository usuarios;
     private final PasswordEncoder encoder;
     private final JwtTokenService tokens;
-    public AutenticacionServiceImpl(UsuarioRepository usuarios,PasswordEncoder encoder,JwtTokenService tokens) {
-        this.usuarios=usuarios; this.encoder=encoder; this.tokens=tokens;
+    private final CodigoVerificacionService codigos;
+    private final SesionService sesiones;
+    /** Se compara contra este hash cuando el correo no existe, para que la respuesta tarde lo mismo. */
+    private final String hashFicticio;
+
+    public AutenticacionServiceImpl(UsuarioRepository usuarios, PasswordEncoder encoder, JwtTokenService tokens,
+            CodigoVerificacionService codigos, SesionService sesiones) {
+        this.usuarios = usuarios;
+        this.encoder = encoder;
+        this.tokens = tokens;
+        this.codigos = codigos;
+        this.sesiones = sesiones;
+        this.hashFicticio = encoder.encode("contrasena-ficticia");
     }
 
-    @Override @Transactional(readOnly=true)
+    @Override
+    @Transactional
+    public DesafioResponse iniciarSesion(LoginRequest r) {
+        Optional<Usuario> encontrado = usuarios.findByCorreoIgnoreCase(ClienteServiceImpl.normalizarCorreo(r.correo()));
+        boolean coincide = encoder.matches(r.password(),
+                encontrado.map(Usuario::getPasswordHash).orElse(hashFicticio));
+        if (encontrado.isEmpty() || !coincide) {
+            throw new AutenticacionException(Tipo.CREDENCIALES_INVALIDAS);
+        }
+        Usuario u = encontrado.get();
+        validarActivo(u);
+        Desafio desafio = codigos.emitir(u.getId(), u.getCorreo());
+        return new DesafioResponse(desafio.id(), desafio.vigencia().toMillis(), enmascarar(u.getCorreo()));
+    }
 
-    public AuthResponse iniciarSesion(LoginRequest r) {
-        
-        Usuario u=usuarios.findByCorreoIgnoreCase(ClienteServiceImpl.normalizarCorreo(r.correo()))
-            .orElseThrow(() -> new AutenticacionException(Tipo.CREDENCIALES_INVALIDAS));
-        if(!encoder.matches(r.password(),u.getPasswordHash())) throw new AutenticacionException(Tipo.CREDENCIALES_INVALIDAS);
-        Cliente c=u.getCliente();
-        if(!u.isActivo() || !c.isActivo()) throw new AutenticacionException(Tipo.CUENTA_INACTIVA);
-        String nombre=Stream.of(c.getPrimerNombre(),c.getSegundoNombre(),c.getApellidoPaterno(),c.getApellidoMaterno())
-            .filter(Objects::nonNull).reduce((a,b) -> a+" "+b).orElse("");
-        
-        return new AuthResponse(tokens.emitir(u.getId().toString()),"Bearer",tokens.getExpirationMs(),u.getCorreo(),nombre);
+    @Override
+    @Transactional(noRollbackFor = {NegocioException.class, AutenticacionException.class})
+    public AuthResponse verificarCodigo(VerificacionCodigoRequest r) {
+        Integer usuarioId = codigos.verificar(r.desafioId(), r.codigo());
+        Usuario u = usuarios.findById(usuarioId)
+                .orElseThrow(() -> new AutenticacionException(Tipo.CREDENCIALES_INVALIDAS));
+        validarActivo(u);
+
+        TokenEmitido token = tokens.emitir(usuarioId.toString());
+        if (!sesiones.abrir(usuarioId, token, r.cerrarSesionAnterior())) {
+            // El código no se consume: el cliente confirma y reenvía la misma verificación.
+            throw new NegocioException(HttpStatus.CONFLICT,
+                    "Ya tienes una sesión activa en otro dispositivo. Ciérrala para continuar aquí");
+        }
+        codigos.consumir(r.desafioId());
+        return new AuthResponse(token.token(), "Bearer", tokens.getExpirationMs(), u.getCorreo(),
+                nombreCompleto(u.getCliente()));
+    }
+
+    @Override
+    public void cerrarSesion(Integer usuarioId) {
+        sesiones.cerrar(usuarioId);
+    }
+
+    private static void validarActivo(Usuario u) {
+        if (!u.isActivo() || !u.getCliente().isActivo()) {
+            throw new AutenticacionException(Tipo.CUENTA_INACTIVA);
+        }
+    }
+
+    private static String nombreCompleto(Cliente c) {
+        return Stream.of(c.getPrimerNombre(), c.getSegundoNombre(), c.getApellidoPaterno(), c.getApellidoMaterno())
+                .filter(Objects::nonNull).reduce((a, b) -> a + " " + b).orElse("");
+    }
+
+    /** ana@correo.com -> a***@correo.com */
+    static String enmascarar(String correo) {
+        int arroba = correo.indexOf('@');
+        return arroba <= 0 ? "***" : correo.charAt(0) + "***" + correo.substring(arroba);
     }
 }

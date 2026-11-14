@@ -37,12 +37,13 @@ class UsuarioServiceTest {
     @Mock private ClientesRepository clientes;
     @Mock private EntityManager em;
     @Mock private AutorizacionService autorizacion;
+    @Mock private SesionService sesiones;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
     private UsuarioService service;
 
     @BeforeEach
     void crearServicio() {
-        service = new UsuarioService(usuarios, clientes, encoder, em, autorizacion);
+        service = new UsuarioService(usuarios, clientes, encoder, em, autorizacion, sesiones);
     }
 
     @Test
@@ -58,6 +59,7 @@ class UsuarioServiceTest {
         verify(usuarios).findById(7);
         verifyNoMoreInteractions(usuarios);
         verify(em).flush();
+        verify(sesiones).cerrar(usuario.getId());
     }
 
     @Test

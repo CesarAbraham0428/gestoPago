@@ -8,6 +8,8 @@ import com.proyecto.servicios.models.response.ClienteResponse;
 import com.proyecto.servicios.models.response.ListaGenericResponse;
 import com.proyecto.servicios.models.response.GenericResponse;
 import com.proyecto.servicios.service.ClienteService;
+import com.proyecto.servicios.service.LimiteAutenticacionService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -24,13 +26,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 public class ClienteController {
     private final ClienteService service;
+    private final LimiteAutenticacionService limite;
 
-    public ClienteController(ClienteService service) {
+    public ClienteController(ClienteService service, LimiteAutenticacionService limite) {
         this.service = service;
+        this.limite = limite;
     }
 
     @PostMapping
-    public ResponseEntity<GenericResponse<ClienteResponse>> registrar(@Valid @RequestBody ClienteRequest request) {
+    public ResponseEntity<GenericResponse<ClienteResponse>> registrar(@Valid @RequestBody ClienteRequest request,
+            HttpServletRequest http) {
+        limite.verificarRegistro(http.getRemoteAddr());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(GenericResponse.exito("Cliente registrado", service.registrar(request)));
     }

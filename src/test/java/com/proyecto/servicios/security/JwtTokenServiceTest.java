@@ -12,14 +12,17 @@ class JwtTokenServiceTest {
     private final JwtTokenService tokens = new JwtTokenService(SECRET, 60000);
 
     @Test void tokenFirmadoConIdentidadYVigencia() {
-        var jwt = tokens.validar(tokens.emitir("7"));
+        var emitido = tokens.emitir("7");
+        var jwt = tokens.validar(emitido.token());
         assertEquals("7", jwt.getSubject());
+        assertEquals(emitido.jti(), jwt.getId());
+        assertNotEquals(emitido.jti(), tokens.emitir("7").jti());
         assertEquals("gestopago-api", jwt.getIssuer());
         assertEquals(60000, jwt.getExpiresAt().getTime() - jwt.getIssuedAt().getTime());
     }
 
     @Test void rechazaFirmaAjenaTokenVencidoYEmisorAjeno() {
-        String ajeno = new JwtTokenService("another-secret-012345678901234567890", 60000).emitir("7");
+        String ajeno = new JwtTokenService("another-secret-012345678901234567890", 60000).emitir("7").token();
         assertThrows(JWTVerificationException.class, () -> tokens.validar(ajeno));
         String vencido = JWT.create().withIssuer("gestopago-api").withSubject("7")
             .withExpiresAt(Instant.now().minusSeconds(60)).sign(Algorithm.HMAC256(SECRET));

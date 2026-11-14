@@ -18,6 +18,7 @@ import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -46,7 +47,8 @@ class ClientesPostgresTest {
         ClienteController.class, CuentaController.class, UsuarioController.class, AutenticacionController.class,
         GlobalExceptionHandler.class,
         ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class,
-        UsuarioService.class, AutenticacionServiceImpl.class, PinAutorizacionService.class})
+        UsuarioService.class, AutenticacionServiceImpl.class, PinAutorizacionService.class,
+        CodigoVerificacionService.class, SesionService.class, EnviadorCodigoDePrueba.class})
     static class Config {}
 
     @DynamicPropertySource static void propiedades(DynamicPropertyRegistry r) {
@@ -54,12 +56,15 @@ class ClientesPostgresTest {
         r.add("spring.datasource.username", () -> System.getenv("TEST_DB_USERNAME"));
         r.add("spring.datasource.password", () -> System.getenv("TEST_DB_PASSWORD"));
         r.add("gestopago.app.jwt.secret", () -> "test-only-secret-012345678901234567890123456789");
+        r.add("gestopago.app.2fa.espera-segundos", () -> "0");
         r.add("gestopago.auth.token-key", () -> "HPo7OLqB4Fkk4E2yGOtwqw8H5fHR9kNx67OR4g4UdlA=");
     }
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @Autowired DataSource datasource;
     @SpyBean PasswordEncoder encoder;
+    @MockBean LimiteAutenticacionService limiteAutenticacion;
+    @Autowired EnviadorCodigoDePrueba correo;
     private JdbcTemplate jdbc;
 
     @BeforeEach void aislarDatos() {
@@ -69,7 +74,7 @@ class ClientesPostgresTest {
         assertTrue(nombre.matches("gestopago_backend_test_[a-f0-9]{32}"),
             "La limpieza solo está permitida en una BD temporal de pruebas");
         // No se usa rollback de test: necesitamos comprobar commits, triggers diferidos y rollback del servicio.
-        jdbc.execute("TRUNCATE TABLE usuarios, cuentas, domicilios, clientes RESTART IDENTITY CASCADE");
+        jdbc.execute("TRUNCATE TABLE desafios_autenticacion, sesiones_usuario, usuarios, cuentas, domicilios, clientes RESTART IDENTITY CASCADE");
     }
 
     @Test void registroPersisteClienteDomicilioCuentaActivaYUsuarioConBCrypt() throws Exception {
@@ -604,6 +609,93 @@ class ClientesPostgresTest {
         assertFalse(respuesta.has("errores"));
         return respuesta.get("datos");
     }
+
+    // ----- Segundo factor y sesión única -----
+    private String verificar(String desafio, String codigo, boolean cerrarAnterior) {
+        return mapper.createObjectNode().put("desafioId", desafio).put("codigo", codigo)
+            .put("cerrarSesionAnterior", cerrarAnterior).toString();
+    }
+    private String desafio(String correo, String password) throws Exception {
+        return json(mvc.perform(post("/auth/login").contentType("application/json").content(credenciales(correo, password)))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.token").doesNotExist()).andReturn()).get("desafioId").asText();
+    }
+    @Test void elLoginSoloEmiteTokenDespuesDeVerificarElCodigoYGuardaSoloSuHash() throws Exception {
+        crear(registro("1"));
+        String desafio = desafio("ana1@example.com", "Segura123!");
+        String codigo = this.correo.ultimoCodigo();
+        assertEquals(1, jdbc.queryForObject("select count(*) from desafios_autenticacion", Integer.class));
+        assertNotEquals(codigo, jdbc.queryForObject("select codigo_hash from desafios_autenticacion", String.class));
+        assertEquals(0, jdbc.queryForObject("select count(*) from sesiones_usuario", Integer.class));
+        mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(desafio, codigo, false)))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.token").isNotEmpty());
+        assertEquals(1, jdbc.queryForObject("select count(*) from sesiones_usuario", Integer.class));
+        assertEquals(0, jdbc.queryForObject("select count(*) from desafios_autenticacion", Integer.class));
+    }
+    @Test void elCodigoSoloSirveUnaVezYTrasLosIntentosMaximosSeInvalida() throws Exception {
+        crear(registro("1"));
+        String desafio = desafio("ana1@example.com", "Segura123!");
+        String correcto = this.correo.ultimoCodigo();
+        String incorrecto = "000000".equals(correcto) ? "000001" : "000000";
+        for (int i = 0; i < 4; i++) {
+            mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(desafio, incorrecto, false)))
+                .andExpect(status().isUnauthorized());
+        }
+        mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(desafio, incorrecto, false)))
+            .andExpect(status().isUnauthorized());
+        mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(desafio, correcto, false)))
+            .andExpect(status().isUnauthorized());
+        assertEquals(0, jdbc.queryForObject("select count(*) from sesiones_usuario", Integer.class));
+    }
+    @Test void unCodigoUsadoNoSeReutiliza() throws Exception {
+        crear(registro("1"));
+        String desafio = desafio("ana1@example.com", "Segura123!");
+        String codigo = this.correo.ultimoCodigo();
+        mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(desafio, codigo, false)))
+            .andExpect(status().isOk());
+        mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(desafio, codigo, true)))
+            .andExpect(status().isUnauthorized());
+    }
+    @Test void unSegundoInicioDeSesionPideCerrarLaAnteriorYAlConfirmarLaInvalida() throws Exception {
+        crear(registro("1"));
+        String primera = login("ana1@example.com", "Segura123!");
+        String desafio = desafio("ana1@example.com", "Segura123!");
+        String codigo = this.correo.ultimoCodigo();
+        mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(desafio, codigo, false)))
+            .andExpect(status().isConflict());
+        // La primera sesión sigue activa y el código no se consumió.
+        mvc.perform(get("/usuarios/me").header("Authorization", "Bearer " + primera)).andExpect(status().isOk());
+        String segunda = json(mvc.perform(post("/auth/verificar").contentType("application/json")
+            .content(verificar(desafio, codigo, true))).andExpect(status().isOk()).andReturn()).get("token").asText();
+        mvc.perform(get("/usuarios/me").header("Authorization", "Bearer " + primera))
+            .andExpect(status().isUnauthorized()).andExpect(jsonPath("mensaje").value(org.hamcrest.Matchers.containsString("otro dispositivo")));
+        mvc.perform(get("/usuarios/me").header("Authorization", "Bearer " + segunda)).andExpect(status().isOk());
+        assertEquals(1, jdbc.queryForObject("select count(*) from sesiones_usuario", Integer.class));
+    }
+    @Test void cerrarSesionInvalidaElTokenYPermiteUnaNuevaSinConfirmar() throws Exception {
+        crear(registro("1"));
+        String token = login("ana1@example.com", "Segura123!");
+        mvc.perform(post("/auth/logout").header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+        mvc.perform(get("/usuarios/me").header("Authorization", "Bearer " + token)).andExpect(status().isUnauthorized());
+        String desafio = desafio("ana1@example.com", "Segura123!");
+        mvc.perform(post("/auth/verificar").contentType("application/json")
+            .content(verificar(desafio, this.correo.ultimoCodigo(), false))).andExpect(status().isOk());
+    }
+    @Test void unaSesionVencidaNoBloqueaUnNuevoInicioDeSesion() throws Exception {
+        crear(registro("1"));
+        login("ana1@example.com", "Segura123!");
+        jdbc.update("update sesiones_usuario set expira_en = now() - interval '1 minute'");
+        String desafio = desafio("ana1@example.com", "Segura123!");
+        mvc.perform(post("/auth/verificar").contentType("application/json")
+            .content(verificar(desafio, this.correo.ultimoCodigo(), false))).andExpect(status().isOk());
+    }
+    @Test void cambiarLaPasswordCierraLaSesionActual() throws Exception {
+        crear(registro("1"));
+        String token = "Bearer " + login("ana1@example.com", "Segura123!");
+        mvc.perform(put("/usuarios/me/password").header("Authorization", token)
+            .contentType("application/json").content("{\"passwordActual\":\"Segura123!\",\"passwordNueva\":\"Nueva123!\"}"))
+            .andExpect(status().isOk());
+        mvc.perform(get("/usuarios/me").header("Authorization", token)).andExpect(status().isUnauthorized());
+    }
     private JsonNode crear(ObjectNode body) throws Exception {
         return json(mvc.perform(post("/clientes").contentType("application/json").content(body.toString()))
             .andExpect(status().isCreated()).andReturn());
@@ -611,8 +703,13 @@ class ClientesPostgresTest {
     private String credenciales(String correo, String password) {
         return mapper.createObjectNode().put("correo", correo).put("password", password).toString();
     }
+    /** Inicio de sesión completo en dos pasos; reemplaza cualquier sesión anterior del usuario. */
     private String login(String correo, String password) throws Exception {
-        return json(mvc.perform(post("/auth/login").contentType("application/json").content(credenciales(correo, password)))
+        String desafio = json(mvc.perform(post("/auth/login").contentType("application/json").content(credenciales(correo, password)))
+            .andExpect(status().isOk()).andReturn()).get("desafioId").asText();
+        return json(mvc.perform(post("/auth/verificar").contentType("application/json")
+            .content(mapper.createObjectNode().put("desafioId", desafio).put("codigo", this.correo.ultimoCodigo())
+                .put("cerrarSesionAnterior", true).toString()))
             .andExpect(status().isOk()).andReturn()).get("token").asText();
     }
     private String bearer(String sufijo) throws Exception { return "Bearer " + login("ana" + sufijo + "@example.com", "Segura123!"); }

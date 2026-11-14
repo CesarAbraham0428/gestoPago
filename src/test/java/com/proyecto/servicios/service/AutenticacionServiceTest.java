@@ -1,64 +1,168 @@
 package com.proyecto.servicios.service;
-import com.proyecto.servicios.entity.sf.*;
-import com.proyecto.servicios.models.request.LoginRequest;
-import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
-import com.proyecto.servicios.security.JwtTokenService;
-import com.proyecto.servicios.service.Impl.AutenticacionServiceImpl;
-import com.proyecto.servicios.service.exception.AutenticacionException;
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+
+import com.proyecto.servicios.entity.sf.Cliente;
+import com.proyecto.servicios.entity.sf.Usuario;
+import com.proyecto.servicios.models.request.LoginRequest;
+import com.proyecto.servicios.models.request.VerificacionCodigoRequest;
+import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
+import com.proyecto.servicios.security.JwtTokenService;
+import com.proyecto.servicios.security.JwtTokenService.TokenEmitido;
+import com.proyecto.servicios.service.CodigoVerificacionService.Desafio;
+import com.proyecto.servicios.service.Impl.AutenticacionServiceImpl;
+import com.proyecto.servicios.service.exception.AutenticacionException;
+import com.proyecto.servicios.service.exception.AutenticacionException.Tipo;
+import com.proyecto.servicios.service.exception.NegocioException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
 @ExtendWith(MockitoExtension.class)
 class AutenticacionServiceTest {
+
+    private static final String DESAFIO = "A".repeat(43);
+
     @Mock UsuarioRepository usuarios;
     @Mock JwtTokenService tokens;
-    final BCryptPasswordEncoder encoder=new BCryptPasswordEncoder(4);
+    @Mock CodigoVerificacionService codigos;
+    @Mock SesionService sesiones;
+    final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
     AutenticacionService service;
-    @BeforeEach void preparar() { service=new AutenticacionServiceImpl(usuarios,encoder,tokens); }
-    private Usuario usuario() {
-        Cliente c=new Cliente(); c.setPrimerNombre("Ana"); c.setApellidoPaterno("Pérez"); c.setApellidoMaterno("Ruiz");
-        Usuario u=new Usuario(); u.setId(7); u.setCorreo("ana@example.com"); u.setCliente(c);
-        u.setPasswordHash(encoder.encode("Segura123!")); return u;
+
+    @BeforeEach
+    void preparar() {
+        service = new AutenticacionServiceImpl(usuarios, encoder, tokens, codigos, sesiones);
     }
-    @Test void loginNormalizaCorreoYUsaIdEstable() {
+
+    private Usuario usuario() {
+        Cliente c = new Cliente();
+        c.setPrimerNombre("Ana");
+        c.setApellidoPaterno("Pérez");
+        c.setApellidoMaterno("Ruiz");
+        Usuario u = new Usuario();
+        u.setId(7);
+        u.setCorreo("ana@example.com");
+        u.setCliente(c);
+        u.setPasswordHash(encoder.encode("Segura123!"));
+        return u;
+    }
+
+    private static AutenticacionException.Tipo tipo(Runnable accion) {
+        return assertThrows(AutenticacionException.class, accion::run).getTipo();
+    }
+
+    @Test
+    void loginValidoEnviaCodigoYNoEmiteToken() {
         when(usuarios.findByCorreoIgnoreCase("ana@example.com")).thenReturn(Optional.of(usuario()));
-        when(tokens.emitir("7")).thenReturn("jwt");
+        when(codigos.emitir(7, "ana@example.com")).thenReturn(new Desafio(DESAFIO, Duration.ofMinutes(5)));
+
+        var r = service.iniciarSesion(new LoginRequest(" ANA@EXAMPLE.COM ", "Segura123!"));
+
+        assertEquals(DESAFIO, r.desafioId());
+        assertEquals("a***@example.com", r.correoEnmascarado());
+        assertEquals(300_000, r.expiraEnMs());
+        verifyNoInteractions(tokens, sesiones);
+    }
+
+    @Test
+    void passwordIncorrectoNoEnviaCodigo() {
+        when(usuarios.findByCorreoIgnoreCase("ana@example.com")).thenReturn(Optional.of(usuario()));
+        assertEquals(Tipo.CREDENCIALES_INVALIDAS,
+                tipo(() -> service.iniciarSesion(new LoginRequest("ana@example.com", "incorrecta"))));
+        verifyNoInteractions(tokens, codigos, sesiones);
+    }
+
+    @Test
+    void usuarioInexistenteRespondeCredencialesInvalidasSinEnviarCodigo() {
+        when(usuarios.findByCorreoIgnoreCase("nadie@example.com")).thenReturn(Optional.empty());
+        assertEquals(Tipo.CREDENCIALES_INVALIDAS,
+                tipo(() -> service.iniciarSesion(new LoginRequest("nadie@example.com", "Segura123!"))));
+        verifyNoInteractions(tokens, codigos, sesiones);
+    }
+
+    @Test
+    void clienteOUsuarioInactivoNoRecibeCodigo() {
+        Usuario clienteInactivo = usuario();
+        clienteInactivo.getCliente().setActivo(false);
+        Usuario usuarioInactivo = usuario();
+        usuarioInactivo.setActivo(false);
+        when(usuarios.findByCorreoIgnoreCase("ana@example.com"))
+                .thenReturn(Optional.of(clienteInactivo), Optional.of(usuarioInactivo));
+        for (int i = 0; i < 2; i++) {
+            assertEquals(Tipo.CUENTA_INACTIVA,
+                    tipo(() -> service.iniciarSesion(new LoginRequest("ana@example.com", "Segura123!"))));
+        }
+        verifyNoInteractions(tokens, codigos, sesiones);
+    }
+
+    @Test
+    void codigoCorrectoAbreLaSesionYConsumeElDesafio() {
+        when(codigos.verificar(DESAFIO, "123456")).thenReturn(7);
+        when(usuarios.findById(7)).thenReturn(Optional.of(usuario()));
+        TokenEmitido token = new TokenEmitido("jwt", "jti-1", Instant.now().plusSeconds(60));
+        when(tokens.emitir("7")).thenReturn(token);
         when(tokens.getExpirationMs()).thenReturn(60000L);
-        var r=service.iniciarSesion(new LoginRequest(" ANA@EXAMPLE.COM ","Segura123!"));
-        assertEquals("ana@example.com",r.usuario()); assertEquals("Ana Pérez Ruiz",r.nombreCompleto()); assertEquals("jwt",r.token());
+        when(sesiones.abrir(7, token, false)).thenReturn(true);
+
+        var r = service.verificarCodigo(new VerificacionCodigoRequest(DESAFIO, "123456", false));
+
+        assertEquals("jwt", r.token());
         assertEquals("Bearer", r.tipo());
         assertEquals(60000, r.expiraEnMs());
+        assertEquals("ana@example.com", r.usuario());
+        assertEquals("Ana Pérez Ruiz", r.nombreCompleto());
+        verify(codigos).consumir(DESAFIO);
     }
-    @Test void passwordIncorrectoNoEmiteToken() {
-        when(usuarios.findByCorreoIgnoreCase("ana@example.com")).thenReturn(Optional.of(usuario()));
-        assertEquals(AutenticacionException.Tipo.CREDENCIALES_INVALIDAS,assertThrows(AutenticacionException.class,
-            () -> service.iniciarSesion(new LoginRequest("ana@example.com","incorrecta"))).getTipo());
-        verifyNoInteractions(tokens);
+
+    @Test
+    void conSesionActivaSinConfirmarResponde409YConservaElDesafio() {
+        when(codigos.verificar(DESAFIO, "123456")).thenReturn(7);
+        when(usuarios.findById(7)).thenReturn(Optional.of(usuario()));
+        TokenEmitido token = new TokenEmitido("jwt", "jti-1", Instant.now().plusSeconds(60));
+        when(tokens.emitir("7")).thenReturn(token);
+        when(sesiones.abrir(7, token, false)).thenReturn(false);
+
+        NegocioException e = assertThrows(NegocioException.class,
+                () -> service.verificarCodigo(new VerificacionCodigoRequest(DESAFIO, "123456", false)));
+
+        assertEquals(HttpStatus.CONFLICT, e.getStatus());
+        verify(codigos, never()).consumir(any());
     }
-    @Test void clienteInactivoNoPuedeIniciarSesion() {
-        Usuario u=usuario(); u.getCliente().setActivo(false);
-        when(usuarios.findByCorreoIgnoreCase("ana@example.com")).thenReturn(Optional.of(u));
-        assertEquals(AutenticacionException.Tipo.CUENTA_INACTIVA,assertThrows(AutenticacionException.class,
-            () -> service.iniciarSesion(new LoginRequest("ana@example.com","Segura123!"))).getTipo());
-        verifyNoInteractions(tokens);
+
+    @Test
+    void confirmandoElCierreReemplazaLaSesionAnterior() {
+        when(codigos.verificar(DESAFIO, "123456")).thenReturn(7);
+        when(usuarios.findById(7)).thenReturn(Optional.of(usuario()));
+        TokenEmitido token = new TokenEmitido("jwt", "jti-2", Instant.now().plusSeconds(60));
+        when(tokens.emitir("7")).thenReturn(token);
+        when(sesiones.abrir(7, token, true)).thenReturn(true);
+
+        service.verificarCodigo(new VerificacionCodigoRequest(DESAFIO, "123456", true));
+
+        verify(codigos).consumir(DESAFIO);
     }
-    @Test void usuarioInactivoNoPuedeIniciarSesion() {
-        Usuario u=usuario(); u.setActivo(false);
-        when(usuarios.findByCorreoIgnoreCase("ana@example.com")).thenReturn(Optional.of(u));
-        assertEquals(AutenticacionException.Tipo.CUENTA_INACTIVA, assertThrows(AutenticacionException.class,
-            () -> service.iniciarSesion(new LoginRequest("ana@example.com","Segura123!"))).getTipo());
-        verifyNoInteractions(tokens);
+
+    @Test
+    void codigoIncorrectoNoEmiteTokenNiTocaLaSesion() {
+        when(codigos.verificar(DESAFIO, "000000"))
+                .thenThrow(new NegocioException(HttpStatus.UNAUTHORIZED, "Código de verificación incorrecto"));
+        assertThrows(NegocioException.class,
+                () -> service.verificarCodigo(new VerificacionCodigoRequest(DESAFIO, "000000", true)));
+        verifyNoInteractions(tokens, sesiones);
     }
-    @Test void usuarioInexistenteNoEmiteToken() {
-        when(usuarios.findByCorreoIgnoreCase("nadie@example.com")).thenReturn(Optional.empty());
-        var exception = assertThrows(AutenticacionException.class,
-            () -> service.iniciarSesion(new LoginRequest("nadie@example.com", "Segura123!")));
-        assertEquals(AutenticacionException.Tipo.CREDENCIALES_INVALIDAS, exception.getTipo());
-        verifyNoInteractions(tokens);
+
+    @Test
+    void cerrarSesionEliminaLaSesionDelUsuario() {
+        service.cerrarSesion(7);
+        verify(sesiones).cerrar(7);
     }
 }

@@ -30,14 +30,16 @@ public class UsuarioService {
     private final PasswordEncoder encoder;
     private final EntityManager em;
     private final AutorizacionService autorizacion;
+    private final SesionService sesiones;
 
     public UsuarioService(UsuarioRepository usuarios, ClientesRepository clientes, PasswordEncoder encoder,
-            EntityManager em, AutorizacionService autorizacion) {
+            EntityManager em, AutorizacionService autorizacion, SesionService sesiones) {
         this.usuarios = usuarios;
         this.clientes = clientes;
         this.encoder = encoder;
         this.em = em;
         this.autorizacion = autorizacion;
+        this.sesiones = sesiones;
     }
 
     @Transactional(readOnly = true)
@@ -73,6 +75,8 @@ public class UsuarioService {
         }
         usuario.setPasswordHash(encoder.encode(request.passwordNueva()));
         em.flush();
+        // Con la contraseña nueva hay que volver a iniciar sesión (y pasar el segundo factor).
+        sesiones.cerrar(usuario.getId());
     }
 
     private Usuario buscar(Integer usuarioAutenticadoId) {

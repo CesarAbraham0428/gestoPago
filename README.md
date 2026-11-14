@@ -27,12 +27,14 @@ El catálogo se consulta en el orden Redis → PostgreSQL → GestoPago. Los dat
 
 ## Endpoints de la API
 
-URL local predeterminada: `http://localhost:8080`. El registro y el login son públicos; los demás endpoints de esta tabla requieren JWT.
+URL local predeterminada: `http://localhost:8080`. El registro y los dos pasos del acceso son públicos; los demás endpoints de esta tabla requieren JWT.
 
 | Método | Ruta | Función |
 | --- | --- | --- |
 | POST | `/clientes` | Registrar cliente, domicilio, cuenta y usuario. |
-| POST | `/auth/login` | Iniciar sesión con `correo` y `password`. |
+| POST | `/auth/login` | Paso 1 del acceso: valida `correo` y `password` y envía un código de 6 dígitos al correo. Devuelve un `desafioId`, no un token. |
+| POST | `/auth/verificar` | Paso 2: valida `desafioId` y `codigo` en el servidor y entrega el JWT. `cerrarSesionAnterior: true` confirma terminar la sesión abierta en otro dispositivo (409 si no). |
+| POST | `/auth/logout` | Cierra la sesión del usuario; su JWT deja de ser válido de inmediato. |
 | POST | `/clientes/consultar` | Consultar clientes completos con filtros en un request JSON. |
 | PATCH | `/clientes` | Identificar por RFC/CURP y modificar solo los campos enviados. |
 | POST | `/clientes/desactivar` | Dar de baja lógica mediante RFC o CURP. |
@@ -114,6 +116,34 @@ La actualización parcial usa un request que separa identificación y cambios:
 Envíalo a `PATCH /clientes`. Los campos omitidos conservan su valor; `null` explícito limpia un campo opcional y se rechaza para los obligatorios. RFC, CURP, rol, estado, contraseña y cuentas no se pueden cambiar por este endpoint. La actualización conserva el bloqueo del cliente y valida el resultado completo antes de modificar entidades.
 
 El saldo se obtiene dentro de cada cuenta devuelta por `POST /cuentas/consultar`; puedes filtrar por `numeroCuenta`. Para cambiar su estado, envía `{"numeroCuenta":"000000000000000001","activa":false}` a `PATCH /cuentas/estado`. Un cliente no puede consultar, activar ni desactivar cuentas ajenas.
+
+## Acceso, doble factor y sesión única
+
+| Control | Cómo funciona |
+| --- | --- |
+| 2FA | Tras validar la contraseña se genera un código aleatorio de 6 dígitos (`SecureRandom`), se guarda **solo su hash** (tabla `desafios_autenticacion`) y se envía por correo. Vence en 5 minutos, admite 5 intentos, se invalida al usarse y un nuevo código reemplaza al anterior (con 30 s de espera entre solicitudes). Se valida siempre en el servidor. |
+| Sesión única | La tabla `sesiones_usuario` guarda una fila por usuario con el `jti` de su JWT. Cada petición debe traer el JWT de esa sesión; si el usuario entra desde otro dispositivo, la API responde `409` hasta que confirme (`cerrarSesionAnterior`), y el token anterior recibe `401 "…iniciaste sesión en otro dispositivo"`. La sesión se reemplaza de forma atómica (`INSERT … ON CONFLICT`). Solo se cierra la sesión anterior **después** de validar contraseña y código. |
+| Cierre de sesión | `POST /auth/logout` borra la sesión: el JWT queda revocado aunque no haya vencido. Cambiar la contraseña también la cierra. |
+| Expiración | El JWT dura `APP_JWT_EXPIRATION_MS` (2 h por omisión). Una sesión vencida no bloquea un nuevo acceso. |
+| Fuerza bruta | Límite de intentos de login por correo (10 / 15 min) y por IP (40 / 15 min), del registro por IP (10 / hora) y de pagos por usuario, en Redis. Detrás de un proxy usa `FORWARD_HEADERS=native` para ver la IP real. |
+| Enumeración de usuarios | Un correo inexistente tarda lo mismo que uno existente (se compara contra un hash ficticio) y devuelve el mismo error. |
+| Si falla la verificación de sesión | La API rechaza la petición (no autentica "a ciegas"). |
+| Cabeceras y exposición | Swagger apagado por omisión (`SWAGGER_ENABLED`); actuator solo expone `health`; `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `nosniff` y `Cache-Control: no-store`. |
+
+**Correo del segundo factor.** La API no arranca sin SMTP: define `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` y `MAIL_REMITENTE` (en Gmail, una contraseña de aplicación). Para desarrollo local sin correo, `APP_2FA_CONSOLA=true` escribe el código en el log de la API; **nunca lo actives en producción**.
+
+Ejemplo de acceso completo:
+
+```json
+POST /auth/login      {"correo":"ana@example.com","password":"Segura123!"}
+200 -> {"codigo":0,"mensaje":"Te enviamos un código de verificación",
+        "datos":{"desafioId":"…43 caracteres…","expiraEnMs":300000,"correoEnmascarado":"a***@example.com"}}
+
+POST /auth/verificar  {"desafioId":"…","codigo":"123456","cerrarSesionAnterior":false}
+200 -> {"codigo":0,"mensaje":"Sesión iniciada","datos":{"token":"…","tipo":"Bearer","expiraEnMs":7200000,"usuario":"ana@example.com","nombreCompleto":"…"}}
+409 -> ya existe una sesión activa: repetir con "cerrarSesionAnterior": true (el código sigue siendo válido)
+401 -> código incorrecto, vencido o con demasiados intentos · 429 demasiados intentos · 503 no se pudo enviar el correo
+```
 
 ## Pagos con GestoPago
 
@@ -318,7 +348,7 @@ Las excepciones de negocio conservan mensajes específicos para correos, RFC y C
 ## Ejecución local
 
 1. Instala Java 17 e inicia PostgreSQL y Redis.
-2. Copia `.env.example` a `.env` y configura las credenciales de PostgreSQL, GestoPago y `APP_JWT_SECRET` con un valor aleatorio de al menos 32 bytes. No compartas este archivo.
+2. Copia `.env.example` a `.env` y configura las credenciales de PostgreSQL, GestoPago, `APP_JWT_SECRET` (valor aleatorio de al menos 32 bytes) y el correo del segundo factor (`MAIL_*`, o `APP_2FA_CONSOLA=true` solo en desarrollo). No compartas este archivo.
 3. Ejecuta desde la raíz del proyecto:
 
    ```powershell

@@ -17,7 +17,7 @@ class LimitePagosServiceTest {
     private final StringRedisTemplate redis = mock(StringRedisTemplate.class);
     @SuppressWarnings("unchecked")
     private final ValueOperations<String, String> valores = mock(ValueOperations.class);
-    private final LimitePagosService service = new LimitePagosService(redis, 2);
+    private final LimitePagosService service = new LimitePagosService(new com.proyecto.servicios.utils.LimitadorVentanaFija(redis), 2);
 
     @BeforeEach
     void preparar() {

@@ -6,4 +6,10 @@ public record LoginRequest(@NotBlank @Email @Size(max=100) String correo, @NotBl
     public void rechazarCampo(String nombre, Object valor) {
         throw new IllegalArgumentException("Campo de autenticación no permitido");
     }
+
+    /** La contraseña nunca debe terminar en un log. */
+    @Override
+    public String toString() {
+        return "LoginRequest[correo=" + correo + "]";
+    }
 }

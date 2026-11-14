@@ -7,6 +7,8 @@ import com.proyecto.servicios.entity.sf.Pago;
 import com.proyecto.servicios.models.request.PagoServicioRequest;
 import com.proyecto.servicios.models.request.gestopago.GestoPagoSendTxRequest;
 import com.proyecto.servicios.models.response.ConsultaPagoResponse;
+import com.proyecto.servicios.models.response.HistorialPagoResponse;
+import com.proyecto.servicios.models.response.ListaGenericResponse;
 import com.proyecto.servicios.models.response.PagoServicioResponse;
 import com.proyecto.servicios.models.response.gestopago.GestoPagoPagosResponse;
 import com.proyecto.servicios.repositorys.gestopago.ProductoRepository;
@@ -22,11 +24,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
 
 import java.time.Clock;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -110,6 +116,24 @@ public class PagoServiceImpl implements PagoService {
         return new ConsultaPagoResponse(pago.getUpc(), pago.getEstado().name(), mensajeDeEstado(pago.getEstado()),
                 pago.getMonto(), pago.getComisionCliente(), pago.getReferencia(),
                 aprobado ? pago.getIdTx() : null, aprobado ? pago.getNumAutorizacion() : null);
+    }
+
+    @Override
+    public ListaGenericResponse<HistorialPagoResponse> historial(Integer usuarioAutenticadoId, int pagina,
+            int tamanio) {
+        Page<Pago> aprobados = registro.aprobadosDeUsuario(usuarioAutenticadoId, pagina, tamanio);
+        Map<String, Optional<Producto>> catalogo = new HashMap<>();
+        return ListaGenericResponse.desde(aprobados.map(pago -> {
+            Optional<Producto> producto = catalogo.computeIfAbsent(pago.getIdProducto() + ":" + pago.getIdServicio(),
+                    clave -> productos.findFirstByIdProductoAndIdServicio(pago.getIdProducto(),
+                            pago.getIdServicio()));
+            return new HistorialPagoResponse(pago.getUpc(), pago.getEstado().name(),
+                    producto.map(Producto::getProducto).orElse(null),
+                    producto.map(Producto::getServicio).orElse(null),
+                    pago.getIdProducto(), pago.getIdServicio(), pago.getMonto(), pago.getComisionCliente(),
+                    pago.cargo(), pago.getReferencia(), pago.getTelefono(), pago.getIdTx(),
+                    pago.getNumAutorizacion(), pago.getFechaCreacion());
+        }));
     }
 
     private String mensajeDeEstado(EstadoPago estado) {

@@ -1,0 +1,89 @@
+import '../../../core/error/app_exception.dart';
+import '../../../core/network/api_client.dart';
+import '../../domain/entities/desafio_verificacion.dart';
+import '../../domain/entities/sesion.dart';
+import '../../domain/ports/autenticacion_gateway.dart';
+
+/// Adaptador HTTP del puerto [AutenticacionGateway]. Acceso en dos pasos.
+///
+/// POST /auth/login   {"correo","password"}
+///   200 -> datos: {desafioId, expiraEnMs, correoEnmascarado}  (código enviado por correo)
+///   400 datos inválidos · 401 credenciales incorrectas · 403 usuario inactivo
+///   429 demasiados intentos o código pedido hace poco · 503 no se pudo enviar el correo
+///
+/// POST /auth/verificar   {"desafioId","codigo":"6 dígitos","cerrarSesionAnterior":bool}
+///   200 -> datos: {token, tipo, expiraEnMs, usuario, nombreCompleto}
+///   400 datos inválidos · 401 código incorrecto, vencido o con demasiados intentos
+///   403 usuario inactivo · 409 ya hay otra sesión activa (reenviar con cerrarSesionAnterior=true)
+///   429 demasiados intentos
+///
+/// POST /auth/logout (Bearer)
+///   200 -> la sesión deja de ser válida de inmediato · 401 la sesión ya no estaba activa
+class ApiAutenticacionGateway implements AutenticacionGateway {
+  ApiAutenticacionGateway(this._api);
+  final ApiClient _api;
+
+  @override
+  Future<DesafioVerificacion> iniciarSesion({
+    required String correo,
+    required String password,
+  }) async {
+    final respuesta = await _api.post(
+      '/auth/login',
+      body: {'correo': correo, 'password': password},
+      authenticated: false,
+    );
+    final datos = respuesta.dataAsMap;
+    final id = datos['desafioId'];
+    final vigenciaMs = datos['expiraEnMs'];
+    if (id is! String || id.isEmpty || vigenciaMs is! num) {
+      throw const ConexionException('La respuesta del servidor no es válida.');
+    }
+    return DesafioVerificacion(
+      desafioId: id,
+      correo: correo,
+      correoEnmascarado: (datos['correoEnmascarado'] as String?) ?? correo,
+      vigencia: Duration(milliseconds: vigenciaMs.toInt()),
+    );
+  }
+
+  @override
+  Future<Sesion> verificarCodigo({
+    required DesafioVerificacion desafio,
+    required String codigo,
+    required bool cerrarSesionAnterior,
+  }) async {
+    final ApiResponse respuesta;
+    try {
+      respuesta = await _api.post(
+        '/auth/verificar',
+        body: {
+          'desafioId': desafio.desafioId,
+          'codigo': codigo,
+          'cerrarSesionAnterior': cerrarSesionAnterior,
+        },
+        authenticated: false,
+      );
+    } on ApiException catch (e) {
+      if (e.statusCode == 409) throw SesionActivaException(e.message);
+      rethrow;
+    }
+    final datos = respuesta.dataAsMap;
+    final token = datos['token'];
+    final expiraEnMs = datos['expiraEnMs'];
+    if (token is! String || token.isEmpty || expiraEnMs is! num) {
+      throw const ConexionException('La respuesta del servidor no es válida.');
+    }
+    return Sesion(
+      token: token,
+      correo: (datos['usuario'] as String?) ?? desafio.correo,
+      nombreCompleto: (datos['nombreCompleto'] as String?) ?? '',
+      expiraEn: DateTime.now().add(Duration(milliseconds: expiraEnMs.toInt())),
+    );
+  }
+
+  @override
+  Future<void> cerrarSesion() async {
+    await _api.post('/auth/logout', timeout: const Duration(seconds: 8));
+  }
+}

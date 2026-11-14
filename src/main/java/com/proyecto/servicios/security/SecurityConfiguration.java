@@ -1,11 +1,17 @@
 package com.proyecto.servicios.security;
 
 import lombok.extern.slf4j.Slf4j;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
+import com.proyecto.servicios.service.SesionService;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -18,13 +24,26 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 @Slf4j
 public class SecurityConfiguration {
+
+    /** Únicas rutas POST sin sesión: registro y los dos pasos del inicio de sesión. */
+    private static final List<String> POST_PUBLICOS = List.of("/clientes", "/auth/login", "/auth/verificar");
+
+    static boolean esRutaPublica(String metodo, String ruta) {
+        return "POST".equals(metodo) && POST_PUBLICOS.contains(ruta);
+    }
+
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtTokenService tokenService,
-            UsuarioRepository usuarios, ApiSecurityErrorWriter errores) throws Exception {
-        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(tokenService, usuarios, errores);
+    SecurityFilterChain securityFilterChain(HttpSecurity http,
+            @Value("${gestopago.app.cors.allowed-origin-patterns:http://localhost:*,http://127.0.0.1:*}")
+            List<String> origenesPermitidos, JwtTokenService tokenService,
+            SesionService sesiones, ApiSecurityErrorWriter errores) throws Exception {
+        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(tokenService, sesiones, errores);
         return http
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.disable())
+                .headers(headers -> headers
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.NO_REFERRER))
+                        .frameOptions(frame -> frame.deny()))
+                .cors(cors -> cors.configurationSource(corsConfigurationSource(origenesPermitidos)))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) -> {
                     log.warn("Solicitud protegida sin autenticación válida: {} {}",
@@ -35,11 +54,22 @@ public class SecurityConfiguration {
                                 "No tienes permiso para realizar esta operación")))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/clientes", "/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, POST_PUBLICOS.toArray(String[]::new)).permitAll()
                         .requestMatchers("/error", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
+    }
+
+    /** Permite que la app web (otro origen) llame a la API; los orígenes se configuran por propiedad. */
+    private static CorsConfigurationSource corsConfigurationSource(List<String> origenes) {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOriginPatterns(origenes);
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 
     @Bean

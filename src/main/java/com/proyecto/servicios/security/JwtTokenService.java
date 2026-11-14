@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 @Service
 public class JwtTokenService {
@@ -29,15 +30,22 @@ public class JwtTokenService {
         this.expirationMs = expirationMs;
     }
 
-    public String emitir(String usuario) {
+    /** Cada token lleva un identificador único (jti) que lo liga a la sesión registrada en el servidor. */
+    public TokenEmitido emitir(String usuario) {
         Instant ahora = Instant.now();
-        return JWT.create()
+        Instant expira = ahora.plusMillis(expirationMs);
+        String jti = UUID.randomUUID().toString();
+        String token = JWT.create()
                 .withIssuer(ISSUER)
                 .withSubject(usuario)
+                .withJWTId(jti)
                 .withIssuedAt(Date.from(ahora))
-                .withExpiresAt(Date.from(ahora.plusMillis(expirationMs)))
+                .withExpiresAt(Date.from(expira))
                 .sign(algorithm);
+        return new TokenEmitido(token, jti, expira);
     }
+
+    public record TokenEmitido(String token, String jti, Instant expiraEn) {}
 
     public DecodedJWT validar(String token) {
         return JWT.require(algorithm).withIssuer(ISSUER).build().verify(token);

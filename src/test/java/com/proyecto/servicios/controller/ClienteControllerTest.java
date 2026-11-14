@@ -25,7 +25,7 @@ class ClienteControllerTest {
     @BeforeEach
     void preparar() {
         service = mock(ClienteService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new ClienteController(service))
+        mvc = MockMvcBuilders.standaloneSetup(new ClienteController(service, mock(com.proyecto.servicios.service.LimiteAutenticacionService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
