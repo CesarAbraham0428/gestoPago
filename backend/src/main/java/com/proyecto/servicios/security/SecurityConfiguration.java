@@ -86,7 +86,7 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, POST_PUBLICOS.toArray(String[]::new)).permitAll()
-                        // Sonda de salud de la plataforma (Railway); solo devuelve {"status":"UP"} sin detalles.
+                        // Sonda de salud de la plataforma (Render); solo devuelve {"status":"UP"} sin detalles.
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers("/error", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated())

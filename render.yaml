@@ -1,8 +1,14 @@
-databases:
-  - name: gestopago-db
-    databaseName: gestopago
-    user: gestopago
-    plan: free
+# Blueprint de Render: API (Spring Boot) + web (Flutter/nginx) + Redis. Guía en docs/DESPLIEGUE-RENDER.md.
+# Uso: Render Dashboard > New > Blueprint > selecciona este repositorio.
+# Los valores marcados con `sync: false` los pide Render al crear el Blueprint (no se guardan en git).
+#
+# - El nombre de cada servicio define su URL (https://<nombre>.onrender.com). Si Render la cambia porque el
+#   nombre ya existe, actualiza CORS_ORIGENES (api) y API_BASE_URL (web).
+# - Plan gratuito: los servicios web se duermen tras 15 min sin tráfico (la primera petición tarda ~1 min).
+# - Flyway crea las tablas al arrancar la API contra una base vacía.
+
+# La base de datos NO se define aquí: Render solo permite una PostgreSQL gratuita por cuenta y tú ya tienes la
+# tuya. Cópiala en las variables DB_URL / DB_USERNAME / DB_PASSWORD de la API (ver más abajo).
 
 services:
   # Redis (caché del catálogo y límite de solicitudes de pago). Solo accesible desde la red privada.
@@ -23,20 +29,18 @@ services:
     buildFilter:
       paths:
         - backend/**
-    # Sin healthCheckPath: /actuator/health exige autenticación en SecurityConfiguration.
-    # Si lo habilitas como público, agrega aquí:  healthCheckPath: /actuator/health
+    # /actuator/health es público y solo responde {"status":"UP"} (sin detalles).
+    healthCheckPath: /actuator/health
     envVars:
-      # El Dockerfile arma DB_URL (jdbc:postgresql://host:puerto/base) con estas tres variables.
-      - key: DB_HOST
-        fromDatabase: { name: gestopago-db, property: host }
-      - key: DB_PORT
-        fromDatabase: { name: gestopago-db, property: port }
-      - key: DB_NAME
-        fromDatabase: { name: gestopago-db, property: database }
+      # Datos de tu PostgreSQL de Render (Dashboard > tu base > Connections). Si la API y la base están en la
+      # misma región usa el host INTERNO (sin dominio, p. ej. dpg-xxxx-a): es más rápido y no necesita SSL.
+      #   DB_URL = jdbc:postgresql://<host>:5432/<base>      (con el host externo, agrega ?sslmode=require)
+      - key: DB_URL
+        sync: false
       - key: DB_USERNAME
-        fromDatabase: { name: gestopago-db, property: user }
+        sync: false
       - key: DB_PASSWORD
-        fromDatabase: { name: gestopago-db, property: password }
+        sync: false
       - key: REDIS_HOST
         fromService: { type: keyvalue, name: gestopago-redis, property: host }
       - key: REDIS_PORT
@@ -60,16 +64,19 @@ services:
       - key: GESTOPAGO_PAGOS_IV
         sync: false
 
-      # Segundo factor (2FA). Render gratis bloquea el SMTP (puertos 25, 465 y 587), así que para
-      # pruebas el código se escribe en el log del servicio (Dashboard > gestopago-api > Logs).
-      # SOLO PRUEBAS: con varios usuarios reales esto filtraría los códigos. Para correo real,
-      # pon "false" y agrega, en Environment, UNA de estas opciones:
-      #   - API de Gmail por HTTPS (funciona en Render gratis): GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET,
-      #     GMAIL_REFRESH_TOKEN y MAIL_REMITENTE (la cuenta de Gmail autorizada).
-      #   - SMTP: MAIL_HOST, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD y MAIL_REMITENTE (puertos 25/465/587
-      #     bloqueados en el plan gratuito).
+      # Segundo factor (2FA) por la API HTTPS de Gmail: Render gratis bloquea el SMTP (puertos 25, 465 y 587),
+      # pero no el 443. MAIL_REMITENTE es la cuenta de Gmail que autorizaste en Google Cloud.
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
+      - key: MAIL_REMITENTE
+        sync: false
+      # "true" escribe el código en el log en vez de enviarlo (solo para pruebas sin Gmail).
       - key: APP_2FA_CONSOLA
-        value: "true"
+        value: "false"
 
       # Origen autorizado por CORS: la URL HTTPS del frontend.
       - key: CORS_ORIGENES

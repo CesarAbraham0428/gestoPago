@@ -125,12 +125,12 @@ El saldo se obtiene dentro de cada cuenta devuelta por `POST /cuentas/consultar`
 | Sesión única | La tabla `sesiones_usuario` guarda una fila por usuario con el `jti` de su JWT. Cada petición debe traer el JWT de esa sesión; si el usuario entra desde otro dispositivo, la API responde `409` hasta que confirme (`cerrarSesionAnterior`), y el token anterior recibe `401 "…iniciaste sesión en otro dispositivo"`. La sesión se reemplaza de forma atómica (`INSERT … ON CONFLICT`). Solo se cierra la sesión anterior **después** de validar contraseña y código. |
 | Cierre de sesión | `POST /auth/logout` borra la sesión: el JWT queda revocado aunque no haya vencido. Cambiar la contraseña también la cierra. |
 | Expiración | El JWT dura `APP_JWT_EXPIRATION_MS` (2 h por omisión). Una sesión vencida no bloquea un nuevo acceso. |
-| Fuerza bruta | Límite general por minuto en todas las rutas (por IP y por usuario) y de ráfaga en login/registro; intentos de login por correo (10 / 15 min) y por IP (40 / 15 min), registro por IP (10 / hora) y pagos por usuario, en Redis con respaldo en memoria si cae. Responde 429 con `Retry-After`. Detrás de un proxy usa `FORWARD_HEADERS=native` para ver la IP real (obligatorio en Railway). Tabla completa en [docs/DESPLIEGUE-RAILWAY.md](docs/DESPLIEGUE-RAILWAY.md). |
+| Fuerza bruta | Límite general por minuto en todas las rutas (por IP y por usuario) y de ráfaga en login/registro; intentos de login por correo (10 / 15 min) y por IP (40 / 15 min), registro por IP (10 / hora) y pagos por usuario, en Redis con respaldo en memoria si cae. Responde 429 con `Retry-After`. Detrás de un proxy usa `FORWARD_HEADERS=native` para ver la IP real. Tabla completa en [docs/DESPLIEGUE-RENDER.md](docs/DESPLIEGUE-RENDER.md#4-qué-protege-la-api). |
 | Enumeración de usuarios | Un correo inexistente tarda lo mismo que uno existente (se compara contra un hash ficticio) y devuelve el mismo error. |
 | Si falla la verificación de sesión | La API rechaza la petición (no autentica "a ciegas"). |
 | Cabeceras y exposición | Swagger apagado por omisión (`SWAGGER_ENABLED`); actuator solo expone `health`; HSTS, `Content-Security-Policy: default-src 'none'`, `Permissions-Policy`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `nosniff` y `Cache-Control: no-store`; CORS sin comodín y cuerpos de petición de hasta 64 KB. |
 
-**Correo del segundo factor.** La API no arranca sin un medio de entrega. Elige uno: la **API de Gmail** por HTTPS (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` y `MAIL_REMITENTE`; sirve en hosts que bloquean el SMTP, como Railway y Render gratis) o **SMTP** (`MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` y `MAIL_REMITENTE`; en Gmail, una contraseña de aplicación). Si están ambos, se usa la API de Gmail. Para desarrollo local sin correo, `APP_2FA_CONSOLA=true` escribe el código en el log de la API; **nunca lo actives en producción**.
+**Correo del segundo factor.** La API no arranca sin un medio de entrega. Elige uno: la **API de Gmail** por HTTPS (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` y `MAIL_REMITENTE`; sirve en hosts que bloquean el SMTP, como Render gratis) o **SMTP** (`MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` y `MAIL_REMITENTE`; en Gmail, una contraseña de aplicación). Si están ambos, se usa la API de Gmail. Para desarrollo local sin correo, `APP_2FA_CONSOLA=true` escribe el código en el log de la API; **nunca lo actives en producción**.
 
 Ejemplo de acceso completo:
 
@@ -358,14 +358,10 @@ render.yaml Blueprint de Render: API, web, PostgreSQL y Redis
 
 ## Despliegue
 
-Guía paso a paso para **Railway** (API y web, variables, verificación y límites de seguridad): [docs/DESPLIEGUE-RAILWAY.md](docs/DESPLIEGUE-RAILWAY.md). Cada carpeta trae su `railway.toml`.
+Guía paso a paso para **Render** (API, web y Redis desde `render.yaml`; usa tu PostgreSQL existente): [docs/DESPLIEGUE-RENDER.md](docs/DESPLIEGUE-RENDER.md). Cada servicio solo se redespliega cuando cambian los archivos de su carpeta.
 
-### Alternativa: Render
-
-`render.yaml` define los cuatro recursos (API, web, PostgreSQL y Redis). En Render: **New > Blueprint**, elige este repositorio y completa los valores que pide (credenciales de GestoPago y `MAIL_*`). Cada servicio solo se redespliega cuando cambian los archivos de su carpeta.
-
-- La API construye `DB_URL` a partir de `DB_HOST`, `DB_PORT` y `DB_NAME` si no se define `DB_URL`; Flyway crea las tablas en la base vacía.
 - `CORS_ORIGENES` (API) y `API_BASE_URL` (web) deben ser las URL HTTPS reales de cada servicio; ajústalas si Render asigna un nombre distinto.
+- La API construye `DB_URL` a partir de `DB_HOST`, `DB_PORT` y `DB_NAME` si no se define `DB_URL`; Flyway crea las tablas en la base vacía.
 - Imágenes en local: `docker build -t gestopago-api backend` y `docker build -t gestopago-web --build-arg API_BASE_URL=https://tu-api frontend`.
 
 ## Ejecución local
