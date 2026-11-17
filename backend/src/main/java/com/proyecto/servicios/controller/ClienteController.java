@@ -9,6 +9,7 @@ import com.proyecto.servicios.models.response.ListaGenericResponse;
 import com.proyecto.servicios.models.response.GenericResponse;
 import com.proyecto.servicios.service.ClienteService;
 import com.proyecto.servicios.service.LimiteAutenticacionService;
+import com.proyecto.servicios.utils.DireccionCliente;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -36,7 +37,7 @@ public class ClienteController {
     @PostMapping
     public ResponseEntity<GenericResponse<ClienteResponse>> registrar(@Valid @RequestBody ClienteRequest request,
             HttpServletRequest http) {
-        limite.verificarRegistro(http.getRemoteAddr());
+        limite.verificarRegistro(DireccionCliente.de(http));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(GenericResponse.exito("Cliente registrado", service.registrar(request)));
     }

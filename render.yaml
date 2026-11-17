@@ -1,14 +1,3 @@
-# Blueprint de Render: API (Spring Boot) + web (Flutter/nginx) + PostgreSQL + Redis.
-# Uso: Render Dashboard > New > Blueprint > selecciona este repositorio.
-# Los valores marcados con `sync: false` los pide Render al crear el Blueprint (no se guardan en git).
-#
-# Notas:
-# - Los nombres de servicio definen la URL (https://<nombre>.onrender.com). Si Render la
-#   cambia porque el nombre ya existe, actualiza CORS_ORIGENES (api) y API_BASE_URL (web).
-# - Plan gratuito: la base de datos expira a los 30 días y los servicios web se duermen
-#   tras 15 min sin tráfico. Para algo estable usa un plan de pago en `plan:`.
-# - Flyway crea todas las tablas al arrancar la API contra una base vacía.
-
 databases:
   - name: gestopago-db
     databaseName: gestopago
@@ -71,15 +60,16 @@ services:
       - key: GESTOPAGO_PAGOS_IV
         sync: false
 
-      # Segundo factor por correo (SMTP obligatorio; con Gmail, usa contraseña de aplicación).
-      - key: MAIL_HOST
-        value: smtp.gmail.com
-      - key: MAIL_USERNAME
-        sync: false
-      - key: MAIL_PASSWORD
-        sync: false
-      - key: MAIL_REMITENTE
-        sync: false
+      # Segundo factor (2FA). Render gratis bloquea el SMTP (puertos 25, 465 y 587), así que para
+      # pruebas el código se escribe en el log del servicio (Dashboard > gestopago-api > Logs).
+      # SOLO PRUEBAS: con varios usuarios reales esto filtraría los códigos. Para correo real,
+      # pon "false" y agrega, en Environment, UNA de estas opciones:
+      #   - API de Gmail por HTTPS (funciona en Render gratis): GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET,
+      #     GMAIL_REFRESH_TOKEN y MAIL_REMITENTE (la cuenta de Gmail autorizada).
+      #   - SMTP: MAIL_HOST, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD y MAIL_REMITENTE (puertos 25/465/587
+      #     bloqueados en el plan gratuito).
+      - key: APP_2FA_CONSOLA
+        value: "true"
 
       # Origen autorizado por CORS: la URL HTTPS del frontend.
       - key: CORS_ORIGENES
@@ -87,8 +77,6 @@ services:
       # Detrás del proxy de Render, para que los límites por IP vean la IP real del cliente.
       - key: FORWARD_HEADERS
         value: native
-      - key: APP_2FA_CONSOLA
-        value: "false"
       - key: SWAGGER_ENABLED
         value: "false"
 

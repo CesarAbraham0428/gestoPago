@@ -7,6 +7,7 @@ import com.proyecto.servicios.models.response.DesafioResponse;
 import com.proyecto.servicios.models.response.GenericResponse;
 import com.proyecto.servicios.service.AutenticacionService;
 import com.proyecto.servicios.service.LimiteAutenticacionService;
+import com.proyecto.servicios.utils.DireccionCliente;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -32,7 +33,7 @@ public class AutenticacionController {
     @PostMapping("/login")
     public GenericResponse<DesafioResponse> iniciarSesion(@Valid @RequestBody LoginRequest request,
             HttpServletRequest http) {
-        limite.verificarInicioDeSesion(http.getRemoteAddr(), request.correo());
+        limite.verificarInicioDeSesion(DireccionCliente.de(http), request.correo());
         return GenericResponse.exito("Te enviamos un código de verificación", service.iniciarSesion(request));
     }
 
@@ -40,7 +41,7 @@ public class AutenticacionController {
     @PostMapping("/verificar")
     public GenericResponse<AuthResponse> verificar(@Valid @RequestBody VerificacionCodigoRequest request,
             HttpServletRequest http) {
-        limite.verificarInicioDeSesion(http.getRemoteAddr(), null);
+        limite.verificarInicioDeSesion(DireccionCliente.de(http), null);
         return GenericResponse.exito("Sesión iniciada", service.verificarCodigo(request));
     }
 

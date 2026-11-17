@@ -1,0 +1,17 @@
+# Configuración de Railway para la API. En el servicio: Settings > Source > Root Directory = /backend
+# y Settings > Config-as-code > Railway Config File = /backend/railway.toml (la ruta del archivo no sigue
+# al Root Directory; hay que indicarla completa).
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+# Solo se redespliega cuando cambia el backend.
+watchPatterns = ["/backend/**"]
+
+[deploy]
+# /actuator/health es público y solo responde {"status":"UP"} (sin detalles). Flyway corre al arrancar,
+# así que se deja margen en el primer despliegue.
+healthcheckPath = "/actuator/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

@@ -13,54 +13,75 @@ import static org.mockito.Mockito.when;
 
 import com.proyecto.servicios.service.exception.NegocioException;
 import com.proyecto.servicios.utils.LimitadorVentanaFija;
+import com.proyecto.servicios.utils.LimitadorVentanaFija.Resultado;
 import java.time.Duration;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 
 class LimiteAutenticacionServiceTest {
 
+    private static final Resultado EXCEDIDO = new Resultado(true, 120);
+
     private final LimitadorVentanaFija limitador = mock(LimitadorVentanaFija.class);
     private final LimiteAutenticacionService servicio = new LimiteAutenticacionService(limitador, 10, 40, 7);
+
+    @BeforeEach
+    void sinExceso() {
+        when(limitador.registrar(anyString(), anyInt(), any())).thenReturn(Resultado.PERMITIDO);
+    }
 
     @Test
     void elInicioDeSesionSeLimitaPorIpYPorCorreoNormalizado() {
         servicio.verificarInicioDeSesion("1.2.3.4", "  Ana@Correo.MX ");
 
-        verify(limitador).excede(eq("limite:login:ip:1.2.3.4"), eq(40), any(Duration.class));
-        verify(limitador).excede(eq("limite:login:correo:ana@correo.mx"), eq(10), eq(Duration.ofMinutes(15)));
+        verify(limitador).registrar(eq("limite:login:ip:1.2.3.4"), eq(40), any(Duration.class));
+        verify(limitador).registrar(eq("limite:login:correo:ana@correo.mx"), eq(10), eq(Duration.ofMinutes(15)));
     }
 
     @Test
     void sinCorreoSoloSeLimitaPorIp() {
         assertDoesNotThrow(() -> servicio.verificarInicioDeSesion("1.2.3.4", null));
 
-        verify(limitador).excede(anyString(), eq(40), any(Duration.class));
+        verify(limitador).registrar(anyString(), eq(40), any(Duration.class));
     }
 
     @Test
     void excederCualquieraDeLosLimitesRespondeTooManyRequests() {
-        when(limitador.excede(eq("limite:login:ip:1.2.3.4"), anyInt(), any())).thenReturn(true);
-        when(limitador.excede(eq("limite:login:correo:a@b.mx"), anyInt(), any())).thenReturn(false);
+        when(limitador.registrar(eq("limite:login:ip:1.2.3.4"), anyInt(), any())).thenReturn(EXCEDIDO);
 
         NegocioException error = assertThrows(NegocioException.class,
                 () -> servicio.verificarInicioDeSesion("1.2.3.4", "a@b.mx"));
 
         assertEquals(HttpStatus.TOO_MANY_REQUESTS, error.getStatus());
+        assertEquals(120L, error.getReintentarEnSegundos());
     }
 
     @Test
     void elLimiteDelCorreoTambienBloquea() {
-        when(limitador.excede(eq("limite:login:correo:a@b.mx"), anyInt(), any())).thenReturn(true);
+        when(limitador.registrar(eq("limite:login:correo:a@b.mx"), anyInt(), any())).thenReturn(EXCEDIDO);
 
         assertThrows(NegocioException.class, () -> servicio.verificarInicioDeSesion("1.2.3.4", "a@b.mx"));
     }
 
     @Test
+    void elRechazoInformaElMayorTiempoDeEsperaParaReintentar() {
+        when(limitador.registrar(eq("limite:login:ip:1.2.3.4"), anyInt(), any())).thenReturn(new Resultado(true, 30));
+        when(limitador.registrar(eq("limite:login:correo:a@b.mx"), anyInt(), any()))
+                .thenReturn(new Resultado(true, 600));
+
+        NegocioException error = assertThrows(NegocioException.class,
+                () -> servicio.verificarInicioDeSesion("1.2.3.4", "a@b.mx"));
+
+        assertEquals(600L, error.getReintentarEnSegundos());
+    }
+
+    @Test
     void elRegistroSeLimitaPorIp() {
         assertDoesNotThrow(() -> servicio.verificarRegistro("1.2.3.4"));
-        verify(limitador).excede("limite:registro:ip:1.2.3.4", 7, Duration.ofHours(1));
+        verify(limitador).registrar("limite:registro:ip:1.2.3.4", 7, Duration.ofHours(1));
 
-        when(limitador.excede(anyString(), anyInt(), any())).thenReturn(true);
+        when(limitador.registrar(anyString(), anyInt(), any())).thenReturn(EXCEDIDO);
         assertThrows(NegocioException.class, () -> servicio.verificarRegistro("1.2.3.4"));
     }
 }

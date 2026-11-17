@@ -14,7 +14,8 @@ services:
     volumes:
       - sonar_data:/opt/sonarqube/data
       - sonar_extensions:/opt/sonarqube/extensions
-      # Plugin de comunidad para analizar Dart/Flutter (frontend/).
+      # Plugin de comunidad para analizar Dart/Flutter (frontend/). No se sube a git: descarga
+      # sonar-flutter-plugin-0.5.2.jar (insideapp-oss/sonar-flutter, releases) en tools/sonar-plugins/.
       - ./tools/sonar-plugins/sonar-flutter-plugin-0.5.2.jar:/opt/sonarqube/extensions/plugins/sonar-flutter-plugin-0.5.2.jar:ro
       - sonar_logs:/opt/sonarqube/logs
     ulimits:

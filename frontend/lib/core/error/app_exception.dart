@@ -10,10 +10,17 @@ sealed class AppException implements Exception {
 /// El servidor respondió con un estado de error. [message] viene del campo
 /// `mensaje` de la API, que ya está redactado para el usuario final.
 class ApiException extends AppException {
-  const ApiException(this.statusCode, super.message);
+  const ApiException(this.statusCode, super.message, {this.reintentarEn});
   final int statusCode;
 
+  /// Espera indicada por el servidor (cabecera `Retry-After`) cuando rechazó
+  /// la solicitud por exceso de intentos; nula si no la envió.
+  final Duration? reintentarEn;
+
   bool get esSesionInvalida => statusCode == 401;
+
+  /// HTTP 429: demasiadas solicitudes o intentos. El cliente debe esperar.
+  bool get esLimiteDeSolicitudes => statusCode == 429;
 }
 
 /// El usuario ya tiene una sesión abierta en otro dispositivo y debe confirmar

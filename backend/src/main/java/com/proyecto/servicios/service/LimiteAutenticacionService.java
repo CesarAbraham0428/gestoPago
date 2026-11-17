@@ -2,6 +2,7 @@ package com.proyecto.servicios.service;
 
 import com.proyecto.servicios.service.exception.NegocioException;
 import com.proyecto.servicios.utils.LimitadorVentanaFija;
+import com.proyecto.servicios.utils.LimitadorVentanaFija.Resultado;
 import java.time.Duration;
 import java.util.Locale;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 /**
  * Frena la fuerza bruta sobre las rutas públicas: el inicio de sesión se limita por correo (protege la
  * contraseña de una cuenta concreta) y por IP (protege contra barridos de muchas cuentas); el registro, por IP.
+ * Al rechazar informa cuánto falta para reintentar (cabecera Retry-After).
  */
 @Service
 public class LimiteAutenticacionService {
@@ -36,19 +38,29 @@ public class LimiteAutenticacionService {
 
     /** Para /auth/login (por IP y correo) y /auth/verificar (solo por IP, pasando correo null). */
     public void verificarInicioDeSesion(String ip, String correo) {
-        boolean excedido = limitador.excede("limite:login:ip:" + ip, maximoPorIp, VENTANA_LOGIN);
-        if (correo != null) {
-            excedido |= limitador.excede("limite:login:correo:" + correo.strip().toLowerCase(Locale.ROOT),
-                    maximoPorCorreo, VENTANA_LOGIN);
-        }
-        if (excedido) {
-            throw new NegocioException(HttpStatus.TOO_MANY_REQUESTS, MENSAJE);
-        }
+        // Se cuentan ambos límites aunque el primero ya se haya superado.
+        Resultado porIp = limitador.registrar("limite:login:ip:" + ip, maximoPorIp, VENTANA_LOGIN);
+        Resultado porCorreo = correo == null ? Resultado.PERMITIDO
+                : limitador.registrar("limite:login:correo:" + correo.strip().toLowerCase(Locale.ROOT),
+                        maximoPorCorreo, VENTANA_LOGIN);
+        rechazarSiExcedido(porIp, porCorreo);
     }
 
     public void verificarRegistro(String ip) {
-        if (limitador.excede("limite:registro:ip:" + ip, maximoRegistrosPorIp, VENTANA_REGISTRO)) {
-            throw new NegocioException(HttpStatus.TOO_MANY_REQUESTS, MENSAJE);
+        rechazarSiExcedido(limitador.registrar("limite:registro:ip:" + ip, maximoRegistrosPorIp, VENTANA_REGISTRO));
+    }
+
+    private static void rechazarSiExcedido(Resultado... resultados) {
+        long espera = 0;
+        boolean excedido = false;
+        for (Resultado resultado : resultados) {
+            if (resultado != null && resultado.excedido()) {
+                excedido = true;
+                espera = Math.max(espera, resultado.reintentarEnSegundos());
+            }
+        }
+        if (excedido) {
+            throw new NegocioException(HttpStatus.TOO_MANY_REQUESTS, MENSAJE, espera);
         }
     }
 }

@@ -208,6 +208,46 @@ void main() {
       expect(await mensaje(418), contains('No fue posible'));
     });
 
+    test('un 429 conserva la espera de Retry-After', () async {
+      ApiClient clienteCon(String? retryAfter) => ApiClient(
+        baseUrl: 'http://api',
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({'mensaje': 'Demasiados intentos'}),
+            429,
+            headers: {
+              'content-type': 'application/json; charset=utf-8',
+              'retry-after': ?retryAfter,
+            },
+          ),
+        ),
+      );
+
+      Future<ApiException> fallo(String? retryAfter) async {
+        try {
+          await clienteCon(retryAfter).post('/auth/login', body: {}, authenticated: false);
+        } on ApiException catch (e) {
+          return e;
+        }
+        throw StateError('debió fallar');
+      }
+
+      final conEspera = await fallo('42');
+      expect(conEspera.esLimiteDeSolicitudes, isTrue);
+      expect(conEspera.reintentarEn, const Duration(seconds: 42));
+      expect((await fallo(null)).reintentarEn, isNull);
+      expect((await fallo('basura')).reintentarEn, isNull);
+    });
+
+    test('esperaIndicada ignora valores inválidos y acota a una hora', () {
+      expect(ApiClient.esperaIndicada(' 30 '), const Duration(seconds: 30));
+      expect(ApiClient.esperaIndicada('999999'), const Duration(hours: 1));
+      expect(ApiClient.esperaIndicada('0'), isNull);
+      expect(ApiClient.esperaIndicada('-5'), isNull);
+      expect(ApiClient.esperaIndicada('Wed, 21 Oct 2026 07:28:00 GMT'), isNull);
+      expect(ApiClient.esperaIndicada(null), isNull);
+    });
+
     test('respuesta 200 que no es un objeto JSON es inválida', () async {
       final api = ApiClient(
         baseUrl: 'http://api',

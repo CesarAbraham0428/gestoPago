@@ -121,4 +121,43 @@ void main() {
     expect(sesion.autenticado, isTrue);
     await sesion.cerrarSesion(); // cancela el temporizador de vencimiento
   });
+
+  testWidgets('un 429 desactiva el envío con cuenta regresiva y luego lo rehabilita', (tester) async {
+    await abrir(tester);
+    await llenarCredenciales(tester);
+
+    gateway.errorIniciar = const ApiException(
+      429,
+      'Demasiados intentos; espera unos minutos',
+      reintentarEn: Duration(seconds: 3),
+    );
+    await tester.tap(find.text('Continuar'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Demasiados intentos; espera unos minutos'), findsOneWidget);
+    expect(find.text('Reintenta en 3 s'), findsOneWidget);
+    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNull);
+
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Reintenta en 2 s'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('Continuar'), findsOneWidget);
+    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNotNull);
+  });
+
+  testWidgets('sin Retry-After el 429 espera un minuto por omisión', (tester) async {
+    await abrir(tester);
+    await llenarCredenciales(tester);
+
+    gateway.errorIniciar = const ApiException(429, 'Demasiados intentos');
+    await tester.tap(find.text('Continuar'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Reintenta en 1:00 min'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 60));
+    expect(find.text('Continuar'), findsOneWidget);
+  });
 }

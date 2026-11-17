@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -146,6 +148,48 @@ class _ContenedorFormularioState extends State<_ContenedorFormulario> {
 String _mensajeDe(Object error, String generico) =>
     error is AppException ? error.message : generico;
 
+/// Espera obligatoria tras un 429 del servidor (demasiados intentos): bloquea
+/// el envío y muestra la cuenta regresiva. Es solo una ayuda de usabilidad; el
+/// límite real lo aplica el servidor, que rechaza igual desde cualquier cliente.
+mixin _EsperaPorLimite<T extends StatefulWidget> on State<T> {
+  static const _esperaPorOmision = Duration(seconds: 60);
+
+  Timer? _reloj;
+  int _segundos = 0;
+
+  int get segundosDeEspera => _segundos;
+
+  bool get enEspera => _segundos > 0;
+
+  /// Si [error] es un 429 inicia la espera y devuelve true.
+  bool iniciarEsperaSiLimite(Object error) {
+    if (error is! ApiException || !error.esLimiteDeSolicitudes) return false;
+    final espera = error.reintentarEn ?? _esperaPorOmision;
+    _segundos = espera.inSeconds < 1 ? 1 : espera.inSeconds;
+    _reloj?.cancel();
+    _reloj = Timer.periodic(const Duration(seconds: 1), (temporizador) {
+      if (!mounted) {
+        temporizador.cancel();
+        return;
+      }
+      setState(() => _segundos--);
+      if (_segundos <= 0) temporizador.cancel();
+    });
+    return true;
+  }
+
+  @override
+  void dispose() {
+    _reloj?.cancel();
+    super.dispose();
+  }
+}
+
+/// "45 s" o "2:05 min" para la cuenta regresiva del botón.
+String _formatoEspera(int segundos) => segundos < 60
+    ? '$segundos s'
+    : '${segundos ~/ 60}:${(segundos % 60).toString().padLeft(2, '0')} min';
+
 class _PasoCredenciales extends StatefulWidget {
   const _PasoCredenciales({required this.sesion, required this.alEnviarCodigo});
   final SesionController sesion;
@@ -155,7 +199,7 @@ class _PasoCredenciales extends StatefulWidget {
   State<_PasoCredenciales> createState() => _PasoCredencialesState();
 }
 
-class _PasoCredencialesState extends State<_PasoCredenciales> {
+class _PasoCredencialesState extends State<_PasoCredenciales> with _EsperaPorLimite {
   final _clave = GlobalKey<FormState>();
   final _correo = TextEditingController();
   final _password = TextEditingController();
@@ -171,7 +215,7 @@ class _PasoCredencialesState extends State<_PasoCredenciales> {
   }
 
   Future<void> _continuar() async {
-    if (_enviando || !(_clave.currentState?.validate() ?? false)) return;
+    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false)) return;
     setState(() {
       _enviando = true;
       _error = null;
@@ -186,6 +230,7 @@ class _PasoCredencialesState extends State<_PasoCredenciales> {
       if (mounted) widget.alEnviarCodigo(desafio);
     } on Object catch (e) {
       if (mounted) {
+        iniciarEsperaSiLimite(e);
         setState(() => _error = _mensajeDe(e, 'No fue posible iniciar sesión. Inténtalo de nuevo.'));
       }
     } finally {
@@ -253,7 +298,12 @@ class _PasoCredencialesState extends State<_PasoCredenciales> {
               validator: ValidadoresCredenciales.password,
             ),
             const SizedBox(height: 24),
-            _BotonEnvio(enviando: _enviando, etiqueta: 'Continuar', alPulsar: _continuar),
+            _BotonEnvio(
+              enviando: _enviando,
+              etiqueta: 'Continuar',
+              alPulsar: _continuar,
+              esperaSegundos: segundosDeEspera,
+            ),
           ],
         ),
       ),
@@ -276,7 +326,7 @@ class _PasoCodigo extends StatefulWidget {
   State<_PasoCodigo> createState() => _PasoCodigoState();
 }
 
-class _PasoCodigoState extends State<_PasoCodigo> {
+class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
   final _clave = GlobalKey<FormState>();
   final _codigo = TextEditingController();
   bool _enviando = false;
@@ -289,7 +339,7 @@ class _PasoCodigoState extends State<_PasoCodigo> {
   }
 
   Future<void> _verificar({bool cerrarSesionAnterior = false}) async {
-    if (_enviando || !(_clave.currentState?.validate() ?? false)) return;
+    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false)) return;
     setState(() {
       _enviando = true;
       _error = null;
@@ -307,6 +357,7 @@ class _PasoCodigoState extends State<_PasoCodigo> {
       await _confirmarCierreDeOtraSesion();
     } on Object catch (e) {
       if (mounted) {
+        iniciarEsperaSiLimite(e);
         setState(() => _error = _mensajeDe(e, 'No fue posible verificar el código. Inténtalo de nuevo.'));
       }
     } finally {
@@ -383,6 +434,7 @@ class _PasoCodigoState extends State<_PasoCodigo> {
             enviando: _enviando,
             etiqueta: 'Verificar y entrar',
             alPulsar: _verificar,
+            esperaSegundos: segundosDeEspera,
           ),
           const SizedBox(height: 8),
           TextButton(
@@ -400,14 +452,24 @@ class _BotonEnvio extends StatelessWidget {
     required this.enviando,
     required this.etiqueta,
     required this.alPulsar,
+    this.esperaSegundos = 0,
   });
 
   final bool enviando;
   final String etiqueta;
   final VoidCallback alPulsar;
 
+  /// Mientras sea mayor que cero el servidor pidió esperar: el botón se desactiva.
+  final int esperaSegundos;
+
   @override
   Widget build(BuildContext context) {
+    if (esperaSegundos > 0) {
+      return FilledButton(
+        onPressed: null,
+        child: Text('Reintenta en ${_formatoEspera(esperaSegundos)}'),
+      );
+    }
     return FilledButton(
       onPressed: enviando ? null : alPulsar,
       child: enviando

@@ -57,3 +57,9 @@ hs_err_pid*.log
 # Herramientas locales de analisis (scanner y reportes ZAP)
 tools/sonar-scanner-*/
 tools/zap-reports/
+
+### IDE (configuracion personal)
+.idea/
+
+### Plugin de SonarQube para Flutter (se descarga aparte, ver README)
+tools/sonar-plugins/

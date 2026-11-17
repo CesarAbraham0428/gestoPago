@@ -85,7 +85,13 @@ class ApiClient {
 
     if (response.statusCode >= 400) {
       if (response.statusCode == 401 && authenticated) onUnauthorized?.call(message);
-      throw ApiException(response.statusCode, message);
+      throw ApiException(
+        response.statusCode,
+        message,
+        reintentarEn: response.statusCode == 429
+            ? esperaIndicada(response.headers['retry-after'])
+            : null,
+      );
     }
     if (decoded is! Map<String, dynamic>) {
       throw const ConexionException('La respuesta del servidor no es válida.');
@@ -95,6 +101,14 @@ class ApiClient {
       message: message,
       data: decoded['datos'],
     );
+  }
+
+  /// Segundos de la cabecera `Retry-After` como espera, acotada a una hora para
+  /// que un valor absurdo no deje la pantalla bloqueada. Nula si no es válida.
+  static Duration? esperaIndicada(String? cabecera) {
+    final segundos = int.tryParse(cabecera?.trim() ?? '');
+    if (segundos == null || segundos <= 0) return null;
+    return Duration(seconds: segundos > 3600 ? 3600 : segundos);
   }
 
   Object? _decode(List<int> bytes) {
@@ -110,6 +124,7 @@ class ApiClient {
     401 => 'Tu sesión terminó. Inicia sesión de nuevo.',
     403 => 'No tienes permiso para realizar esta operación.',
     404 => 'No encontramos lo que buscas.',
+    413 => 'La solicitud es demasiado grande.',
     429 => 'Hiciste demasiadas solicitudes. Espera un minuto.',
     >= 500 => 'El servicio no está disponible por ahora.',
     _ => 'No fue posible completar la operación.',

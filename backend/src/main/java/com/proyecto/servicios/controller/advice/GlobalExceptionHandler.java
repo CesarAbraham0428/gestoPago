@@ -68,7 +68,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(NegocioException.class)
     ResponseEntity<GenericResponse<Void>> negocio(NegocioException exception) {
-        return respuesta(exception.getStatus(), exception.getMessage());
+        ResponseEntity.BodyBuilder respuesta = ResponseEntity.status(exception.getStatus())
+                .contentType(MediaType.APPLICATION_JSON);
+        if (exception.getReintentarEnSegundos() != null) {
+            respuesta.header(HttpHeaders.RETRY_AFTER, String.valueOf(exception.getReintentarEnSegundos()));
+        }
+        return respuesta.body(GenericResponse.error(exception.getMessage()));
     }
 
     @ExceptionHandler(AutenticacionException.class)
