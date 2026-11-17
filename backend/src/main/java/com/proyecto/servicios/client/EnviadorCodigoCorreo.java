@@ -21,10 +21,8 @@ public class EnviadorCodigoCorreo implements EnviadorCodigo {
         SimpleMailMessage mensaje = new SimpleMailMessage();
         mensaje.setFrom(remitente);
         mensaje.setTo(destinatario);
-        mensaje.setSubject("Tu código de verificación de GestoPago");
-        mensaje.setText("Tu código de verificación es: " + codigo + "\n\n"
-                + "Vence en " + vigencia.toMinutes() + " minutos y solo sirve una vez.\n"
-                + "Si no intentaste iniciar sesión, ignora este mensaje y cambia tu contraseña.");
+        mensaje.setSubject(TextoCodigo.ASUNTO);
+        mensaje.setText(TextoCodigo.cuerpo(codigo, vigencia));
         correo.send(mensaje);
     }
 }
