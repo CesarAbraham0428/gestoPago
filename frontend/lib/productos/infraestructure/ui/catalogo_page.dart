@@ -219,7 +219,13 @@ class _PanelLista extends StatelessWidget {
                   style: tema.bodySmall,
                 ),
               ),
-              Text('Solo los que puedo comprar', style: tema.bodySmall),
+              Flexible(
+                child: Text(
+                  'Solo los que puedo comprar',
+                  style: tema.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
               Switch(
                 value: controller.soloDisponibles,
                 onChanged: controller.alternarSoloDisponibles,

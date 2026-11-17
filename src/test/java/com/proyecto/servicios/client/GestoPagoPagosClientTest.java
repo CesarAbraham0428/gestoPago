@@ -24,11 +24,12 @@ class GestoPagoPagosClientTest {
     private final ObjectMapper mapper = new ObjectMapper();
     private final FirmaGestoPago firma = new FirmaGestoPago(mapper, LLAVE, IV);
     private final GestoPagoPagosFeignClient feign = mock(GestoPagoPagosFeignClient.class);
-    private final GestoPagoPagosClient client = new GestoPagoPagosClient(feign, mapper, firma, "signed");
+    private final RespuestaPagoParser parser = new RespuestaPagoParser(mapper, firma);
+    private final GestoPagoPagosClient client = new GestoPagoPagosClient(feign, parser, "signed");
 
     @Test
     void interpretaPagoExitosoDeServicio() {
-        GestoPagoPagosResponse respuesta = client.interpretar("""
+        GestoPagoPagosResponse respuesta = parser.interpretar("""
                 <?xml version='1.0' encoding='UTF-8'?>
                 <RESPONSE>
                     <ID_TX>291620941</ID_TX>
@@ -59,7 +60,7 @@ class GestoPagoPagosClientTest {
 
     @Test
     void interpretaTarjetaDeRegaloConPinYLegendEnCdata() {
-        GestoPagoPagosResponse respuesta = client.interpretar("""
+        GestoPagoPagosResponse respuesta = parser.interpretar("""
                 <?xml version='1.0' encoding='UTF-8'?>
                 <RESPONSE>
                     <ID_TX>291676393</ID_TX>
@@ -85,8 +86,8 @@ class GestoPagoPagosClientTest {
 
     @Test
     void interpretaCodigosDeErrorDeSendTx() {
-        GestoPagoPagosResponse saldo = client.interpretar(error("02", "Saldo insuficiente"), 200);
-        GestoPagoPagosResponse timeout = client.interpretar(
+        GestoPagoPagosResponse saldo = parser.interpretar(error("02", "Saldo insuficiente"), 200);
+        GestoPagoPagosResponse timeout = parser.interpretar(
                 error("82", "Tiempo de espera alcanzado, la transacción no ha sido registrada"), 200);
 
         assertTrue(saldo.esSaldoInsuficiente());
@@ -96,7 +97,7 @@ class GestoPagoPagosClientTest {
 
     @Test
     void interpretaConfirmTxConIdTxDentroDeMensaje() {
-        GestoPagoPagosResponse aplicada = client.interpretar("""
+        GestoPagoPagosResponse aplicada = parser.interpretar("""
                 <RESPONSE>
                     <NUM_AUTORIZACION>100024988</NUM_AUTORIZACION>
                     <MENSAJE>
@@ -146,7 +147,7 @@ class GestoPagoPagosClientTest {
     @Test
     void respuestaSinCodigoEsIncierta() {
         GestoPagoPagoException error = assertThrows(GestoPagoPagoException.class,
-                () -> client.interpretar("<RESPONSE><ID_TX>1</ID_TX></RESPONSE>", 200));
+                () -> parser.interpretar("<RESPONSE><ID_TX>1</ID_TX></RESPONSE>", 200));
 
         assertTrue(error.isResultadoIncierto());
         assertEquals(GestoPagoPagoException.Tipo.RESPUESTA_INVALIDA, error.getTipo());
@@ -154,7 +155,7 @@ class GestoPagoPagosClientTest {
 
     @Test
     void rechazaXmlConDoctype() {
-        assertThrows(GestoPagoPagoException.class, () -> client.interpretar(
+        assertThrows(GestoPagoPagoException.class, () -> parser.interpretar(
                 "<!DOCTYPE x [<!ENTITY e SYSTEM \"file:///etc/passwd\">]><R><CODIGO>&e;</CODIGO></R>", 200));
     }
 

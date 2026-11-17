@@ -62,8 +62,8 @@ class ProductoServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new ProductoServiceImpl(catalogClient, cache, persistence, tokenService,
-                productoMapper, 42, "device-test");
+        service = new ProductoServiceImpl(new ConsultorCatalogoGestoPago(catalogClient, tokenService,
+                productoMapper, 42, "device-test"), cache, persistence);
     }
 
     @Test
@@ -148,13 +148,9 @@ class ProductoServiceImplTest {
         when(cache.guardar(any())).thenReturn(true);
         mockProviderAndToken(providerCatalog(validProviderProduct("Producto externo")));
         service = new ProductoServiceImpl(
-                catalogClient,
+                new ConsultorCatalogoGestoPago(catalogClient, tokenService, productoMapper, 42, "device-test"),
                 cache,
-                new CatalogoProductosPersistenceServiceImpl(productoRepository, productoMapper),
-                tokenService,
-                productoMapper,
-                42,
-                "device-test");
+                new CatalogoProductosPersistenceServiceImpl(productoRepository, productoMapper));
 
         CatalogoProductosResponse result = service.obtenerProductos();
 

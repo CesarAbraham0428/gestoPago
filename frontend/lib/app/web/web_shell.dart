@@ -15,7 +15,10 @@ Widget construirShellWeb(
   Widget contenido,
 ) {
   final sesion = DependenciasScope.of(context).sesion;
-  final conBarraLateral = Breakpoints.esAncho(context, Breakpoints.barraLateral);
+  final conBarraLateral = Breakpoints.esAncho(
+    context,
+    Breakpoints.barraLateral,
+  );
 
   if (conBarraLateral) {
     return Scaffold(
@@ -26,7 +29,9 @@ Widget construirShellWeb(
           Expanded(
             child: Column(
               children: [
-                _CabeceraContenido(titulo: destinos[indiceDestino(state)].etiqueta),
+                _CabeceraContenido(
+                  titulo: destinos[indiceDestino(state)].etiqueta,
+                ),
                 Expanded(child: contenido),
               ],
             ),
@@ -96,7 +101,10 @@ class _BarraLateral extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
             child: Text(
               'GestoPago',
-              style: tema.titleLarge?.copyWith(color: AppColors.marca, fontSize: 22),
+              style: tema.titleLarge?.copyWith(
+                color: AppColors.marca,
+                fontSize: 22,
+              ),
             ),
           ),
           for (var i = 0; i < destinos.length; i++)
@@ -177,11 +185,14 @@ class _ItemMenu extends StatelessWidget {
                   color: activo ? AppColors.marcaOscura : AppColors.tintaSuave,
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  destino.etiqueta,
-                  style: tema.bodyLarge?.copyWith(
-                    fontWeight: activo ? FontWeight.w700 : FontWeight.w500,
-                    color: activo ? AppColors.marcaOscura : AppColors.tinta,
+                Flexible(
+                  child: Text(
+                    destino.etiqueta,
+                    overflow: TextOverflow.ellipsis,
+                    style: tema.bodyLarge?.copyWith(
+                      fontWeight: activo ? FontWeight.w700 : FontWeight.w500,
+                      color: activo ? AppColors.marcaOscura : AppColors.tinta,
+                    ),
                   ),
                 ),
               ],

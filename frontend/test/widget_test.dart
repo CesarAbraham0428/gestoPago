@@ -34,7 +34,7 @@ const _recarga = Producto(
   precio: 50,
 );
 
-final _solicitud = SolicitudCompra(
+const _solicitud = SolicitudCompra(
   producto: _recarga,
   numeroCuenta: '123456789012345678',
   monto: 50,

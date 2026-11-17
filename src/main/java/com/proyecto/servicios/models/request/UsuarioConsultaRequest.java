@@ -12,7 +12,7 @@ import jakarta.validation.constraints.Size;
 public record UsuarioConsultaRequest(
         @Pattern(regexp = FormatosCliente.RFC, flags = Pattern.Flag.CASE_INSENSITIVE) String rfc,
         @Pattern(regexp = FormatosCliente.CURP, flags = Pattern.Flag.CASE_INSENSITIVE) String curp,
-        @Email @Size(max = 100) @Pattern(regexp = ".*\\S.*", message = "no puede estar vacío") String correo,
+        @Email @Size(max = 100) @Pattern(regexp = FormatosCliente.CON_TEXTO, message = "no puede estar vacío") String correo,
         @NombreValido String nombre,
         Boolean activo,
         @Min(0) Integer pagina,

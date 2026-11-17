@@ -5,14 +5,13 @@ import com.proyecto.servicios.repositorys.sf.DesafioAutenticacionRepository;
 import com.proyecto.servicios.service.exception.NegocioException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.HexFormat;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -130,11 +129,6 @@ public class CodigoVerificacionService {
     }
 
     private static String hash(String id, String codigo) {
-        try {
-            MessageDigest sha = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(sha.digest((id + ":" + codigo).getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 no disponible", e);
-        }
+        return DigestUtils.sha256Hex(id + ":" + codigo);
     }
 }

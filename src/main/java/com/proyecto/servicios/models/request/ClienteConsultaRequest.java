@@ -26,7 +26,7 @@ public class ClienteConsultaRequest {
     private String curp;
     @NombreValido
     private String nombre;
-    @Email @Size(max = 100) @Pattern(regexp = ".*\\S.*", message = "no puede estar vacío")
+    @Email @Size(max = 100) @Pattern(regexp = FormatosCliente.CON_TEXTO, message = "no puede estar vacío")
     private String correo;
     @Pattern(regexp = "[0-9]{18}", message = "debe contener 18 dígitos")
     private String numeroCuenta;

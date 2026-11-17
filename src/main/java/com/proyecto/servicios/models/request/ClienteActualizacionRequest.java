@@ -22,7 +22,7 @@ public record ClienteActualizacionRequest(
     @NotBlank @Size(max=250) String empresa,
     @NotNull @DecimalMin(value="0",inclusive=false) @Digits(integer=16,fraction=2) BigDecimal ingresoMensual,
     @NotNull @Valid DomicilioRequest domicilio
-) {
+) implements DatosCliente {
     @com.fasterxml.jackson.annotation.JsonAnySetter
     public void rechazarCampo(String nombre, Object valor) {
         throw new IllegalArgumentException("Campo no permitido en actualización: " + nombre);

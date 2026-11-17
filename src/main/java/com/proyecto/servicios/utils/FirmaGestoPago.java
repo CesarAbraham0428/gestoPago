@@ -31,7 +31,7 @@ public class FirmaGestoPago {
 
     /** Firma un JSON ya serializado; confirmTx debe reenviar exactamente el mismo JSON que sendTx. */
     public String firmarJson(String json) {
-        return Encriptar.AESCipher(Encriptar.Mode.ENCRYPT, json, iv, llave);
+        return Encriptar.cifrar(json, iv, llave);
     }
 
     public String firmar(Object peticion) {
@@ -39,6 +39,6 @@ public class FirmaGestoPago {
     }
 
     public String descifrar(String textoFirmado) {
-        return Encriptar.AESCipher(Encriptar.Mode.DECRYPT, textoFirmado, iv, llave);
+        return Encriptar.descifrar(textoFirmado, iv, llave);
     }
 }

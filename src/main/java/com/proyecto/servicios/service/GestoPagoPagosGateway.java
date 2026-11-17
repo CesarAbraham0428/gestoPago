@@ -55,7 +55,7 @@ public class GestoPagoPagosGateway {
             // Token vencido (403): la transacción no se procesó y es seguro reintentar con el mismo UPC.
             log.warn("GestoPago rechazó el token; se renovará y se reintentará una vez");
             GestoPagoToken renovado = tokenService.renovarToken();
-            if (renovado == null || renovado.getToken() == null || renovado.getToken().isBlank()) {
+            if (renovado.getToken() == null || renovado.getToken().isBlank()) {
                 throw new GestoPagoAuthException("No fue posible renovar la autenticación de GestoPago",
                         GestoPagoAuthException.Tipo.RESPUESTA_INVALIDA, null, e);
             }

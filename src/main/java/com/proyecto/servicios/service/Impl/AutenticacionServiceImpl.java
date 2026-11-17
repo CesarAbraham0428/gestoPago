@@ -16,8 +16,10 @@ import com.proyecto.servicios.service.SesionService;
 import com.proyecto.servicios.service.exception.AutenticacionException;
 import com.proyecto.servicios.service.exception.AutenticacionException.Tipo;
 import com.proyecto.servicios.service.exception.NegocioException;
+import com.proyecto.servicios.utils.Texto;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -46,13 +48,13 @@ public class AutenticacionServiceImpl implements AutenticacionService {
         this.tokens = tokens;
         this.codigos = codigos;
         this.sesiones = sesiones;
-        this.hashFicticio = encoder.encode("contrasena-ficticia");
+        this.hashFicticio = encoder.encode(UUID.randomUUID().toString());
     }
 
     @Override
     @Transactional
     public DesafioResponse iniciarSesion(LoginRequest r) {
-        Optional<Usuario> encontrado = usuarios.findByCorreoIgnoreCase(ClienteServiceImpl.normalizarCorreo(r.correo()));
+        Optional<Usuario> encontrado = usuarios.findByCorreoIgnoreCase(Texto.correo(r.correo()));
         boolean coincide = encoder.matches(r.password(),
                 encontrado.map(Usuario::getPasswordHash).orElse(hashFicticio));
         if (encontrado.isEmpty() || !coincide) {

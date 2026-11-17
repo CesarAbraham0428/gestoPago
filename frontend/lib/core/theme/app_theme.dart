@@ -21,7 +21,7 @@ class _SinTransicion extends PageTransitionsBuilder {
 }
 
 class AppTheme {
-  const AppTheme._();
+  const AppTheme._(); // coverage:ignore-line
 
   static const radio = 8.0;
 

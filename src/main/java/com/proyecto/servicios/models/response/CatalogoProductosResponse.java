@@ -12,4 +12,13 @@ import java.util.List;
 public class CatalogoProductosResponse extends GenericResponse<Void> {
     private Integer total;
     private List<ProductoResponse> productos;
+
+    public static CatalogoProductosResponse de(Integer codigo, String mensaje, List<ProductoResponse> productos) {
+        CatalogoProductosResponse response = new CatalogoProductosResponse();
+        response.setCodigo(codigo);
+        response.setMensaje(mensaje);
+        response.setProductos(productos);
+        response.setTotal(productos.size());
+        return response;
+    }
 }

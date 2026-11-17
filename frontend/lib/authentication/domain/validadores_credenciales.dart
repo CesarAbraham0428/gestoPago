@@ -1,7 +1,7 @@
 /// Validaciones previas al envío. Replican las reglas de `LoginRequest` de la
 /// API para evitar viajes inútiles; el servidor sigue siendo la autoridad.
 class ValidadoresCredenciales {
-  const ValidadoresCredenciales._();
+  const ValidadoresCredenciales._(); // coverage:ignore-line
 
   static final _correo = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$');
 

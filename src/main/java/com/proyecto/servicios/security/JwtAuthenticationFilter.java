@@ -3,12 +3,14 @@ package com.proyecto.servicios.security;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.proyecto.servicios.service.SesionService;
+import com.proyecto.servicios.service.SesionService.Estado;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -23,6 +25,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * solicitud se rechaza: nunca se autentica "a ciegas".
  */
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Map<Estado, String> MENSAJES_DE_RECHAZO = Map.of(
+            Estado.USUARIO_INACTIVO, "Usuario inactivo o inexistente",
+            Estado.REEMPLAZADA, "Tu sesión se cerró porque iniciaste sesión en otro dispositivo",
+            Estado.FINALIZADA, "Tu sesión ya no está activa; inicia sesión de nuevo");
 
     private final JwtTokenService tokens;
     private final SesionService sesiones;
@@ -47,23 +54,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 DecodedJWT jwt = tokens.validar(header.substring(7));
                 Integer usuarioId = Integer.valueOf(jwt.getSubject());
-                switch (sesiones.estado(usuarioId, jwt.getId())) {
-                    case VALIDA -> SecurityContextHolder.getContext().setAuthentication(
-                            new UsernamePasswordAuthenticationToken(usuarioId.toString(), null,
-                                    List.of(new SimpleGrantedAuthority("ROLE_USER"))));
-                    case USUARIO_INACTIVO -> {
-                        rechazar(response, "Usuario inactivo o inexistente");
-                        return;
-                    }
-                    case REEMPLAZADA -> {
-                        rechazar(response, "Tu sesión se cerró porque iniciaste sesión en otro dispositivo");
-                        return;
-                    }
-                    case FINALIZADA -> {
-                        rechazar(response, "Tu sesión ya no está activa; inicia sesión de nuevo");
-                        return;
-                    }
+                Estado estado = sesiones.estado(usuarioId, jwt.getId());
+                if (estado != Estado.VALIDA) {
+                    rechazar(response, MENSAJES_DE_RECHAZO.get(estado));
+                    return;
                 }
+                SecurityContextHolder.getContext().setAuthentication(
+                        new UsernamePasswordAuthenticationToken(usuarioId.toString(), null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))));
             } catch (JWTVerificationException | IllegalArgumentException ex) {
                 rechazar(response, "Tu sesión expiró o no es válida; inicia sesión de nuevo");
                 return;

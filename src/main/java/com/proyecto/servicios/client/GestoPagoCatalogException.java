@@ -13,10 +13,6 @@ public class GestoPagoCatalogException extends RuntimeException {
         this(message, Tipo.COMUNICACION, null, cause);
     }
 
-    public GestoPagoCatalogException(String message, Tipo tipo, Throwable cause) {
-        this(message, tipo, null, cause);
-    }
-
     public GestoPagoCatalogException(String message, Tipo tipo, Integer statusHttp, Throwable cause) {
         super(message, cause);
         this.tipo = tipo;

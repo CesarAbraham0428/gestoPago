@@ -10,10 +10,8 @@ import com.proyecto.servicios.service.exception.CatalogoPersistenciaException;
 import com.proyecto.servicios.validation.CatalogoProductosValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.TransactionException;
 
 import java.time.Duration;
 import java.util.List;
@@ -49,10 +47,6 @@ public class CatalogoProductosPersistenceServiceImpl implements CatalogoProducto
             }
             log.info("PostgreSQL devolvió un catálogo válido: {} productos", productos.size());
             return catalogo;
-        } catch (DataAccessException | TransactionException exception) {
-            log.error("Falló la consulta del catálogo en PostgreSQL ({})",
-                    exception.getClass().getSimpleName());
-            throw exception;
         } finally {
             log.info("Finaliza lectura del catálogo en PostgreSQL: duraciónMs={}", duracionMs(startedAt));
         }
@@ -74,23 +68,16 @@ public class CatalogoProductosPersistenceServiceImpl implements CatalogoProducto
             productoRepository.bloquearEscriturasCatalogo();
             long cantidadActual = productoRepository.count();
             if (cantidadActual > 0 && productosNuevos.size() <= cantidadActual) {
-                List<Producto> actuales = productoRepository.findAllByOrderByIdAsc();
-                if (!actuales.isEmpty()) {
-                    CatalogoProductosResponse vigente = crearRespuesta(actuales);
-                    log.info("Se conserva el catálogo: cantidadNueva={}, cantidadActual={}",
-                            productosNuevos.size(), cantidadActual);
-                    return new ResultadoActualizacion(false, cantidadActual,
-                            CatalogoProductosValidator.esValido(vigente.getProductos()) ? vigente : null);
-                }
+                CatalogoProductosResponse vigente = crearRespuesta(productoRepository.findAllByOrderByIdAsc());
+                log.info("Se conserva el catálogo: cantidadNueva={}, cantidadActual={}",
+                        productosNuevos.size(), cantidadActual);
+                return new ResultadoActualizacion(false, cantidadActual,
+                        CatalogoProductosValidator.esValido(vigente.getProductos()) ? vigente : null);
             }
 
             CatalogoProductosResponse respuesta = reemplazarCatalogo(productosNuevos);
             log.info("Catálogo válido escrito en PostgreSQL: {} → {} productos", cantidadActual, cantidadNueva);
             return new ResultadoActualizacion(true, cantidadActual, respuesta);
-        } catch (DataAccessException | TransactionException exception) {
-            log.error("Falló la actualización del catálogo en PostgreSQL ({})",
-                    exception.getClass().getSimpleName());
-            throw exception;
         } finally {
             log.info("Finaliza actualización del catálogo en PostgreSQL: duraciónMs={}", duracionMs(startedAt));
         }
@@ -113,10 +100,6 @@ public class CatalogoProductosPersistenceServiceImpl implements CatalogoProducto
             log.info("Catálogo de GestoPago persistido en PostgreSQL: {} → {} productos",
                     cantidadAnterior, cantidad);
             return persistido;
-        } catch (DataAccessException | TransactionException exception) {
-            log.error("Falló la persistencia del catálogo recuperado de GestoPago en PostgreSQL ({})",
-                    exception.getClass().getSimpleName());
-            throw exception;
         } finally {
             log.info("Finaliza persistencia del catálogo recuperado de GestoPago: duraciónMs={}",
                     duracionMs(startedAt));
@@ -142,12 +125,8 @@ public class CatalogoProductosPersistenceServiceImpl implements CatalogoProducto
     }
 
     private CatalogoProductosResponse crearRespuesta(List<Producto> entidades) {
-        CatalogoProductosResponse response = new CatalogoProductosResponse();
-        response.setCodigo(0);
-        response.setMensaje("Catálogo obtenido correctamente desde PostgreSQL");
-        response.setProductos(entidades.stream().map(productoMapper::toResponse).toList());
-        response.setTotal(response.getProductos().size());
-        return response;
+        return CatalogoProductosResponse.de(0, "Catálogo obtenido correctamente desde PostgreSQL",
+                entidades.stream().map(productoMapper::toResponse).toList());
     }
 
     private long duracionMs(long startedAt) {

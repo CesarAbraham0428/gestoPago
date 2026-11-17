@@ -39,7 +39,9 @@ public class SecurityConfiguration {
             SesionService sesiones, ApiSecurityErrorWriter errores) throws Exception {
         JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(tokenService, sesiones, errores);
         return http
-                .csrf(csrf -> csrf.disable())
+                // API sin estado: el JWT viaja solo en el encabezado Authorization (nunca en cookies), por lo que
+                // no hay credencial ambiental que un sitio ajeno pueda reutilizar y CSRF no aplica.
+                .csrf(csrf -> csrf.disable()) // NOSONAR java:S4502
                 .headers(headers -> headers
                         .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.NO_REFERRER))
                         .frameOptions(frame -> frame.deny()))

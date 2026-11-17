@@ -26,7 +26,7 @@ public record ClienteRequest(
     @NotNull @DecimalMin(value="0",inclusive=false) @Digits(integer=16,fraction=2) BigDecimal ingresoMensual,
     @NotNull @Valid DomicilioRequest domicilio,
     @NotBlank @com.proyecto.servicios.validation.PasswordSegura String password
-) {
+) implements DatosCliente {
     @JsonAnySetter
     public void rechazarCampo(String nombre, Object valor) {
         throw new IllegalArgumentException("Campo de registro no permitido: " + nombre);

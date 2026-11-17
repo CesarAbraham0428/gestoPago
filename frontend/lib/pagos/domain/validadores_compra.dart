@@ -3,7 +3,7 @@ import '../../core/format/formatters.dart';
 /// Reglas de entrada de `PagoServicioRequest`, repetidas aquí solo para guiar
 /// al usuario antes de enviar. El servidor valida de nuevo todo.
 class ValidadoresCompra {
-  const ValidadoresCompra._();
+  const ValidadoresCompra._(); // coverage:ignore-line
 
   static String? telefono(String? valor) {
     final texto = (valor ?? '').trim();

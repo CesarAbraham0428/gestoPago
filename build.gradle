@@ -2,7 +2,7 @@ plugins {
     id 'jacoco'
     id 'io.spring.dependency-management' version '1.1.0'
     id 'org.springframework.boot' version '3.3.6'//Versión de componentes de spring boot
-    id 'org.sonarqube' version '4.0.0.2929'
+    id 'org.sonarqube' version '6.3.1.5724'
     id "org.owasp.dependencycheck" version "8.1.2"
     id 'com.github.ben-manes.versions' version '0.46.0'
     id 'java'
@@ -53,6 +53,7 @@ dependencies {
     implementation 'org.apache.commons:commons-lang3:3.12.0'
     implementation 'commons-fileupload:commons-fileupload:1.5'
     implementation 'commons-io:commons-io:2.18.0'
+    implementation 'commons-codec:commons-codec'
     //implementation 'org.apache.httpcomponents:httpclient:4.5.14'
     implementation 'org.apache.httpcomponents.client5:httpclient5'
     implementation 'org.mapstruct:mapstruct:1.6.3'
@@ -92,6 +93,11 @@ configurations.all {
 
 test {
     useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacoco {
+    toolVersion = '0.8.13'
 }
 
 springBoot {
@@ -99,16 +105,31 @@ springBoot {
     }
 }
 
-sonarqube {
+sonar {
     properties {
-        property "sonar.exclusions", "**/App.java,**/model/**,**/entity/**,**/enums/**,**/config/**,**/controller/**,**/service/configuracion/**"
+        property 'sonar.projectKey', 'gestopago-api'
+        property 'sonar.projectName', 'GestoPago API'
+        property 'sonar.host.url', 'http://localhost:9001'
+        property 'sonar.sources', 'src/main/java'
+        property 'sonar.tests', 'src/test/java'
+        property 'sonar.java.binaries', 'build/classes/java/main'
+        property 'sonar.coverage.jacoco.xmlReportPaths', 'build/reports/jacoco/test/jacocoTestReport.xml'
+        // Solo el arranque (main) queda fuera de cobertura; todo el codigo se analiza (seguridad/duplicados).
+        property 'sonar.coverage.exclusions', 'src/main/java/com/proyecto/servicios/App.java'
     }
 }
+
 jacocoTestReport {
+    dependsOn test
+    // Mismas exclusiones que Sonar: el main de arranque y las clases que MapStruct genera en build/.
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: ['**/App.class', '**/mapper/*MapperImpl.class'])
+        }))
+    }
     reports {
-        reports {
-            xml.required=true
-        }
+        xml.required = true
+        html.required = true
     }
 }
 

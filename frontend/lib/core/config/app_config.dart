@@ -5,7 +5,7 @@
 /// arrancar con HTTP salvo hacia el propio equipo ([conexionPermitida]), para que
 /// las credenciales y el token nunca viajen en claro por la red.
 class AppConfig {
-  const AppConfig._();
+  const AppConfig._(); // coverage:ignore-line
 
   static const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',

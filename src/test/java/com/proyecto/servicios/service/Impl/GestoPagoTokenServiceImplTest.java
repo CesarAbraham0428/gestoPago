@@ -179,19 +179,19 @@ class GestoPagoTokenServiceImplTest {
     }
 
     @Test
-    void revisarRenovacionProgramada_omiteTokenFresco() {
+    void renovarSiHaceFalta_omiteTokenFresco() {
         GestoPagoToken fresh = token("fresh", LocalDateTime.now(CLOCK).minusMinutes(5), 3_600L);
         when(repository.findByIdDistribuidorAndCodigoDispositivoAndActivoTrue(DISTRIBUTOR_ID, DEVICE_CODE))
                 .thenReturn(Optional.of(fresh));
 
-        service.revisarRenovacionProgramada();
+        service.renovarSiHaceFalta();
 
         verifyNoInteractions(authClient, mapper);
         verify(repository, never()).saveAndFlush(any());
     }
 
     @Test
-    void revisarRenovacionProgramada_renuevaElRegistroVencidoSinCrearOtro() {
+    void renovarSiHaceFalta_renuevaElRegistroVencidoSinCrearOtro() {
         usarMapperReal();
         GestoPagoToken expired = token("expired", LocalDateTime.now(CLOCK).minusMinutes(10), 60L);
         expired.setId(5);
@@ -203,7 +203,7 @@ class GestoPagoTokenServiceImplTest {
             .thenReturn(authResponse("renewed", 3_600L));
         when(repository.saveAndFlush(any(GestoPagoToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.revisarRenovacionProgramada();
+        service.renovarSiHaceFalta();
 
         verify(repository).saveAndFlush(expired);
         assertEquals(5, expired.getId());

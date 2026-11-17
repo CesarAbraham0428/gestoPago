@@ -13,9 +13,17 @@ import 'shell_comun.dart';
 
 /// Arranque común de las dos aplicaciones; cada punto de entrada solo elige
 /// el marco de navegación ([shell]).
-Future<void> iniciarAplicacion(ConstructorShell shell) async {
+///
+/// [produccion] y [conexionPermitida] existen para poder probar la negativa a
+/// arrancar sin HTTPS; en uso normal se toman del modo de compilación y de
+/// [AppConfig].
+Future<void> iniciarAplicacion(
+  ConstructorShell shell, {
+  bool produccion = kReleaseMode,
+  bool? conexionPermitida,
+}) async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (kReleaseMode && !AppConfig.conexionPermitida) {
+  if (produccion && !(conexionPermitida ?? AppConfig.conexionPermitida)) {
     runApp(const _ConfiguracionInsegura());
     return;
   }

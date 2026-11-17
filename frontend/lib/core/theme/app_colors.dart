@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// Paleta de GestoPago. Un verde tinta como única marca; el resto es neutro
 /// con un ligero tinte verde. Los colores de estado solo comunican estado.
 class AppColors {
-  const AppColors._();
+  const AppColors._(); // coverage:ignore-line
 
   static const papel = Color(0xFFF3F5F2);
   static const superficie = Color(0xFFFFFFFF);

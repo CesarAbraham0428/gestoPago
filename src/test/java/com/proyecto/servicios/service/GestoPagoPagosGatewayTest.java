@@ -73,8 +73,8 @@ class GestoPagoPagosGatewayTest {
     }
 
     @Test
-    void siLaRenovacionDevuelveNuloFallaSinReintentar() {
-        when(tokenService.renovarToken()).thenReturn(null);
+    void siLaRenovacionNoTraeTokenFallaSinReintentar() {
+        when(tokenService.renovarToken()).thenReturn(new com.proyecto.servicios.entity.gestopago.GestoPagoToken());
         when(pagosClient.enviar(any(), any())).thenThrow(autenticacion());
 
         assertThrows(GestoPagoAuthException.class, () -> gateway.enviar("firmada"));

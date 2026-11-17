@@ -18,25 +18,25 @@ class EncriptarTest {
 
         assertEquals("+LWZ7icI60/DAI8ggv/SpDvJpFYeaYOZ5J7hPGK7g/87r9PRJfgFRBoBLYpBxW33ouvuwQPnhhKHXqzbiqLhMSH4gSH8"
                 + "SMvW6PvHfeklNfTrZnbgWFWDPSy/nqFCP0B/gKavafHG0tW5UP4KPwyhECZK2pLT+I3qYAA85uQaAPQ=",
-                Encriptar.AESCipher(Encriptar.Mode.ENCRYPT, json, IV, LLAVE));
+                Encriptar.cifrar(json, IV, LLAVE));
     }
 
     @Test
     void cifraYDescifraConLaMismaLlave() {
         String json = "{\"idProducto\":1,\"referencia\":\"ÁÉÍ123\"}";
 
-        String cifrado = Encriptar.AESCipher(Encriptar.Mode.ENCRYPT, json, IV, LLAVE);
+        String cifrado = Encriptar.cifrar(json, IV, LLAVE);
 
         assertNotEquals(json, cifrado);
-        assertEquals(json, Encriptar.AESCipher(Encriptar.Mode.DECRYPT, cifrado, IV, LLAVE));
+        assertEquals(json, Encriptar.descifrar(cifrado, IV, LLAVE));
     }
 
     @Test
     void llaveFaltanteOQueNoEsAes256FallaSinDevolverNull() {
-        assertThrows(IllegalStateException.class, () -> Encriptar.AESCipher(Encriptar.Mode.ENCRYPT, "x", IV, ""));
+        assertThrows(IllegalStateException.class, () -> Encriptar.cifrar("x", IV, ""));
         String llaveAes128 = Base64.getEncoder().encodeToString("0123456789abcdef".getBytes());
         assertThrows(IllegalStateException.class,
-                () -> Encriptar.AESCipher(Encriptar.Mode.ENCRYPT, "x", IV, llaveAes128));
+                () -> Encriptar.cifrar("x", IV, llaveAes128));
     }
 
     @Test

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -151,7 +153,7 @@ class _PanelCompraState extends State<PanelCompra> {
     });
     if (resultado is CompraExitosa) {
       widget.alConfirmarCompra();
-      _cargarCuentas(); // el saldo cambió
+      unawaited(_cargarCuentas()); // el saldo cambió
     }
   }
 

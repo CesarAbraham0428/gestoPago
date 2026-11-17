@@ -50,3 +50,10 @@ especificacion-reglas-negocio-gestoapi.md
 
 # JVM crash reports
 hs_err_pid*.log
+
+### SonarQube ###
+.sonar/
+
+# Herramientas locales de analisis (scanner y reportes ZAP)
+tools/sonar-scanner-*/
+tools/zap-reports/
