@@ -37,7 +37,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/** Cada caso utiliza exclusivamente una BD temporal creada por scripts/test-postgres.ps1. */
+/** Cada caso utiliza exclusivamente una BD temporal creada por backend/scripts/test-postgres.ps1. */
 @EnabledIfEnvironmentVariable(named="TEST_DB_URL", matches=".*gestopago_backend_test_[a-zA-Z0-9_]+.*")
 @SpringBootTest(classes=ClientesPostgresTest.Config.class)
 @AutoConfigureMockMvc

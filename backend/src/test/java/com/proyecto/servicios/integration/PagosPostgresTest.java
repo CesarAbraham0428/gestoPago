@@ -46,7 +46,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * Flujo de pago contra PostgreSQL real (BD temporal de scripts/test-postgres.ps1); GestoPago se simula.
+ * Flujo de pago contra PostgreSQL real (BD temporal de backend/scripts/test-postgres.ps1); GestoPago se simula.
  * Comprueba lo que solo se ve con commits reales: saldo retenido/devuelto, estados y el contador del PIN.
  */
 @EnabledIfEnvironmentVariable(named="TEST_DB_URL", matches=".*gestopago_backend_test_[a-zA-Z0-9_]+.*")

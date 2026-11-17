@@ -37,7 +37,10 @@ if (-not $ok) {
 try { Invoke-RestMethod "$base/api/user_tokens/revoke" -Method Post -Headers $h -Body @{ name = 'gradle' } | Out-Null } catch {}
 $token = (Invoke-RestMethod "$base/api/user_tokens/generate" -Method Post -Headers $h -Body @{ name = 'gradle' }).token
 
-./gradlew.bat clean test jacocoTestReport sonar "-Dsonar.host.url=$base" "-Dsonar.token=$token"
-if ($LASTEXITCODE) { throw 'Fallo el analisis' }
+Push-Location backend
+try {
+  ./gradlew.bat clean test jacocoTestReport sonar "-Dsonar.host.url=$base" "-Dsonar.token=$token"
+  if ($LASTEXITCODE) { throw 'Fallo el analisis' }
+} finally { Pop-Location }
 Write-Host "Listo: $base/dashboard?id=gestopago-api"
 if ($Detener) { docker compose stop sonarqube }

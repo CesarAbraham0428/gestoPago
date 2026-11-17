@@ -1,0 +1,109 @@
+# Blueprint de Render: API (Spring Boot) + web (Flutter/nginx) + PostgreSQL + Redis.
+# Uso: Render Dashboard > New > Blueprint > selecciona este repositorio.
+# Los valores marcados con `sync: false` los pide Render al crear el Blueprint (no se guardan en git).
+#
+# Notas:
+# - Los nombres de servicio definen la URL (https://<nombre>.onrender.com). Si Render la
+#   cambia porque el nombre ya existe, actualiza CORS_ORIGENES (api) y API_BASE_URL (web).
+# - Plan gratuito: la base de datos expira a los 30 días y los servicios web se duermen
+#   tras 15 min sin tráfico. Para algo estable usa un plan de pago en `plan:`.
+# - Flyway crea todas las tablas al arrancar la API contra una base vacía.
+
+databases:
+  - name: gestopago-db
+    databaseName: gestopago
+    user: gestopago
+    plan: free
+
+services:
+  # Redis (caché del catálogo y límite de solicitudes de pago). Solo accesible desde la red privada.
+  - type: keyvalue
+    name: gestopago-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+  # --- API --------------------------------------------------------------------------------
+  - type: web
+    name: gestopago-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    # Solo se redespliega cuando cambia el backend.
+    buildFilter:
+      paths:
+        - backend/**
+    # Sin healthCheckPath: /actuator/health exige autenticación en SecurityConfiguration.
+    # Si lo habilitas como público, agrega aquí:  healthCheckPath: /actuator/health
+    envVars:
+      # El Dockerfile arma DB_URL (jdbc:postgresql://host:puerto/base) con estas tres variables.
+      - key: DB_HOST
+        fromDatabase: { name: gestopago-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: gestopago-db, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: gestopago-db, property: database }
+      - key: DB_USERNAME
+        fromDatabase: { name: gestopago-db, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: gestopago-db, property: password }
+      - key: REDIS_HOST
+        fromService: { type: keyvalue, name: gestopago-redis, property: host }
+      - key: REDIS_PORT
+        fromService: { type: keyvalue, name: gestopago-redis, property: port }
+
+      # Secretos generados por Render (base64 de 256 bits).
+      - key: APP_JWT_SECRET
+        generateValue: true
+      - key: GESTOPAGO_TOKEN_KEY
+        generateValue: true
+
+      # Credenciales que entrega GestoPago.
+      - key: GESTOPAGO_AUTH_ID_DISTRIBUIDOR
+        sync: false
+      - key: GESTOPAGO_AUTH_CODIGO_DISPOSITIVO
+        sync: false
+      - key: GESTOPAGO_AUTH_PASSWORD
+        sync: false
+      - key: GESTOPAGO_PAGOS_SECRET_KEY
+        sync: false
+      - key: GESTOPAGO_PAGOS_IV
+        sync: false
+
+      # Segundo factor por correo (SMTP obligatorio; con Gmail, usa contraseña de aplicación).
+      - key: MAIL_HOST
+        value: smtp.gmail.com
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_REMITENTE
+        sync: false
+
+      # Origen autorizado por CORS: la URL HTTPS del frontend.
+      - key: CORS_ORIGENES
+        value: https://gestopago-web.onrender.com
+      # Detrás del proxy de Render, para que los límites por IP vean la IP real del cliente.
+      - key: FORWARD_HEADERS
+        value: native
+      - key: APP_2FA_CONSOLA
+        value: "false"
+      - key: SWAGGER_ENABLED
+        value: "false"
+
+  # --- Frontend (Flutter web + nginx) -----------------------------------------------------
+  - type: web
+    name: gestopago-web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    buildFilter:
+      paths:
+        - frontend/**
+    healthCheckPath: /
+    envVars:
+      # Se compila dentro de la app y se agrega al CSP (connect-src) de nginx. Debe ser HTTPS.
+      - key: API_BASE_URL
+        value: https://gestopago-api.onrender.com

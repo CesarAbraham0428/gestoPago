@@ -345,29 +345,50 @@ Las excepciones de negocio conservan mensajes específicos para correos, RFC y C
 | 503 | Servicio de pagos no disponible por el momento; no se realizó ningún cargo. |
 | 504 | GestoPago no confirmó el pago; queda en revisión con el monto retenido. |
 
+## Estructura del repositorio
+
+```
+backend/    API Spring Boot (Gradle, Dockerfile, migraciones Flyway, .env.example)
+frontend/   App Flutter (web y móvil, Dockerfile + nginx para la versión web)
+docs/       Documentación
+scripts/    Análisis SonarQube (ambos proyectos)
+tools/      Scanner y plugins de SonarQube (local)
+render.yaml Blueprint de Render: API, web, PostgreSQL y Redis
+```
+
+## Despliegue en Render
+
+`render.yaml` define los cuatro recursos (API, web, PostgreSQL y Redis). En Render: **New > Blueprint**, elige este repositorio y completa los valores que pide (credenciales de GestoPago y `MAIL_*`). Cada servicio solo se redespliega cuando cambian los archivos de su carpeta.
+
+- La API construye `DB_URL` a partir de `DB_HOST`, `DB_PORT` y `DB_NAME` si no se define `DB_URL`; Flyway crea las tablas en la base vacía.
+- `CORS_ORIGENES` (API) y `API_BASE_URL` (web) deben ser las URL HTTPS reales de cada servicio; ajústalas si Render asigna un nombre distinto.
+- Imágenes en local: `docker build -t gestopago-api backend` y `docker build -t gestopago-web --build-arg API_BASE_URL=https://tu-api frontend`.
+
 ## Ejecución local
 
 1. Instala Java 17 e inicia PostgreSQL y Redis.
-2. Copia `.env.example` a `.env` y configura las credenciales de PostgreSQL, GestoPago, `APP_JWT_SECRET` (valor aleatorio de al menos 32 bytes) y el correo del segundo factor (`MAIL_*`, o `APP_2FA_CONSOLA=true` solo en desarrollo). No compartas este archivo.
-3. Ejecuta desde la raíz del proyecto:
+2. Copia `backend/.env.example` a `backend/.env` y configura las credenciales de PostgreSQL, GestoPago, `APP_JWT_SECRET` (valor aleatorio de al menos 32 bytes) y el correo del segundo factor (`MAIL_*`, o `APP_2FA_CONSOLA=true` solo en desarrollo). No compartas este archivo.
+3. Ejecuta desde la carpeta `backend/`:
 
    ```powershell
+   cd backend
    .\gradlew.bat bootRun
    ```
 
-Flyway crea el esquema en una base vacía. Para la instalación mediante SQL manual, consulta [las instrucciones de base de datos](docs/ENTREGA-BASE-DATOS.md) y [el script de creación](scripts/crear-base-datos.sql); con ese script, configura `SPRING_FLYWAY_BASELINE_VERSION=5` en el primer inicio. Las tablas históricas `personas` y `registro` se conservan, pero ya no participan en la API.
+Flyway crea el esquema en una base vacía. Para la instalación mediante SQL manual, consulta [las instrucciones de base de datos](docs/ENTREGA-BASE-DATOS.md) y [el script de creación](backend/scripts/crear-base-datos.sql); con ese script, configura `SPRING_FLYWAY_BASELINE_VERSION=5` en el primer inicio. Las tablas históricas `personas` y `registro` se conservan, pero ya no participan en la API.
 
 ## Pruebas
 
 ```powershell
+cd backend
 .\gradlew.bat test
 ```
 
-La suite cubre validación, clientes, cuentas, usuarios, autenticación, JWT, catálogo y pagos. Para verificar también PostgreSQL, instala sus herramientas cliente en `PATH` y ejecuta:
+La suite cubre validación, clientes, cuentas, usuarios, autenticación, JWT, catálogo y pagos. Para verificar también PostgreSQL, instala sus herramientas cliente en `PATH` y ejecuta desde la raíz del repositorio:
 
 ```powershell
-.\scripts\test-postgres.ps1
-.\scripts\test-postgres.ps1 -EsquemaManual
+.\backend\scripts\test-postgres.ps1
+.\backend\scripts\test-postgres.ps1 -EsquemaManual
 ```
 
 Estas ejecuciones verifican, respectivamente, las migraciones en una base vacía y la adopción del esquema manual, y corren también las pruebas de integración de pagos (pagos simultáneos sobre una misma cuenta, conciliación tras un timeout y bloqueo del PIN). Crean y eliminan una base temporal, por lo que requieren permiso para crear bases. Sin `TEST_DB_URL`, las pruebas de PostgreSQL se omiten en `gradlew test`.
