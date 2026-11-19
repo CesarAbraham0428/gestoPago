@@ -1,3 +1,5 @@
+import 'mensajes_usuario.dart';
+
 /// Errores que cruzan las capas. La capa de dominio nunca ve `http`.
 sealed class AppException implements Exception {
   const AppException(this.message);
@@ -7,8 +9,8 @@ sealed class AppException implements Exception {
   String toString() => message;
 }
 
-/// El servidor respondió con un estado de error. [message] viene del campo
-/// `mensaje` de la API, que ya está redactado para el usuario final.
+/// El servidor respondió con un estado de error. [message] ya pasó por
+/// [MensajesUsuario.desdeServidor]: es apto para mostrarse al usuario.
 class ApiException extends AppException {
   const ApiException(this.statusCode, super.message, {this.reintentarEn});
   final int statusCode;
@@ -32,7 +34,5 @@ class SesionActivaException extends AppException {
 /// No hubo respuesta utilizable (sin red, tiempo agotado, respuesta ilegible).
 /// En una operación de escritura el resultado en el servidor es desconocido.
 class ConexionException extends AppException {
-  const ConexionException([
-    super.message = 'No pudimos comunicarnos con el servidor.',
-  ]);
+  const ConexionException([super.message = MensajesUsuario.sinConexion]);
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import 'ilustracion.dart';
 
 /// Etiqueta de estado. El color nunca va solo: siempre lleva texto.
 class EtiquetaEstado extends StatelessWidget {
@@ -78,8 +79,12 @@ class VistaMensaje extends StatelessWidget {
     this.icono = Icons.info_outline,
     this.accion,
     this.etiquetaAccion,
+    this.color = AppColors.turquesa,
+    this.fondo = AppColors.turquesaTenue,
   });
 
+  final Color color;
+  final Color fondo;
   final String titulo;
   final String detalle;
   final IconData icono;
@@ -97,8 +102,8 @@ class VistaMensaje extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icono, size: 36, color: AppColors.tintaSuave),
-              const SizedBox(height: 16),
+              Ilustracion(icono: icono, color: color, fondo: fondo),
+              const SizedBox(height: 20),
               Text(titulo, style: tema.titleMedium, textAlign: TextAlign.center),
               const SizedBox(height: 6),
               Text(
@@ -108,9 +113,10 @@ class VistaMensaje extends StatelessWidget {
               ),
               if (accion != null) ...[
                 const SizedBox(height: 20),
-                OutlinedButton(
+                FilledButton.tonalIcon(
                   onPressed: accion,
-                  child: Text(etiquetaAccion ?? 'Reintentar'),
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: Text(etiquetaAccion ?? 'Reintentar'),
                 ),
               ],
             ],

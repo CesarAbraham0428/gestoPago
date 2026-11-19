@@ -6,90 +6,24 @@ import 'package:flutter/services.dart';
 import '../../../core/error/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/ui/breakpoints.dart';
+import '../../../core/ui/campo_codigo.dart';
+import '../../../core/ui/logo_app.dart';
 import '../../../core/ui/widgets_estado.dart';
 import '../../application/sesion_controller.dart';
 import '../../domain/entities/desafio_verificacion.dart';
 import '../../domain/validadores_credenciales.dart';
 
 /// Pantalla de acceso (adaptador de entrada). Las dos apps comparten esta
-/// pantalla; en ancho amplio añade un panel lateral con lo que se puede hacer.
-/// El acceso tiene dos pasos: credenciales y código enviado al correo.
+/// pantalla: el formulario va centrado y, en pantallas amplias, dentro de una
+/// tarjeta. El acceso tiene dos pasos: credenciales y código enviado al correo.
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key, required this.sesion});
 
   final SesionController sesion;
 
   @override
-  Widget build(BuildContext context) {
-    final ancho = Breakpoints.esAncho(context, Breakpoints.barraLateral);
-    return Scaffold(
-      body: ancho
-          ? Row(
-              children: [
-                const Expanded(flex: 5, child: _PanelMarca()),
-                Expanded(flex: 6, child: _ContenedorFormulario(sesion: sesion)),
-              ],
-            )
-          : _ContenedorFormulario(sesion: sesion),
-    );
-  }
-}
-
-class _PanelMarca extends StatelessWidget {
-  const _PanelMarca();
-
-  @override
-  Widget build(BuildContext context) {
-    final tema = Theme.of(context).textTheme;
-    const blanco = Colors.white;
-    final suave = blanco.withValues(alpha: 0.78);
-    return Container(
-      color: AppColors.marca,
-      padding: const EdgeInsets.all(56),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'GestoPago',
-            style: tema.titleLarge?.copyWith(color: blanco, fontSize: 22),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Recarga tu celular y paga tus servicios desde un solo lugar.',
-                style: tema.headlineMedium?.copyWith(color: blanco, fontSize: 34),
-              ),
-              const SizedBox(height: 28),
-              for (final linea in const [
-                'Elige el servicio y confirma con tu PIN.',
-                'Cada compra queda en tu historial con su referencia.',
-                'Tu saldo se descuenta solo cuando el pago se confirma.',
-              ])
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.check, size: 18, color: suave),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          linea,
-                          style: tema.bodyLarge?.copyWith(color: suave),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox.shrink(),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      Scaffold(body: _ContenedorFormulario(sesion: sesion));
 }
 
 class _ContenedorFormulario extends StatefulWidget {
@@ -106,42 +40,119 @@ class _ContenedorFormularioState extends State<_ContenedorFormulario> {
 
   @override
   Widget build(BuildContext context) {
-    final tema = Theme.of(context).textTheme;
     final desafio = _desafio;
-    return SafeArea(
-      child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (!Breakpoints.esAncho(context, Breakpoints.barraLateral)) ...[
-                  Text(
-                    'GestoPago',
-                    style: tema.titleLarge?.copyWith(color: AppColors.marca),
-                  ),
-                  const SizedBox(height: 32),
-                ],
-                if (desafio == null)
-                  _PasoCredenciales(
-                    sesion: widget.sesion,
-                    alEnviarCodigo: (d) => setState(() => _desafio = d),
-                  )
-                else
-                  _PasoCodigo(
-                    sesion: widget.sesion,
-                    desafio: desafio,
-                    alVolver: () => setState(() => _desafio = null),
-                  ),
-              ],
+    final ancho = Breakpoints.esAncho(context, Breakpoints.barraLateral);
+    final Widget paso = desafio == null
+        ? _PasoCredenciales(
+            sesion: widget.sesion,
+            alEnviarCodigo: (d) => setState(() => _desafio = d),
+          )
+        : _PasoCodigo(
+            sesion: widget.sesion,
+            desafio: desafio,
+            alVolver: () => setState(() => _desafio = null),
+          );
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.bosqueClaro, AppColors.bosque],
+        ),
+      ),
+      child: CustomPaint(
+        painter: const _FondoDecorado(),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: ancho ? 440 : 400),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Center(child: LogoApp(tamano: 44, sobreMarca: true)),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Paga tus servicios y recargas en un solo lugar',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.78),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Container(
+                      padding: ancho
+                          ? const EdgeInsets.fromLTRB(36, 36, 36, 28)
+                          : const EdgeInsets.fromLTRB(22, 26, 22, 20),
+                      decoration: BoxDecoration(
+                        color: AppColors.superficie,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.25),
+                            blurRadius: 32,
+                            offset: const Offset(0, 14),
+                          ),
+                        ],
+                      ),
+                      child: paso,
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.lock_outline, size: 14, color: Colors.white.withValues(alpha: 0.7)),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'Conexión cifrada y verificación en dos pasos',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+/// Círculos suaves con los colores de las secciones de la app, detrás del
+/// formulario. Solo decoran: no compiten con la tarjeta blanca.
+class _FondoDecorado extends CustomPainter {
+  const _FondoDecorado();
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    void circulo(double x, double y, double r, Color c, double alfa) => canvas.drawCircle(
+      Offset(s.width * x, s.height * y),
+      r,
+      Paint()..color = c.withValues(alpha: alfa),
+    );
+    circulo(0.08, 0.12, 180, AppColors.turquesa, 0.28);
+    circulo(0.95, 0.85, 220, AppColors.azul, 0.20);
+    circulo(0.88, 0.10, 70, AppColors.coral, 0.22);
+    circulo(0.12, 0.92, 90, AppColors.ciruela, 0.22);
+    final anillo = Paint()
+      ..color = Colors.white.withValues(alpha: 0.07)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas
+      ..drawCircle(Offset(s.width * 0.82, s.height * 0.35), 140, anillo)
+      ..drawCircle(Offset(s.width * 0.20, s.height * 0.62), 110, anillo);
+  }
+
+  @override
+  bool shouldRepaint(_FondoDecorado oldDelegate) => false;
 }
 
 /// Mensaje de un error de la API, o uno genérico si fue otra cosa.
@@ -265,7 +276,11 @@ class _PasoCredencialesState extends State<_PasoCredenciales> with _EsperaPorLim
             ],
             TextFormField(
               controller: _correo,
-              enabled: !_enviando,
+              // Las `key` evitan que el aviso de error, al insertarse encima, haga que
+              // Flutter recree los campos con el foco puesto: en web el input del
+              // navegador quedaba desincronizado y dejaba de recibir texto.
+              key: const ValueKey('login-correo'),
+              readOnly: _enviando, // no `enabled`: desactivar quita el foco y en web el campo deja de recibir texto
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               autofillHints: const [AutofillHints.email],
@@ -276,8 +291,9 @@ class _PasoCredencialesState extends State<_PasoCredenciales> with _EsperaPorLim
             ),
             const SizedBox(height: 16),
             TextFormField(
+              key: const ValueKey('login-password'),
               controller: _password,
-              enabled: !_enviando,
+              readOnly: _enviando,
               obscureText: _ocultar,
               textInputAction: TextInputAction.done,
               autofillHints: const [AutofillHints.password],
@@ -410,24 +426,13 @@ class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
             AvisoEstado(tono: Tono.rechazo, icono: Icons.error_outline, texto: _error!),
             const SizedBox(height: 20),
           ],
-          TextFormField(
+          CampoCodigo(
+            key: const ValueKey('login-codigo'), // el aviso de error se inserta encima: ver los campos del paso 1
             controller: _codigo,
             enabled: !_enviando,
             autofocus: true,
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.done,
-            autofillHints: const [AutofillHints.oneTimeCode],
-            enableSuggestions: false,
-            autocorrect: false,
-            textAlign: TextAlign.center,
-            style: tema.headlineSmall?.copyWith(letterSpacing: 8),
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(6),
-            ],
-            onFieldSubmitted: (_) => _verificar(),
-            decoration: const InputDecoration(labelText: 'Código de verificación'),
             validator: ValidadoresCredenciales.codigo,
+            alEnviar: _verificar,
           ),
           const SizedBox(height: 24),
           _BotonEnvio(

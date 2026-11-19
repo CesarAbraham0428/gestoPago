@@ -1,4 +1,5 @@
 import '../../../core/error/app_exception.dart';
+import '../../../core/error/mensajes_usuario.dart';
 import '../../../core/network/api_client.dart';
 import '../../domain/entities/desafio_verificacion.dart';
 import '../../domain/entities/sesion.dart';
@@ -28,16 +29,27 @@ class ApiAutenticacionGateway implements AutenticacionGateway {
     required String correo,
     required String password,
   }) async {
-    final respuesta = await _api.post(
-      '/auth/login',
-      body: {'correo': correo, 'password': password},
-      authenticated: false,
-    );
+    final ApiResponse respuesta;
+    try {
+      respuesta = await _api.post(
+        '/auth/login',
+        body: {'correo': correo, 'password': password},
+        authenticated: false,
+      );
+    } on ApiException catch (e) {
+      // Un correo inexistente y una contraseña errónea se ven igual: el
+      // mensaje no confirma si la cuenta existe.
+      throw switch (e.statusCode) {
+        400 || 401 || 404 => ApiException(e.statusCode, MensajesUsuario.credencialesIncorrectas),
+        403 => ApiException(e.statusCode, MensajesUsuario.cuentaNoDisponible),
+        _ => e,
+      };
+    }
     final datos = respuesta.dataAsMap;
     final id = datos['desafioId'];
     final vigenciaMs = datos['expiraEnMs'];
     if (id is! String || id.isEmpty || vigenciaMs is! num) {
-      throw const ConexionException('La respuesta del servidor no es válida.');
+      throw const ConexionException(MensajesUsuario.respuestaInvalida);
     }
     return DesafioVerificacion(
       desafioId: id,
@@ -66,13 +78,19 @@ class ApiAutenticacionGateway implements AutenticacionGateway {
       );
     } on ApiException catch (e) {
       if (e.statusCode == 409) throw SesionActivaException(e.message);
-      rethrow;
+      throw switch (e.statusCode) {
+        401 when e.message.contains('Demasiados') =>
+          const ApiException(401, MensajesUsuario.demasiadosCodigos),
+        400 || 401 || 404 => ApiException(e.statusCode, MensajesUsuario.codigoIncorrecto),
+        403 => ApiException(e.statusCode, MensajesUsuario.cuentaNoDisponible),
+        _ => e,
+      };
     }
     final datos = respuesta.dataAsMap;
     final token = datos['token'];
     final expiraEnMs = datos['expiraEnMs'];
     if (token is! String || token.isEmpty || expiraEnMs is! num) {
-      throw const ConexionException('La respuesta del servidor no es válida.');
+      throw const ConexionException(MensajesUsuario.respuestaInvalida);
     }
     return Sesion(
       token: token,

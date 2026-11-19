@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frontend/core/error/mensajes_usuario.dart';
 import 'package:frontend/authentication/application/sesion_controller.dart';
 import 'package:frontend/authentication/domain/entities/desafio_verificacion.dart';
 import 'package:frontend/authentication/domain/entities/sesion.dart';
@@ -179,11 +180,35 @@ void main() {
       );
     });
 
-    test('401 al verificar conserva el mensaje del servidor', () async {
+    test('401 al verificar muestra un mensaje claro y genérico', () async {
       final gateway = conRespuesta(401, {'codigo': 1, 'mensaje': 'Código de verificación incorrecto'});
       await expectLater(
         gateway.verificarCodigo(desafio: _desafio, codigo: '000000', cerrarSesionAnterior: false),
-        throwsA(isA<ApiException>().having((e) => e.message, 'mensaje', contains('incorrecto'))),
+        throwsA(isA<ApiException>().having((e) => e.message, 'mensaje', MensajesUsuario.codigoIncorrecto)),
+      );
+    });
+
+    test('demasiados códigos pide volver a iniciar sesión', () async {
+      final gateway = conRespuesta(401, {'mensaje': 'Demasiados códigos incorrectos; inicia sesión de nuevo'});
+      await expectLater(
+        gateway.verificarCodigo(desafio: _desafio, codigo: '000000', cerrarSesionAnterior: false),
+        throwsA(isA<ApiException>().having((e) => e.message, 'mensaje', MensajesUsuario.demasiadosCodigos)),
+      );
+    });
+
+    test('el login no distingue correo inexistente de contraseña incorrecta', () async {
+      for (final (estado, mensaje) in [(401, 'Usuario o contraseña incorrectos'), (404, 'Usuario no encontrado')]) {
+        await expectLater(
+          conRespuesta(estado, {'mensaje': mensaje})
+              .iniciarSesion(correo: 'ana@example.com', password: 'Segura123!'),
+          throwsA(isA<ApiException>()
+              .having((e) => e.message, 'mensaje', MensajesUsuario.credencialesIncorrectas)),
+        );
+      }
+      await expectLater(
+        conRespuesta(403, {'mensaje': 'El usuario o cliente está inactivo'})
+            .iniciarSesion(correo: 'ana@example.com', password: 'Segura123!'),
+        throwsA(isA<ApiException>().having((e) => e.message, 'mensaje', MensajesUsuario.cuentaNoDisponible)),
       );
     });
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frontend/core/ui/campo_codigo.dart';
 import 'package:frontend/authentication/application/sesion_controller.dart';
 import 'package:frontend/authentication/infraestructure/ui/login_page.dart';
 import 'package:frontend/core/error/app_exception.dart';
@@ -34,10 +35,10 @@ void main() {
     await tester.enterText(campo('Contraseña'), 'Segura123!');
   }
 
-  testWidgets('en pantalla ancha muestra el panel de marca', (tester) async {
+  testWidgets('en pantalla ancha el formulario va centrado, sin panel lateral', (tester) async {
     await abrir(tester, tamano: const Size(1200, 800));
-    expect(find.textContaining('Recarga tu celular'), findsOneWidget);
-    expect(find.textContaining('Elige el servicio'), findsOneWidget);
+    expect(find.textContaining('Recarga tu celular'), findsNothing);
+    expect(find.text('GestoPago'), findsOneWidget);
     expect(find.text('Inicia sesión'), findsOneWidget);
   });
 
@@ -94,13 +95,13 @@ void main() {
     await tester.pumpAndSettle();
 
     gateway.errorVerificar = const ApiException(401, 'Código incorrecto');
-    await tester.enterText(campo('Código de verificación'), '123456');
+    await tester.enterText(find.byKey(CampoCodigo.claveCampo), '123456');
     await tester.tap(find.text('Verificar y entrar'));
     await tester.pumpAndSettle();
     expect(find.text('Código incorrecto'), findsOneWidget);
 
     gateway.errorVerificar = StateError('raro');
-    await tester.tap(campo('Código de verificación'));
+    await tester.tap(find.byKey(CampoCodigo.claveCampo));
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
     expect(find.textContaining('No fue posible verificar'), findsOneWidget);
@@ -110,12 +111,29 @@ void main() {
     expect(find.text('Inicia sesión'), findsOneWidget);
   });
 
+  testWidgets('tras credenciales incorrectas la contraseña conserva el foco y se puede escribir', (tester) async {
+    await abrir(tester);
+    await llenarCredenciales(tester);
+    gateway.errorIniciar = const ApiException(401, 'Correo o contraseña incorrectos');
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Correo o contraseña incorrectos'), findsOneWidget);
+
+    final password = tester.widget<EditableText>(
+      find.descendant(of: campo('Contraseña'), matching: find.byType(EditableText)),
+    );
+    expect(password.focusNode.hasFocus, isTrue);
+    tester.testTextInput.enterText('Otra123!');
+    await tester.pump();
+    expect(password.controller.text, 'Otra123!');
+  });
+
   testWidgets('verificación exitosa abre la sesión', (tester) async {
     await abrir(tester);
     await llenarCredenciales(tester);
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
-    await tester.enterText(campo('Código de verificación'), '123456');
+    await tester.enterText(find.byKey(CampoCodigo.claveCampo), '123456');
     await tester.tap(find.text('Verificar y entrar'));
     await tester.pumpAndSettle();
     expect(sesion.autenticado, isTrue);

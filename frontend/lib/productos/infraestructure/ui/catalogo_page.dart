@@ -289,6 +289,8 @@ class _Contenido extends StatelessWidget {
       case EstadoCatalogo.error:
         return VistaMensaje(
           icono: Icons.cloud_off_outlined,
+          color: AppColors.coral,
+          fondo: AppColors.coralTenue,
           titulo: 'No pudimos cargar el catálogo',
           detalle: controller.error ?? 'Revisa tu conexión e inténtalo de nuevo.',
           accion: () => controller.cargar(forzar: true),

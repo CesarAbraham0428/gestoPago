@@ -17,7 +17,7 @@ void main() {
       peticion.response
         ..statusCode = 401
         ..headers.contentType = ContentType.json
-        ..write(jsonEncode({'mensaje': 'Sesión reemplazada'}));
+        ..write(jsonEncode({'mensaje': 'Sesión reemplazada.'}));
       peticion.response.close();
     });
 
@@ -35,7 +35,7 @@ void main() {
     );
     expect(autorizacion, 'Bearer jwt');
     expect(deps.sesion.autenticado, isFalse);
-    expect(deps.sesion.aviso, 'Sesión reemplazada');
+    expect(deps.sesion.aviso, 'Sesión reemplazada.');
 
     deps.sesion.dispose();
     await servidor.close(force: true);

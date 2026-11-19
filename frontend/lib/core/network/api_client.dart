@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../error/app_exception.dart';
+import '../error/mensajes_usuario.dart';
 
 /// Respuesta ya desenvuelta del contrato `{codigo, mensaje, datos}` de la API.
 class ApiResponse {
@@ -47,6 +48,12 @@ class ApiClient {
     bool authenticated = true,
   }) => _send('POST', path, body: body, timeout: timeout, authenticated: authenticated);
 
+  Future<ApiResponse> put(String path, {Object? body}) =>
+      _send('PUT', path, body: body, timeout: const Duration(seconds: 20));
+
+  Future<ApiResponse> patch(String path, {Object? body}) =>
+      _send('PATCH', path, body: body, timeout: const Duration(seconds: 20));
+
   Future<ApiResponse> _send(
     String method,
     String path, {
@@ -71,19 +78,18 @@ class ApiClient {
         await _client.send(request).timeout(timeout),
       ).timeout(timeout);
     } on TimeoutException {
-      throw const ConexionException(
-        'El servidor tardó demasiado en responder.',
-      );
+      throw const ConexionException(MensajesUsuario.tiempoAgotado);
     } on Object {
       throw const ConexionException();
     }
 
     final decoded = _decode(response.bodyBytes);
-    final message = decoded is Map<String, dynamic> && decoded['mensaje'] is String
+    final mensajeServidor = decoded is Map<String, dynamic> && decoded['mensaje'] is String
         ? decoded['mensaje'] as String
-        : _defaultMessage(response.statusCode);
+        : null;
 
     if (response.statusCode >= 400) {
+      final message = MensajesUsuario.desdeServidor(response.statusCode, mensajeServidor);
       if (response.statusCode == 401 && authenticated) onUnauthorized?.call(message);
       throw ApiException(
         response.statusCode,
@@ -94,11 +100,11 @@ class ApiClient {
       );
     }
     if (decoded is! Map<String, dynamic>) {
-      throw const ConexionException('La respuesta del servidor no es válida.');
+      throw const ConexionException(MensajesUsuario.respuestaInvalida);
     }
     return ApiResponse(
       statusCode: response.statusCode,
-      message: message,
+      message: mensajeServidor ?? '',
       data: decoded['datos'],
     );
   }
@@ -119,14 +125,4 @@ class ApiClient {
       return null;
     }
   }
-
-  String _defaultMessage(int status) => switch (status) {
-    401 => 'Tu sesión terminó. Inicia sesión de nuevo.',
-    403 => 'No tienes permiso para realizar esta operación.',
-    404 => 'No encontramos lo que buscas.',
-    413 => 'La solicitud es demasiado grande.',
-    429 => 'Hiciste demasiadas solicitudes. Espera un minuto.',
-    >= 500 => 'El servicio no está disponible por ahora.',
-    _ => 'No fue posible completar la operación.',
-  };
 }

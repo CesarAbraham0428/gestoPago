@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../authentication/infraestructure/ui/login_page.dart';
 import '../pagos/infraestructure/ui/historial_page.dart';
 import '../pagos/infraestructure/ui/panel_compra.dart';
+import '../perfil/infraestructure/ui/perfil_page.dart';
 import '../productos/infraestructure/ui/catalogo_page.dart';
 import 'dependencias.dart';
 import 'shell_comun.dart';
@@ -49,6 +50,14 @@ GoRouter crearRouter(Dependencias deps, ConstructorShell shell) {
                     _historial(deps, state.pathParameters['upc']),
               ),
             ],
+          ),
+          GoRoute(
+            path: '/perfil',
+            builder: (context, state) => PerfilPage(controller: deps.perfil),
+          ),
+          GoRoute(
+            path: '/cuentas',
+            builder: (context, state) => CuentasBancariasPage(controller: deps.perfil),
           ),
         ],
       ),

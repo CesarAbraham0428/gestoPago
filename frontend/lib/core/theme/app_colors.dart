@@ -16,7 +16,25 @@ class AppColors {
   static const marcaOscura = Color(0xFF0A4435);
   static const marcaTenue = Color(0xFFDDEBE5);
 
-  static const exito = Color(0xFF14724F);
+  /// Fondo de la barra lateral web: verde bosque profundo.
+  static const bosque = Color(0xFF0B3B2E);
+  static const bosqueClaro = Color(0xFF14513F);
+
+  /// Azul para "Mis compras" y datos de empleo.
+  static const azul = Color(0xFF2470C9);
+  static const azulTenue = Color(0xFFDFEBF9);
+
+  /// Un color por sección para iconos e ilustraciones.
+  static const turquesa = Color(0xFF0E8A8A);
+  static const turquesaTenue = Color(0xFFD9F1EF);
+  static const coral = Color(0xFFD9614C);
+  static const coralTenue = Color(0xFFFBE4DF);
+  static const indigo = Color(0xFF4F5BD5);
+  static const indigoTenue = Color(0xFFE4E6FA);
+  static const ciruela = Color(0xFF9B4F96);
+  static const ciruelaTenue = Color(0xFFF3E3F2);
+
+  static const exito =Color(0xFF14724F);
   static const exitoFondo = Color(0xFFDDEFE6);
   static const pendiente = Color(0xFF8A5A00);
   static const pendienteFondo = Color(0xFFFBEBC8);

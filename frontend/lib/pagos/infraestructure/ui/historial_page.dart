@@ -64,6 +64,8 @@ class _HistorialPageState extends State<HistorialPage> {
               child: seleccion == null
                   ? const VistaMensaje(
                       icono: Icons.receipt_long_outlined,
+                      color: AppColors.azul,
+                      fondo: AppColors.azulTenue,
                       titulo: 'Elige una compra',
                       detalle: 'Aquí verás su recibo completo.',
                     )
@@ -135,6 +137,8 @@ class _Lista extends StatelessWidget {
       case EstadoHistorial.error:
         return VistaMensaje(
           icono: Icons.cloud_off_outlined,
+          color: AppColors.coral,
+          fondo: AppColors.coralTenue,
           titulo: 'No pudimos cargar tus compras',
           detalle: controller.error ?? 'Revisa tu conexión e inténtalo de nuevo.',
           accion: controller.recargar,
@@ -146,6 +150,8 @@ class _Lista extends StatelessWidget {
     if (compras.isEmpty) {
       return const VistaMensaje(
         icono: Icons.receipt_long_outlined,
+        color: AppColors.azul,
+        fondo: AppColors.azulTenue,
         titulo: 'Aún no tienes compras',
         detalle: 'Cuando el servicio confirme una compra, aparecerá aquí con su recibo.',
       );

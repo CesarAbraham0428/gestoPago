@@ -18,12 +18,18 @@ class DestinoNavegacion {
     required this.etiqueta,
     required this.icono,
     required this.iconoActivo,
+    required this.color,
+    required this.fondo,
+    required this.descripcion,
   });
 
   final String ruta;
   final String etiqueta;
   final IconData icono;
   final IconData iconoActivo;
+  final Color color;
+  final Color fondo;
+  final String descripcion;
 }
 
 const destinos = [
@@ -32,12 +38,36 @@ const destinos = [
     etiqueta: 'Catálogo',
     icono: Icons.storefront_outlined,
     iconoActivo: Icons.storefront,
+    color: AppColors.turquesa,
+    fondo: AppColors.turquesaTenue,
+    descripcion: 'Recargas, servicios y tarjetas de regalo',
   ),
   DestinoNavegacion(
     ruta: '/compras',
     etiqueta: 'Mis compras',
     icono: Icons.receipt_long_outlined,
     iconoActivo: Icons.receipt_long,
+    color: AppColors.azul,
+    fondo: AppColors.azulTenue,
+    descripcion: 'Tus recibos y pagos anteriores',
+  ),
+  DestinoNavegacion(
+    ruta: '/perfil',
+    etiqueta: 'Mi perfil',
+    icono: Icons.person_outline,
+    iconoActivo: Icons.person,
+    color: AppColors.ciruela,
+    fondo: AppColors.ciruelaTenue,
+    descripcion: 'Datos personales, empleo y domicilio',
+  ),
+  DestinoNavegacion(
+    ruta: '/cuentas',
+    etiqueta: 'Cuentas bancarias',
+    icono: Icons.account_balance_outlined,
+    iconoActivo: Icons.account_balance,
+    color: AppColors.coral,
+    fondo: AppColors.coralTenue,
+    descripcion: 'Saldos y estado de tus cuentas',
   ),
 ];
 

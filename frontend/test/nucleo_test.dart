@@ -58,7 +58,7 @@ void main() {
       expect(const ApiException(500, 'x').esSesionInvalida, isFalse);
       expect(api.toString(), 'No');
       expect(const SesionActivaException('otra').message, 'otra');
-      expect(const ConexionException().message, contains('comunicarnos'));
+      expect(const ConexionException().message, contains('conectarnos'));
       expect(const ConexionException('caída').toString(), 'caída');
     });
   });
@@ -116,7 +116,7 @@ void main() {
       expect(recibida.headers.containsKey('Authorization'), isFalse);
       expect(jsonDecode(recibida.body), {'k': 'v'});
       expect(r.dataAsMap, isEmpty);
-      expect(r.message, 'No fue posible completar la operación.');
+      expect(r.message, isEmpty);
     });
 
     test('sin tokenReader no hay cabecera Authorization', () async {
@@ -143,7 +143,7 @@ void main() {
         tokenReader: () => 't',
         onUnauthorized: (m) => aviso = m,
         client: MockClient(
-          (_) async => _json({'mensaje': 'Sesión reemplazada'}, 401),
+          (_) async => _json({'mensaje': 'Sesión reemplazada.'}, 401),
         ),
       );
       await expectLater(
@@ -152,11 +152,11 @@ void main() {
           isA<ApiException>().having(
             (e) => e.message,
             'mensaje',
-            'Sesión reemplazada',
+            'Sesión reemplazada.',
           ),
         ),
       );
-      expect(aviso, 'Sesión reemplazada');
+      expect(aviso, 'Sesión reemplazada.');
     });
 
     test('401 sin autenticación no dispara onUnauthorized', () async {
@@ -203,9 +203,10 @@ void main() {
 
       expect(await mensaje(403), contains('permiso'));
       expect(await mensaje(404), contains('No encontramos'));
-      expect(await mensaje(429), contains('demasiadas'));
+      expect(await mensaje(429), contains('demasiados intentos'));
       expect(await mensaje(503), contains('no está disponible'));
-      expect(await mensaje(418), contains('No fue posible'));
+      expect(await mensaje(418), contains('No pudimos completar'));
+      expect(await mensaje(400), contains('Revisa los datos'));
     });
 
     test('un 429 conserva la espera de Retry-After', () async {
@@ -275,7 +276,7 @@ void main() {
           isA<ConexionException>().having(
             (e) => e.message,
             'mensaje',
-            contains('tardó'),
+            contains('tardando'),
           ),
         ),
       );
@@ -289,7 +290,7 @@ void main() {
           isA<ConexionException>().having(
             (e) => e.message,
             'mensaje',
-            contains('comunicarnos'),
+            contains('conectarnos'),
           ),
         ),
       );

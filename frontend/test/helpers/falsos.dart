@@ -12,6 +12,8 @@ import 'package:frontend/pagos/domain/entities/estado_pago.dart';
 import 'package:frontend/pagos/domain/entities/solicitud_compra.dart';
 import 'package:frontend/pagos/domain/ports/cuentas_repository.dart';
 import 'package:frontend/pagos/domain/ports/pagos_repository.dart';
+import 'package:frontend/perfil/domain/entities/perfil.dart';
+import 'package:frontend/perfil/domain/ports/perfil_repository.dart';
 import 'package:frontend/productos/domain/entities/producto.dart';
 import 'package:frontend/productos/domain/ports/catalogo_repository.dart';
 
@@ -184,4 +186,70 @@ Pagina<CompraHistorial> pagina(
   pagina: n,
   totalPaginas: total,
   totalElementos: items.length,
+);
+
+class PerfilFalso implements PerfilRepository {
+  PerfilFalso([Perfil? perfil]) : perfil = perfil ?? perfilPrueba();
+  Perfil perfil;
+  Object? errorObtener;
+  Object? errorActualizar;
+  final List<Map<String, Object?>> cambiosRecibidos = [];
+  Object? errorPin;
+  final List<({String cuenta, String? actual, String nuevo})> pinesRecibidos = [];
+
+  @override
+  Future<Perfil> obtener() async {
+    if (errorObtener != null) throw errorObtener!; // ignore: only_throw_errors
+    return perfil;
+  }
+
+  @override
+  Future<void> cambiarPin({
+    required String numeroCuenta,
+    String? pinActual,
+    required String pinNuevo,
+  }) async {
+    pinesRecibidos.add((cuenta: numeroCuenta, actual: pinActual, nuevo: pinNuevo));
+    if (errorPin != null) throw errorPin!; // ignore: only_throw_errors
+  }
+
+  @override
+  Future<Perfil> actualizar({
+    required String rfc,
+    required Map<String, Object?> cambios,
+  }) async {
+    cambiosRecibidos.add(cambios);
+    if (errorActualizar != null) throw errorActualizar!; // ignore: only_throw_errors
+    return perfil = perfilPrueba(empresa: cambios['empresa'] as String? ?? perfil.empresa);
+  }
+}
+
+Perfil perfilPrueba({String empresa = 'Acme'}) => Perfil(
+  primerNombre: 'Ana',
+  apellidoPaterno: 'Pérez',
+  apellidoMaterno: 'López',
+  fechaNacimiento: DateTime(1995, 4, 12),
+  curp: 'PELA950412MDFRPN09',
+  rfc: 'PELA950412AB1',
+  sexo: 'Femenino',
+  nacionalidad: 'Mexicana',
+  estadoCivil: 'Union libre',
+  correoElectronico: 'ana@example.com',
+  telefonoMovil: '5512345678',
+  ocupacion: 'Ingeniera',
+  empresa: empresa,
+  ingresoMensual: 25000,
+  domicilio: const Domicilio(
+    calle: 'Reforma',
+    numeroExterior: '10',
+    colonia: 'Centro',
+    municipio: 'Cuauhtémoc',
+    estado: 'CDMX',
+    codigoPostal: '06000',
+    pais: 'México',
+  ),
+  cuentas: const [
+    Cuenta(id: 1, numeroCuenta: '123456789012345678', saldo: 900, activa: true),
+    Cuenta(id: 2, numeroCuenta: '876543210987654321', saldo: 50, activa: false),
+  ],
 );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frontend/core/ui/campo_codigo.dart';
 import 'package:frontend/authentication/application/sesion_controller.dart';
 import 'package:frontend/authentication/domain/entities/desafio_verificacion.dart';
 import 'package:frontend/authentication/domain/entities/sesion.dart';
@@ -80,14 +81,14 @@ void main() {
     expect(sesion.autenticado, isFalse);
 
     // Un código mal escrito no llega al servidor.
-    await tester.enterText(find.widgetWithText(TextFormField, 'Código de verificación'), '123');
+    await tester.enterText(find.byKey(CampoCodigo.claveCampo), '123');
     await tester.tap(find.text('Verificar y entrar'));
     await tester.pumpAndSettle();
     expect(find.text('El código tiene 6 dígitos.'), findsOneWidget);
     expect(gateway.reemplazos, isEmpty);
 
     // Paso 2: hay otra sesión; se pide confirmar y al aceptar se entra.
-    await tester.enterText(find.widgetWithText(TextFormField, 'Código de verificación'), '123456');
+    await tester.enterText(find.byKey(CampoCodigo.claveCampo), '123456');
     await tester.tap(find.text('Verificar y entrar'));
     await tester.pumpAndSettle();
     expect(find.text('Ya tienes una sesión abierta'), findsOneWidget);
@@ -118,7 +119,7 @@ void main() {
     await tester.enterText(find.widgetWithText(TextFormField, 'Contraseña'), 'Segura123!');
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextFormField, 'Código de verificación'), '123456');
+    await tester.enterText(find.byKey(CampoCodigo.claveCampo), '123456');
     await tester.tap(find.text('Verificar y entrar'));
     await tester.pumpAndSettle();
 

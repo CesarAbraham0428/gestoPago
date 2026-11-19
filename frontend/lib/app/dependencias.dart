@@ -13,6 +13,9 @@ import '../pagos/domain/ports/cuentas_repository.dart';
 import '../pagos/domain/ports/pagos_repository.dart';
 import '../pagos/infraestructure/adapters/api_cuentas_repository.dart';
 import '../pagos/infraestructure/adapters/api_pagos_repository.dart';
+import '../perfil/application/perfil_controller.dart';
+import '../perfil/domain/ports/perfil_repository.dart';
+import '../perfil/infraestructure/adapters/api_perfil_repository.dart';
 import '../productos/application/catalogo_controller.dart';
 import '../productos/domain/ports/catalogo_repository.dart';
 import '../productos/infraestructure/adapters/api_catalogo_repository.dart';
@@ -27,6 +30,7 @@ class Dependencias {
     required this.cuentas,
     required this.pagos,
     required this.realizarCompra,
+    required this.perfil,
   });
 
   final SesionController sesion;
@@ -35,6 +39,7 @@ class Dependencias {
   final CuentasRepository cuentas;
   final PagosRepository pagos;
   final RealizarCompra realizarCompra;
+  final PerfilController perfil;
 
   /// Construye el grafo con los adaptadores HTTP y de almacenamiento reales.
   /// Los parámetros opcionales permiten sustituir adaptadores en pruebas.
@@ -45,6 +50,7 @@ class Dependencias {
     CatalogoRepository? catalogoRepositorio,
     PagosRepository? pagosRepositorio,
     CuentasRepository? cuentasRepositorio,
+    PerfilRepository? perfilRepositorio,
   }) {
     late final SesionController sesion;
     final api = ApiClient(
@@ -61,6 +67,7 @@ class Dependencias {
       catalogoRepositorio ?? ApiCatalogoRepository(api),
     );
     final historial = HistorialController(pagos);
+    final perfil = PerfilController(perfilRepositorio ?? ApiPerfilRepository(api));
 
     // Al cerrar sesión se descartan los datos del usuario anterior.
     var estabaAutenticado = false;
@@ -68,6 +75,7 @@ class Dependencias {
       if (estabaAutenticado && !sesion.autenticado) {
         catalogo.limpiar();
         historial.limpiar();
+        perfil.limpiar();
       }
       estabaAutenticado = sesion.autenticado;
     });
@@ -79,6 +87,7 @@ class Dependencias {
       cuentas: cuentasRepositorio ?? ApiCuentasRepository(api),
       pagos: pagos,
       realizarCompra: RealizarCompra(pagos),
+      perfil: perfil,
     );
   }
 }
