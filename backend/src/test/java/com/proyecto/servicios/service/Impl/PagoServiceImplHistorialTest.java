@@ -56,7 +56,7 @@ class PagoServiceImplHistorialTest {
         telcel.setServicio("Recargas");
         when(productos.findFirstByIdProductoAndIdServicio(1, 2)).thenReturn(Optional.of(telcel));
         when(productos.findFirstByIdProductoAndIdServicio(3, 4)).thenReturn(Optional.empty());
-        when(registro.aprobadosDeUsuario(7, 0, 10)).thenReturn(new PageImpl<>(
+        when(registro.deUsuario(7, 0, 10)).thenReturn(new PageImpl<>(
                 List.of(pago(1, 2, "A"), pago(1, 2, "B"), pago(3, 4, "C")), PageRequest.of(0, 10), 3));
 
         ListaGenericResponse<HistorialPagoResponse> historial = service.historial(7, 0, 10);

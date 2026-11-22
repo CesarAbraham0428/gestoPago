@@ -54,7 +54,7 @@ class CuentaServiceTest {
     @Test
     void paginaIncluyePropietarioEnConsultaAntesDePaginar() {
         var cuenta = new CuentaResponse(4, 3, NUMERO, new BigDecimal("1250.75"), true,
-                Instant.parse("2026-10-01T12:00:00Z"), Instant.parse("2026-10-02T12:00:00Z"));
+                Instant.parse("2026-10-01T12:00:00Z"), Instant.parse("2026-10-02T12:00:00Z"), null);
         when(cuentas.consultar(isNull(), isNull(), isNull(), eq(3), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(cuenta), PageRequest.of(2, 10), 21));
 
@@ -73,7 +73,7 @@ class CuentaServiceTest {
     @Test
     void administradorPuedeConsultarCuentasDeOtrosClientes() {
         usuario.getCliente().setRol(Rol.Administrador);
-        CuentaResponse cuenta = new CuentaResponse(4, 9, NUMERO, BigDecimal.TEN, true, null, null);
+        CuentaResponse cuenta = new CuentaResponse(4, 9, NUMERO, BigDecimal.TEN, true, null, null, null);
         when(cuentas.consultar(isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(cuenta)));
 

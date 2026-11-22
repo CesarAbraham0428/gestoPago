@@ -121,9 +121,9 @@ public class PagoServiceImpl implements PagoService {
     @Override
     public ListaGenericResponse<HistorialPagoResponse> historial(Integer usuarioAutenticadoId, int pagina,
             int tamanio) {
-        Page<Pago> aprobados = registro.aprobadosDeUsuario(usuarioAutenticadoId, pagina, tamanio);
+        Page<Pago> pagos = registro.deUsuario(usuarioAutenticadoId, pagina, tamanio);
         Map<String, Optional<Producto>> catalogo = new HashMap<>();
-        return ListaGenericResponse.desde(aprobados.map(pago -> {
+        return ListaGenericResponse.desde(pagos.map(pago -> {
             Optional<Producto> producto = catalogo.computeIfAbsent(pago.getIdProducto() + ":" + pago.getIdServicio(),
                     clave -> productos.findFirstByIdProductoAndIdServicio(pago.getIdProducto(),
                             pago.getIdServicio()));

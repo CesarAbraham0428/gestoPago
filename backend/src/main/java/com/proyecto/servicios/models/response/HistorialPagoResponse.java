@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * Compra aprobada del usuario autenticado. No expone el texto ni la respuesta de GestoPago.
+ * Pago del usuario autenticado en cualquier estado (idTx y numAutorizacion solo si fue aprobado). No expone el texto ni la respuesta de GestoPago.
  * producto y servicio son nulos si el catálogo ya no los contiene; total es monto + comision.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)

@@ -33,7 +33,8 @@ public final class ClienteMapper {
     public static CuentaResponse cuenta(Cuenta cuenta) {
         return new CuentaResponse(
             cuenta.getId(), cuenta.getCliente().getId(), cuenta.getNumeroCuenta(), cuenta.getSaldo(),
-            cuenta.isEstaActiva(), cuenta.getFechaCreacion(), cuenta.getFechaActualizacion()
+            cuenta.isEstaActiva(), cuenta.getFechaCreacion(), cuenta.getFechaActualizacion(),
+            cuenta.getPinBloqueadoHasta()
         );
     }
 

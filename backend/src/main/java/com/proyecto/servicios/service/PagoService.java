@@ -13,6 +13,6 @@ public interface PagoService {
     /** Estado del pago según el registro local; no llama a GestoPago. 404 si no existe o es de otro usuario. */
     ConsultaPagoResponse consultar(String upc, Integer usuarioAutenticadoId);
 
-    /** Pagos aprobados del usuario autenticado, del más reciente al más antiguo. */
+    /** Pagos del usuario autenticado en cualquier estado, del más reciente al más antiguo. */
     ListaGenericResponse<HistorialPagoResponse> historial(Integer usuarioAutenticadoId, int pagina, int tamanio);
 }

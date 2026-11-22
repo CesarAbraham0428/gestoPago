@@ -150,10 +150,10 @@ public class PagoRegistroService {
         return pagos.findByUpcAndUsuarioId(upc, usuarioId);
     }
 
-    /** Pagos aprobados del usuario, del más reciente al más antiguo. */
+    /** Todos los pagos del usuario (en cualquier estado), del más reciente al más antiguo. */
     @Transactional(readOnly = true)
-    public Page<Pago> aprobadosDeUsuario(Integer usuarioId, int pagina, int tamanio) {
-        return pagos.findByUsuarioIdAndEstado(usuarioId, EstadoPago.APROBADO,
+    public Page<Pago> deUsuario(Integer usuarioId, int pagina, int tamanio) {
+        return pagos.findByUsuarioId(usuarioId,
                 PageRequest.of(pagina, tamanio, Sort.by(Sort.Direction.DESC, "id")));
     }
 

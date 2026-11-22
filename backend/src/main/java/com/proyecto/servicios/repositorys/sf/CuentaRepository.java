@@ -37,7 +37,7 @@ public interface CuentaRepository extends JpaRepository<Cuenta, Integer>, JpaSpe
     @Query("""
             select new com.proyecto.servicios.models.response.CuentaResponse(
                 c.id, c.cliente.id, c.numeroCuenta, c.saldo, c.estaActiva,
-                c.fechaCreacion, c.fechaActualizacion)
+                c.fechaCreacion, c.fechaActualizacion, c.pinBloqueadoHasta)
             from Cuenta c
             where (:activa is null or c.estaActiva = :activa)
               and (:saldo is null or c.saldo = :saldo)

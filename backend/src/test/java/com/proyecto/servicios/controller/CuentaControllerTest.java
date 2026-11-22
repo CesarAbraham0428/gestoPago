@@ -49,7 +49,7 @@ class CuentaControllerTest {
     @Test
     void consultaDevuelveSaldoYFechasAdemasDeLaIdentificacionDeCuenta() throws Exception {
         CuentaResponse cuenta = new CuentaResponse(4, 3, NUMERO, new BigDecimal("1250.75"), true,
-                Instant.parse("2026-10-01T12:00:00Z"), Instant.parse("2026-10-02T12:00:00Z"));
+                Instant.parse("2026-10-01T12:00:00Z"), Instant.parse("2026-10-02T12:00:00Z"), null);
         when(service.consultar(any(), eq(7)))
                 .thenReturn(new ListaGenericResponse<>(List.of(cuenta), 0, 20, 1, 1));
 
@@ -99,7 +99,7 @@ class CuentaControllerTest {
     @Test
     void cambioDeEstadoConservaLaOperacionYUsaLaRespuestaExitosa() throws Exception {
         when(service.cambiarEstado(NUMERO, false, 7))
-                .thenReturn(new CuentaResponse(4, 3, NUMERO, BigDecimal.TEN, false, null, null));
+                .thenReturn(new CuentaResponse(4, 3, NUMERO, BigDecimal.TEN, false, null, null, null));
         mvc.perform(patch("/cuentas/estado").principal(usuario).contentType("application/json")
                 .content("{\"numeroCuenta\":\"" + NUMERO + "\",\"activa\":false}"))
                 .andExpect(status().isOk())

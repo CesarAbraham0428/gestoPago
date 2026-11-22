@@ -173,14 +173,14 @@ class PagosYCuentasComplementoTest {
     void lasConsultasDelHistorialSeDelegaAlRepositorio() {
         Pago pago = pagoCon(EstadoPago.APROBADO);
         when(pagos.findByUpcAndUsuarioId("UPC", 7)).thenReturn(Optional.of(pago));
-        when(pagos.findByUsuarioIdAndEstado(any(), any(), any(Pageable.class)))
+        when(pagos.findByUsuarioId(any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(pago)));
         Instant ahora = Instant.parse("2026-11-01T10:00:00Z");
         when(pagos.idsPorConfirmar(ahora, ahora, ahora)).thenReturn(List.of(1, 2));
 
         assertSame(pago, registro.buscarDeUsuario("UPC", 7).orElseThrow());
-        assertEquals(1, registro.aprobadosDeUsuario(7, 2, 10).getContent().size());
-        verify(pagos).findByUsuarioIdAndEstado(7, EstadoPago.APROBADO, PageRequest.of(2, 10,
+        assertEquals(1, registro.deUsuario(7, 2, 10).getContent().size());
+        verify(pagos).findByUsuarioId(7, PageRequest.of(2, 10,
                 org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "id")));
         assertEquals(List.of(1, 2), registro.idsPorConfirmar(ahora, ahora, ahora));
         assertEquals(55, registro.buscarParaConfirmar(55).getId());
