@@ -10,8 +10,14 @@ class Monograma extends StatelessWidget {
   final double tamano;
 
   static const _fondos = [
-    Color(0xFF1F4E5F), Color(0xFF5B3A29), Color(0xFF3D4A7A), Color(0xFF6B2D4A),
-    Color(0xFF2F5D3A), Color(0xFF7A4E12), Color(0xFF4A3A6B), Color(0xFF214E6B),
+    Color(0xFF1F4E5F),
+    Color(0xFF5B3A29),
+    Color(0xFF3D4A7A),
+    Color(0xFF6B2D4A),
+    Color(0xFF2F5D3A),
+    Color(0xFF7A4E12),
+    Color(0xFF4A3A6B),
+    Color(0xFF214E6B),
   ];
 
   String get _iniciales {

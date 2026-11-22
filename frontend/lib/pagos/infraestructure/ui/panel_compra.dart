@@ -7,6 +7,8 @@ import '../../../core/error/app_exception.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/ui/ilustracion.dart';
+import '../../../core/ui/tarjeta_debito.dart';
 import '../../../core/ui/widgets_estado.dart';
 import '../../../productos/domain/entities/producto.dart';
 import '../../application/realizar_compra.dart';
@@ -82,23 +84,41 @@ class _PanelCompraState extends State<PanelCompra> {
     super.dispose();
   }
 
-  Future<void> _cargarCuentas() async {
-    setState(() {
-      _cuentas = null;
-      _errorCuentas = null;
-    });
+  /// Con [silencioso] se refresca sin mostrar el indicador de carga ni perder la
+  /// cuenta elegida, y un fallo no reemplaza lo que ya se ve.
+  Future<void> _cargarCuentas({bool silencioso = false}) async {
+    if (!silencioso) {
+      setState(() {
+        _cuentas = null;
+        _errorCuentas = null;
+      });
+    }
     try {
       final lista = await widget.cuentas.obtenerActivas();
       if (!mounted) return;
+      final elegida = _cuenta?.numeroCuenta;
       setState(() {
         _cuentas = lista;
-        _cuenta = lista.isEmpty ? null : lista.first;
+        _cuenta = lista.isEmpty
+            ? null
+            : lista.firstWhere(
+                (c) => silencioso && c.numeroCuenta == elegida,
+                orElse: () => lista.first,
+              );
       });
     } on AppException catch (e) {
-      if (mounted) setState(() => _errorCuentas = e.message);
+      if (mounted && !silencioso) setState(() => _errorCuentas = e.message);
     } on Object {
-      if (mounted) setState(() => _errorCuentas = 'No pudimos cargar tu cuenta.');
+      if (mounted && !silencioso) {
+        setState(() => _errorCuentas = 'No pudimos cargar tu cuenta.');
+      }
     }
+  }
+
+  /// El servidor bloquea los pagos de la cuenta tras varios PIN incorrectos.
+  DateTime? get _pinBloqueadoHasta {
+    final c = _cuenta;
+    return c != null && c.bloqueoRestante() != null ? c.pinBloqueadoHasta : null;
   }
 
   double? get _montoIngresado =>
@@ -110,6 +130,7 @@ class _PanelCompraState extends State<PanelCompra> {
   }
 
   Future<void> _revisar() async {
+    if (_pinBloqueadoHasta != null) return;
     if (!(_clave.currentState?.validate() ?? false)) return;
     final cuenta = _cuenta;
     final monto = _montoIngresado;
@@ -146,6 +167,8 @@ class _PanelCompraState extends State<PanelCompra> {
       _solicitud = solicitud;
     });
     final resultado = await widget.realizarCompra.ejecutar(solicitud);
+    // Un PIN incorrecto pudo bloquear la cuenta: se consulta antes de mostrar el resultado.
+    if (resultado is CompraRechazada) await _cargarCuentas(silencioso: true);
     if (!mounted) return;
     setState(() {
       _resultado = resultado;
@@ -179,6 +202,8 @@ class _PanelCompraState extends State<PanelCompra> {
         return _VistaResultado(
           resultado: _resultado!,
           solicitud: _solicitud!,
+          pinBloqueadoHasta: _pinBloqueadoHasta,
+          alDesbloquear: () => setState(() {}),
           pagos: widget.pagos,
           alReintentar: () => _volverAlFormulario(),
           alComprarOtro: () => _volverAlFormulario(limpiar: true),
@@ -226,7 +251,13 @@ class _PanelCompraState extends State<PanelCompra> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Comprar', style: tema.titleLarge),
+          Row(
+            children: [
+              const Icon(Icons.shopping_bag_outlined, color: AppColors.marca),
+              const SizedBox(width: 8),
+              Text('Comprar', style: tema.titleLarge),
+            ],
+          ),
           const SizedBox(height: 16),
           if (cuentas.length == 1)
             _CuentaFija(cuenta: cuentas.first)
@@ -311,7 +342,23 @@ class _PanelCompraState extends State<PanelCompra> {
             ),
           ],
           const SizedBox(height: 16),
-          FilledButton(onPressed: _revisar, child: const Text('Revisar compra')),
+          if (_pinBloqueadoHasta case final hasta?) ...[
+            _PinBloqueado(
+              hasta: hasta,
+              alTerminar: () => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: null,
+              icon: const Icon(Icons.lock_outline),
+              label: const Text('Compras bloqueadas'),
+            ),
+          ] else
+            FilledButton.icon(
+              onPressed: _revisar,
+              icon: const Icon(Icons.shopping_cart_checkout),
+              label: const Text('Realizar compra'),
+            ),
         ],
       ),
     );
@@ -324,30 +371,20 @@ class _CuentaFija extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tema = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.superficie,
-        border: Border.all(color: AppColors.linea),
-        borderRadius: BorderRadius.circular(AppTheme.radio),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.account_balance_wallet_outlined, size: 20, color: AppColors.tintaSuave),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Pagas desde ${cuentaEnmascarada(cuenta.numeroCuenta)}',
-              style: tema.bodyMedium,
-            ),
-          ),
-          Text(
-            formatoMoneda(cuenta.saldo),
-            style: tema.titleMedium?.copyWith(fontFeatures: cifrasTabulares),
-          ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Pagas desde ${cuentaEnmascarada(cuenta.numeroCuenta)}',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 10),
+        TarjetaDebito(
+          numeroCuenta: cuenta.numeroCuenta,
+          saldo: cuenta.saldo,
+          activa: cuenta.activa,
+        ),
+      ],
     );
   }
 }
@@ -441,7 +478,17 @@ class _DialogoConfirmacionState extends State<_DialogoConfirmacion> {
     final total = widget.monto + p.comision;
     final tema = Theme.of(context).textTheme;
     return AlertDialog(
-      title: const Text('Confirma tu compra'),
+      title: const Row(
+        children: [
+          IconoEnRecuadro(
+            icono: Icons.verified_user_outlined,
+            color: AppColors.marca,
+            fondo: AppColors.marcaTenue,
+          ),
+          SizedBox(width: 12),
+          Expanded(child: Text('Confirma tu compra')),
+        ],
+      ),
       content: SizedBox(
         width: 400,
         child: SingleChildScrollView(
@@ -451,21 +498,71 @@ class _DialogoConfirmacionState extends State<_DialogoConfirmacion> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                FilaDato(etiqueta: 'Producto', valor: p.nombre),
-                FilaDato(etiqueta: 'Servicio', valor: p.servicio),
-                if (widget.telefono != null)
-                  FilaDato(etiqueta: 'Celular', valor: formatoTelefono(widget.telefono!)),
-                if (widget.referencia != null)
-                  FilaDato(etiqueta: 'Referencia', valor: widget.referencia!),
-                FilaDato(etiqueta: 'Importe', valor: formatoMoneda(widget.monto)),
-                if (p.comision > 0)
-                  FilaDato(etiqueta: 'Comisión', valor: formatoMoneda(p.comision)),
-                FilaDato(etiqueta: 'Total', valor: formatoMoneda(total), destacado: true),
-                FilaDato(
-                  etiqueta: 'Cuenta',
-                  valor: cuentaEnmascarada(widget.cuenta.numeroCuenta),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.papel,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.lineaSuave),
+                  ),
+                  child: Column(
+                    children: [
+                      FilaDato(
+                        icono: Icons.shopping_bag_outlined,
+                        etiqueta: 'Producto',
+                        valor: p.nombre,
+                      ),
+                      FilaDato(
+                        icono: Icons.storefront_outlined,
+                        etiqueta: 'Servicio',
+                        valor: p.servicio,
+                      ),
+                      if (widget.telefono != null)
+                        FilaDato(
+                          icono: Icons.smartphone_outlined,
+                          etiqueta: 'Celular',
+                          valor: formatoTelefono(widget.telefono!),
+                        ),
+                      if (widget.referencia != null)
+                        FilaDato(
+                          icono: Icons.tag,
+                          etiqueta: 'Referencia',
+                          valor: widget.referencia!,
+                        ),
+                      FilaDato(
+                        icono: Icons.payments_outlined,
+                        etiqueta: 'Importe',
+                        valor: formatoMoneda(widget.monto),
+                      ),
+                      if (p.comision > 0)
+                        FilaDato(
+                          icono: Icons.percent,
+                          etiqueta: 'Comisión',
+                          valor: formatoMoneda(p.comision),
+                        ),
+                      FilaDato(
+                        icono: Icons.account_balance_wallet_outlined,
+                        etiqueta: 'Cuenta',
+                        valor: cuentaEnmascarada(widget.cuenta.numeroCuenta),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.marcaTenue,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: FilaDato(
+                    icono: Icons.receipt_long_outlined,
+                    etiqueta: 'Total',
+                    valor: formatoMoneda(total),
+                    destacado: true,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _pin,
                   autofocus: true,
@@ -482,6 +579,7 @@ class _DialogoConfirmacionState extends State<_DialogoConfirmacion> {
                   decoration: InputDecoration(
                     labelText: 'PIN de autorización',
                     helperText: 'De 4 a 6 dígitos',
+                    prefixIcon: const Icon(Icons.lock_outline, color: AppColors.marca),
                     suffixIcon: IconButton(
                       tooltip: _ocultar ? 'Mostrar PIN' : 'Ocultar PIN',
                       icon: Icon(_ocultar ? Icons.visibility_outlined : Icons.visibility_off_outlined),
@@ -491,9 +589,18 @@ class _DialogoConfirmacionState extends State<_DialogoConfirmacion> {
                   validator: ValidadoresCompra.pin,
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Al pagar, ${formatoMoneda(total)} se descuentan de tu saldo.',
-                  style: tema.bodySmall,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline, size: 16, color: AppColors.tintaSuave),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Al pagar, ${formatoMoneda(total)} se descuentan de tu saldo.',
+                        style: tema.bodySmall,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -505,11 +612,206 @@ class _DialogoConfirmacionState extends State<_DialogoConfirmacion> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancelar'),
         ),
-        FilledButton(
+        FilledButton.icon(
           onPressed: _confirmar,
-          child: Text('Pagar ${formatoMoneda(total)}'),
+          icon: const Icon(Icons.lock_outline, size: 18),
+          label: Text('Pagar ${formatoMoneda(total)}'),
         ),
       ],
+    );
+  }
+}
+
+/// Compra rechazada: qué pasó y, sobre todo, que no se cobró nada.
+class _Rechazo extends StatelessWidget {
+  const _Rechazo({required this.mensaje, required this.alReintentar});
+  final String mensaje;
+  final VoidCallback alReintentar;
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context).textTheme;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+        decoration: BoxDecoration(
+          color: AppColors.rechazoFondo.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.rechazo.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Center(
+              child: Ilustracion(
+                icono: Icons.close_rounded,
+                color: AppColors.rechazo,
+                fondo: AppColors.rechazoFondo,
+                tamano: 104,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Compra rechazada',
+              textAlign: TextAlign.center,
+              style: tema.titleLarge?.copyWith(color: AppColors.rechazo),
+            ),
+            const SizedBox(height: 6),
+            Text(mensaje, textAlign: TextAlign.center, style: tema.bodyMedium),
+            const SizedBox(height: 14),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppColors.exitoFondo,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.verified_user_outlined, size: 16, color: AppColors.exito),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'No se hizo ningún cargo a tu cuenta.',
+                        style: tema.bodySmall?.copyWith(
+                          color: AppColors.exito,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: alReintentar,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Corregir y reintentar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// PIN bloqueado por intentos fallidos: explica el bloqueo y cuenta hacia atrás
+/// hasta que se pueda volver a pagar; entonces avisa con [alTerminar].
+class _PinBloqueado extends StatefulWidget {
+  const _PinBloqueado({required this.hasta, required this.alTerminar});
+  final DateTime hasta;
+  final VoidCallback alTerminar;
+
+  @override
+  State<_PinBloqueado> createState() => _PinBloqueadoState();
+}
+
+class _PinBloqueadoState extends State<_PinBloqueado> {
+  Timer? _reloj;
+  late Duration _resta;
+
+  @override
+  void initState() {
+    super.initState();
+    _resta = _calcular();
+    _reloj = Timer.periodic(const Duration(seconds: 1), (_) {
+      final resta = _calcular();
+      if (resta <= Duration.zero) {
+        _reloj?.cancel();
+        widget.alTerminar();
+      } else {
+        setState(() => _resta = resta);
+      }
+    });
+  }
+
+  Duration _calcular() => widget.hasta.difference(DateTime.now());
+
+  @override
+  void dispose() {
+    _reloj?.cancel();
+    super.dispose();
+  }
+
+  String get _cuenta {
+    final s = _resta.inSeconds < 0 ? 0 : _resta.inSeconds;
+    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
+  }
+
+  String get _hora {
+    final h = widget.hasta.toLocal();
+    return '${h.hour.toString().padLeft(2, '0')}:${h.minute.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context).textTheme;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+        decoration: BoxDecoration(
+          color: AppColors.coralTenue.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.coral.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Center(
+              child: Ilustracion(
+                icono: Icons.lock_clock_outlined,
+                color: AppColors.coral,
+                fondo: AppColors.coralTenue,
+                tamano: 104,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'PIN bloqueado temporalmente',
+              textAlign: TextAlign.center,
+              style: tema.titleLarge?.copyWith(color: AppColors.coral),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Por tu seguridad bloqueamos las compras de esta cuenta tras '
+              'varios intentos con un PIN incorrecto. No se hizo ningún cargo.',
+              textAlign: TextAlign.center,
+              style: tema.bodyMedium,
+            ),
+            const SizedBox(height: 14),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.timer_outlined, size: 20, color: AppColors.coral),
+                    const SizedBox(width: 8),
+                    Text(
+                      _cuenta,
+                      style: tema.titleLarge?.copyWith(fontFeatures: cifrasTabulares),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Podrás volver a comprar a las $_hora.',
+              textAlign: TextAlign.center,
+              style: tema.bodySmall,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -519,6 +821,8 @@ class _VistaResultado extends StatefulWidget {
   const _VistaResultado({
     required this.resultado,
     required this.solicitud,
+    required this.pinBloqueadoHasta,
+    required this.alDesbloquear,
     required this.pagos,
     required this.alReintentar,
     required this.alComprarOtro,
@@ -528,6 +832,10 @@ class _VistaResultado extends StatefulWidget {
 
   final ResultadoCompra resultado;
   final SolicitudCompra solicitud;
+
+  /// Hasta cuándo está bloqueado el PIN de la cuenta (si lo está).
+  final DateTime? pinBloqueadoHasta;
+  final VoidCallback alDesbloquear;
   final PagosRepository pagos;
   final VoidCallback alReintentar;
   final VoidCallback alComprarOtro;
@@ -580,16 +888,22 @@ class _VistaResultadoState extends State<_VistaResultado> {
           ),
         ],
       ),
-      CompraRechazada(:final mensaje) => AvisoEstado(
-        tono: Tono.rechazo,
-        icono: Icons.cancel_outlined,
-        titulo: 'Compra rechazada',
-        texto: '$mensaje\nNo se hizo ningún cargo a tu cuenta.',
-        accion: FilledButton(
-          onPressed: widget.alReintentar,
-          child: const Text('Corregir y reintentar'),
-        ),
-      ),
+      CompraRechazada(:final mensaje) => widget.pinBloqueadoHasta == null
+          ? _Rechazo(mensaje: mensaje, alReintentar: widget.alReintentar)
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _PinBloqueado(
+                  hasta: widget.pinBloqueadoHasta!,
+                  alTerminar: widget.alDesbloquear,
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: widget.alReintentar,
+                  child: const Text('Entendido'),
+                ),
+              ],
+            ),
       CompraPendiente(:final mensaje, :final referencia) => _pendiente(mensaje, referencia),
       ErrorDeComunicacion(:final mensaje, :final resultadoIncierto) => AvisoEstado(
         tono: resultadoIncierto ? Tono.pendiente : Tono.aviso,

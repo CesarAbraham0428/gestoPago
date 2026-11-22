@@ -58,21 +58,32 @@ class DetalleProducto extends StatelessWidget {
         _Precio(producto: producto),
         if (_condiciones.isNotEmpty) ...[
           const SizedBox(height: 16),
-          for (final linea in _condiciones)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 2),
-                    child: Icon(Icons.info_outline, size: 16, color: AppColors.tintaSuave),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(linea, style: tema.bodySmall)),
-                ],
-              ),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.avisoFondo.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: Column(
+              children: [
+                for (final linea in _condiciones)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Icon(Icons.info_outline, size: 16, color: AppColors.aviso),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(linea, style: tema.bodySmall)),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
         const SizedBox(height: 24),
         if (producto.disponibleParaCompra)
@@ -129,13 +140,16 @@ class _Precio extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.superficie,
-        border: Border.all(color: AppColors.linea),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.marcaTenue,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          const Padding(
+            padding: EdgeInsets.only(right: 14, bottom: 4),
+            child: Icon(Icons.sell_outlined, color: AppColors.marca, size: 28),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -144,13 +158,20 @@ class _Precio extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   valor,
-                  style: tema.headlineMedium?.copyWith(fontFeatures: cifrasTabulares),
+                  style: tema.headlineMedium?.copyWith(
+                    fontFeatures: cifrasTabulares,
+                    color: AppColors.marcaOscura,
+                  ),
                 ),
               ],
             ),
           ),
           Flexible(
-            child: Text(nota, style: tema.bodySmall, textAlign: TextAlign.right),
+            child: Text(
+              nota,
+              style: tema.bodySmall?.copyWith(color: AppColors.marcaOscura),
+              textAlign: TextAlign.right,
+            ),
           ),
         ],
       ),

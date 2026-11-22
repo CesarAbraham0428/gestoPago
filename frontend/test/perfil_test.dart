@@ -269,13 +269,20 @@ void main() {
       expect(find.text('Datos personales'), findsOneWidget);
     });
 
-    testWidgets('cuentas bancarias: saldo total y estado', (tester) async {
+    testWidgets('cuenta bancaria: saldo oculto por defecto y estado', (tester) async {
       await montar(tester, CuentasBancariasPage(controller: PerfilController(PerfilFalso())));
       await tester.pumpAndSettle();
       expect(find.text('Cuenta ${cuentaEnmascarada('123456789012345678')}'), findsOneWidget);
+      expect(find.text('1234 5678 9012 3456 78'), findsWidgets);
       expect(find.text('Activa'), findsOneWidget);
       expect(find.text('Inactiva'), findsOneWidget);
-      expect(find.text(r'$900.00'), findsWidgets); // solo suma cuentas activas
+      expect(find.text(r'$900.00'), findsNothing); // el saldo arranca oculto
+      await tester.tap(find.byTooltip('Mostrar saldo').first);
+      await tester.pump();
+      expect(find.text(r'$900.00'), findsOneWidget);
+      await tester.tap(find.byTooltip('Ocultar saldo'));
+      await tester.pump();
+      expect(find.text(r'$900.00'), findsNothing);
     });
 
     testWidgets('cuentas bancarias: copiar número de cuenta', (tester) async {
@@ -394,6 +401,7 @@ void main() {
       GoRouter.of(tester.element(find.byType(Scaffold).first)).go('/cuentas');
       await tester.pumpAndSettle();
       expect(find.text('Cuenta ${cuentaEnmascarada('123456789012345678')}'), findsOneWidget);
+      expect(find.text('1234 5678 9012 3456 78'), findsWidgets);
 
       // Al cerrar sesión se descartan los datos del perfil.
       await deps.sesion.cerrarSesion();

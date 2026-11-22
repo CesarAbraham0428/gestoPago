@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../authentication/infraestructure/ui/login_page.dart';
+import '../authentication/infraestructure/ui/registro_page.dart';
 import '../pagos/infraestructure/ui/historial_page.dart';
 import '../pagos/infraestructure/ui/panel_compra.dart';
 import '../perfil/infraestructure/ui/perfil_page.dart';
@@ -16,15 +17,25 @@ GoRouter crearRouter(Dependencias deps, ConstructorShell shell) {
     initialLocation: '/catalogo',
     refreshListenable: deps.sesion,
     redirect: (context, state) {
-      final enLogin = state.uri.path == '/login';
-      if (!deps.sesion.autenticado) return enLogin ? null : '/login';
-      if (enLogin || state.uri.path == '/') return '/catalogo';
+      final enAcceso = state.uri.path == '/login' || state.uri.path == '/registro';
+      if (!deps.sesion.autenticado) return enAcceso ? null : '/login';
+      if (enAcceso || state.uri.path == '/') return '/catalogo';
       return null;
     },
     routes: [
       GoRoute(
         path: '/login',
-        builder: (context, state) => LoginPage(sesion: deps.sesion),
+        builder: (context, state) => LoginPage(
+          sesion: deps.sesion,
+          alCrearCuenta: () => context.go('/registro'),
+        ),
+      ),
+      GoRoute(
+        path: '/registro',
+        builder: (context, state) => RegistroPage(
+          registro: deps.registro,
+          alVolver: () => context.go('/login'),
+        ),
       ),
       ShellRoute(
         builder: shell,

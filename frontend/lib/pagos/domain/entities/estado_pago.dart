@@ -22,7 +22,19 @@ class EstadoPago {
   final int? idTx;
   final String? numAutorizacion;
 
+  CategoriaPago get categoria => categoriaDeEstado(estado);
+
   bool get aprobado => estado == 'APROBADO';
   bool get rechazado => estado == 'RECHAZADO';
   bool get enProceso => estado == 'PENDIENTE' || estado == 'EN_REVISION';
 }
+
+/// Los cuatro estados del servicio agrupados como los ve el usuario:
+/// PENDIENTE y EN_REVISION son lo mismo para él ("en proceso").
+enum CategoriaPago { aprobado, enProceso, rechazado }
+
+CategoriaPago categoriaDeEstado(String estado) => switch (estado) {
+  'APROBADO' => CategoriaPago.aprobado,
+  'RECHAZADO' => CategoriaPago.rechazado,
+  _ => CategoriaPago.enProceso,
+};

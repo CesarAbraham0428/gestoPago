@@ -74,7 +74,7 @@ void main() {
       tester.enterText(campo('Número de celular'), '5512345678');
 
   Future<void> revisar(WidgetTester tester) async {
-    await tester.tap(find.text('Revisar compra'));
+    await tester.tap(find.text('Realizar compra'));
     await tester.pumpAndSettle();
   }
 
@@ -112,7 +112,7 @@ void main() {
       expect(find.text('No pudimos cargar tu cuenta.'), findsOneWidget);
       await tester.tap(find.text('Reintentar'));
       await tester.pumpAndSettle();
-      expect(find.text('Revisar compra'), findsOneWidget);
+      expect(find.text('Realizar compra'), findsOneWidget);
     });
 
     testWidgets('cerrar el panel antes de que lleguen las cuentas no falla', (tester) async {
@@ -143,7 +143,7 @@ void main() {
       expect(find.textContaining('Pagas desde'), findsOneWidget);
       expect(find.textContaining('50.00'), findsWidgets);
 
-      await tester.tap(find.text('Revisar compra'));
+      await tester.tap(find.text('Realizar compra'));
       await tester.pump();
       expect(find.text('Escribe el número de celular.'), findsOneWidget);
     });
@@ -180,7 +180,7 @@ void main() {
       expect(find.text('55 1234 5678'), findsOneWidget);
       await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
-      expect(find.text('Revisar compra'), findsOneWidget);
+      expect(find.text('Realizar compra'), findsOneWidget);
       expect(e.confirmadas, 0);
     });
 
@@ -222,7 +222,7 @@ void main() {
       expect(e.verHistorial, 1);
       await tester.tap(find.text('Comprar otro'));
       await tester.pumpAndSettle();
-      expect(find.text('Revisar compra'), findsOneWidget);
+      expect(find.text('Realizar compra'), findsOneWidget);
     });
 
     testWidgets('mientras se procesa muestra el aviso de espera', (tester) async {
@@ -257,6 +257,76 @@ void main() {
       expect(find.text('5512345678'), findsOneWidget);
     });
 
+    testWidgets('cuenta con el PIN bloqueado: no deja comprar y avisa', (tester) async {
+      final bloqueada = Cuenta(
+        id: 1,
+        numeroCuenta: '123456789012345678',
+        saldo: 1000,
+        activa: true,
+        pinBloqueadoHasta: DateTime.now().add(const Duration(minutes: 15)),
+      );
+      await abrir(tester, recarga, cuentas: () async => [bloqueada]);
+      await tester.pumpAndSettle();
+      expect(find.text('PIN bloqueado temporalmente'), findsOneWidget);
+      expect(find.text('Compras bloqueadas'), findsOneWidget);
+      expect(find.text('Realizar compra'), findsNothing);
+      expect(find.textContaining('Podrás volver a comprar a las'), findsOneWidget);
+    });
+
+    testWidgets('el bloqueo termina solo y vuelve a permitir comprar', (tester) async {
+      final casiLibre = Cuenta(
+        id: 1,
+        numeroCuenta: '123456789012345678',
+        saldo: 1000,
+        activa: true,
+        pinBloqueadoHasta: DateTime.now().add(const Duration(milliseconds: 300)),
+      );
+      await abrir(tester, recarga, cuentas: () async => [casiLibre]);
+      await tester.pumpAndSettle();
+      expect(find.text('Compras bloqueadas'), findsOneWidget);
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 400)));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Realizar compra'), findsOneWidget);
+      expect(find.text('Compras bloqueadas'), findsNothing);
+    });
+
+    testWidgets('el PIN que se bloquea al pagar muestra el bloqueo y no deja reintentar', (tester) async {
+      final pagos = PagosFalso()
+        ..alPagar = (_) async => throw const ApiException(
+          422,
+          'PIN incorrecto; se bloqueó por 15 minutos por intentos fallidos',
+        );
+      var consultas = 0;
+      await abrir(
+        tester,
+        recarga,
+        pagos: pagos,
+        cuentas: () async {
+          consultas++;
+          if (consultas == 1) return [_cuenta1];
+          return [
+            Cuenta(
+              id: 1,
+              numeroCuenta: _cuenta1.numeroCuenta,
+              saldo: 1000,
+              activa: true,
+              pinBloqueadoHasta: DateTime.now().add(const Duration(minutes: 15)),
+            ),
+          ];
+        },
+      );
+      await tester.pumpAndSettle();
+      await ponerCelular(tester);
+      await revisar(tester);
+      await pagarConPin(tester);
+      expect(find.text('PIN bloqueado temporalmente'), findsOneWidget);
+      expect(find.text('Corregir y reintentar'), findsNothing);
+      await tester.tap(find.text('Entendido'));
+      await tester.pumpAndSettle();
+      expect(find.text('Compras bloqueadas'), findsOneWidget);
+      expect(find.text('Realizar compra'), findsNothing);
+    });
+
     testWidgets('error de comunicación incierto y no incierto', (tester) async {
       final pagos = PagosFalso()..alPagar = (_) async => throw const ConexionException();
       final e = await abrir(tester, recarga, pagos: pagos);
@@ -278,7 +348,7 @@ void main() {
       expect(find.text('No se pudo completar la compra'), findsOneWidget);
       await tester.tap(find.text('Intentar de nuevo'));
       await tester.pumpAndSettle();
-      expect(find.text('Revisar compra'), findsOneWidget);
+      expect(find.text('Realizar compra'), findsOneWidget);
     });
 
     testWidgets('si se cierra el panel durante el pago no falla', (tester) async {
@@ -334,7 +404,7 @@ void main() {
       expect(find.textContaining('saldo fue devuelto'), findsOneWidget);
       await tester.tap(find.text('Volver al catálogo'));
       await tester.pumpAndSettle();
-      expect(find.text('Revisar compra'), findsOneWidget);
+      expect(find.text('Realizar compra'), findsOneWidget);
     });
 
     testWidgets('consulta en proceso, con espera y luego error', (tester) async {

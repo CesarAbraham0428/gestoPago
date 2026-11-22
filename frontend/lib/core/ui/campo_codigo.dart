@@ -94,7 +94,8 @@ class _CampoCodigoState extends State<CampoCodigo> {
                           Expanded(
                             child: _Cuadro(
                               digito: i < texto.length ? texto[i] : '',
-                              activo: _foco.hasFocus &&
+                              activo:
+                                  _foco.hasFocus &&
                                   widget.enabled &&
                                   (i == texto.length ||
                                       (texto.length == widget.longitud &&
@@ -126,7 +127,9 @@ class _CampoCodigoState extends State<CampoCodigo> {
                           // (Ctrl+V en web y el menú "Pegar" en móvil).
                           enableInteractiveSelection: true,
                           inputFormatters: [FormatoCodigo(widget.longitud)],
-                          decoration: const InputDecoration.collapsed(hintText: ''),
+                          decoration: const InputDecoration.collapsed(
+                            hintText: '',
+                          ),
                           onChanged: estado.didChange,
                           onSubmitted: (_) => widget.alEnviar?.call(),
                         ),
@@ -138,7 +141,10 @@ class _CampoCodigoState extends State<CampoCodigo> {
             ),
             if (error != null) ...[
               const SizedBox(height: 8),
-              Text(error, style: tema.bodySmall?.copyWith(color: AppColors.rechazo)),
+              Text(
+                error,
+                style: tema.bodySmall?.copyWith(color: AppColors.rechazo),
+              ),
             ],
           ],
         );
@@ -158,7 +164,10 @@ class FormatoCodigo extends TextInputFormatter {
   static String _digitos(String texto) => texto.replaceAll(RegExp(r'\D'), '');
 
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue anterior, TextEditingValue nuevo) {
+  TextEditingValue formatEditUpdate(
+    TextEditingValue anterior,
+    TextEditingValue nuevo,
+  ) {
     var digitos = _digitos(nuevo.text);
     if (digitos.length > longitud) {
       final insertados = _digitos(_textoInsertado(anterior, nuevo));
@@ -174,7 +183,10 @@ class FormatoCodigo extends TextInputFormatter {
 
   /// Lo que la edición agregó: el texto nuevo sin el prefijo y el sufijo que
   /// ya estaban en el anterior.
-  static String _textoInsertado(TextEditingValue anterior, TextEditingValue nuevo) {
+  static String _textoInsertado(
+    TextEditingValue anterior,
+    TextEditingValue nuevo,
+  ) {
     final a = anterior.text;
     final n = nuevo.text;
     var inicio = 0;
@@ -227,10 +239,8 @@ class _Cuadro extends StatelessWidget {
       ),
       child: Text(
         digito,
-        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: AppColors.tinta,
-              fontWeight: FontWeight.w600,
-            ),
+        style: Theme.of(context).textTheme.headlineSmall
+            ?.copyWith(color: AppColors.tinta, fontWeight: FontWeight.w600),
       ),
     );
   }

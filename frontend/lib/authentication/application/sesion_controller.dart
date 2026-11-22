@@ -14,10 +14,7 @@ import '../domain/ports/autenticacion_gateway.dart';
 /// El servidor guarda una sola sesión por usuario: cerrar sesión la invalida allí
 /// además de borrar el token de este dispositivo.
 class SesionController extends ChangeNotifier {
-  SesionController({
-    required this._gateway,
-    required this._almacen,
-  });
+  SesionController({required this._gateway, required this._almacen});
 
   final AutenticacionGateway _gateway;
   final AlmacenSesion _almacen;
@@ -112,7 +109,9 @@ class SesionController extends ChangeNotifier {
     _sesion = sesion;
     _temporizador?.cancel();
     _temporizador = Timer(sesion.tiempoRestante, () {
-      unawaited(_cerrar('Tu sesión expiró por seguridad. Inicia sesión de nuevo.'));
+      unawaited(
+        _cerrar('Tu sesión expiró por seguridad. Inicia sesión de nuevo.'),
+      );
     });
   }
 

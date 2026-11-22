@@ -220,6 +220,26 @@ void main() {
       final s = _Servidor({'datos': 'nada'});
       expect(await ApiCuentasRepository(s.api).obtenerActivas(), isEmpty);
     });
+
+    test('lee el bloqueo del PIN y ignora fechas ilegibles', () async {
+      final s = _Servidor({
+        'datos': [
+          {
+            'id': 1,
+            'numeroCuenta': 'A',
+            'saldo': 10,
+            'estaActiva': true,
+            'pinBloqueadoHasta': '2026-03-05T12:15:00Z',
+          },
+          {'id': 2, 'numeroCuenta': 'B', 'saldo': 5, 'estaActiva': true, 'pinBloqueadoHasta': 'ayer'},
+          {'id': 3, 'numeroCuenta': 'C', 'saldo': 5, 'estaActiva': true},
+        ],
+      });
+      final cuentas = await ApiCuentasRepository(s.api).obtenerActivas();
+      expect(cuentas[0].pinBloqueadoHasta, DateTime.utc(2026, 3, 5, 12, 15));
+      expect(cuentas[1].pinBloqueadoHasta, isNull);
+      expect(cuentas[2].pinBloqueadoHasta, isNull);
+    });
   });
 
   group('ApiCatalogoRepository', () {
@@ -358,6 +378,7 @@ void main() {
             'telefono': 'T',
             'idTx': 3,
             'numAutorizacion': 'A',
+            'estado': 'RECHAZADO',
           },
           {'upc': 'U2', 'fecha': '2026-02-04T10:00:00', 'monto': 5},
           {'upc': 'U3', 'fecha': 'no-fecha', 'monto': 5},
@@ -373,6 +394,8 @@ void main() {
       expect(p.elementos.map((c) => c.upc), ['U1', 'U2']);
       expect(p.elementos.last.total, 5);
       expect(p.elementos.last.comision, 0);
+      expect(p.elementos.first.estado, 'RECHAZADO');
+      expect(p.elementos.last.estado, 'APROBADO'); // sin dato se asume aprobado
       expect(p.pagina, 1);
       expect(p.totalPaginas, 4);
       expect(p.totalElementos, 40);

@@ -133,8 +133,7 @@ Perfil perfilDesdeJson(Map<String, dynamic> j) {
                   id: id,
                   numeroCuenta: numero,
                   saldo: saldo.toDouble(),
-                  activa: c['estaActiva'] == true,
-                );
+                  activa: c['estaActiva'] == true,                );
               })
               .whereType<Cuenta>()
               .toList(growable: false)

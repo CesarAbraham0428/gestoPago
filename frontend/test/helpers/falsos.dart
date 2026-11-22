@@ -163,6 +163,7 @@ CompraHistorial compra(
   String? referencia,
   double monto = 50,
   double comision = 0,
+  String estado = 'APROBADO',
 }) => CompraHistorial(
   upc: upc,
   producto: producto,
@@ -175,6 +176,7 @@ CompraHistorial compra(
   referencia: referencia,
   idTx: 77,
   numAutorizacion: 'AUT1',
+  estado: estado,
 );
 
 Pagina<CompraHistorial> pagina(

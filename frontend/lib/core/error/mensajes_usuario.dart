@@ -28,6 +28,11 @@ abstract final class MensajesUsuario {
   static const demasiadosCodigos =
       'Demasiados códigos incorrectos. Vuelve a iniciar sesión para recibir uno nuevo.';
 
+  // Registro
+  static const cuentaYaExiste =
+      'Ya existe una cuenta con alguno de estos datos (correo, CURP o RFC). '
+      'Inicia sesión o revisa lo que escribiste.';
+
   /// Pistas de que un texto del servidor es técnico y no debe llegar al usuario.
   static final _tecnico = RegExp(
     r'campo|filtro|json|xml|solicitud inválida|ruta|método http|tipo de contenido|'

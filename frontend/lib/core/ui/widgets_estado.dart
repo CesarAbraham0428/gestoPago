@@ -34,10 +34,8 @@ class EtiquetaEstado extends StatelessWidget {
           ],
           Text(
             texto,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: tono.texto,
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: tono.texto, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -104,7 +102,11 @@ class VistaMensaje extends StatelessWidget {
             children: [
               Ilustracion(icono: icono, color: color, fondo: fondo),
               const SizedBox(height: 20),
-              Text(titulo, style: tema.titleMedium, textAlign: TextAlign.center),
+              Text(
+                titulo,
+                style: tema.titleMedium,
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 6),
               Text(
                 detalle,
@@ -134,11 +136,15 @@ class FilaDato extends StatelessWidget {
     required this.etiqueta,
     required this.valor,
     this.destacado = false,
+    this.icono,
   });
 
   final String etiqueta;
   final String valor;
   final bool destacado;
+
+  /// Icono opcional antes de la etiqueta.
+  final IconData? icono;
 
   @override
   Widget build(BuildContext context) {
@@ -148,6 +154,10 @@ class FilaDato extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (icono != null) ...[
+            Icon(icono, size: 18, color: AppColors.marca),
+            const SizedBox(width: 10),
+          ],
           Expanded(
             flex: 4,
             child: Text(
@@ -200,7 +210,11 @@ class AvisoEstado extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: tono.fondo,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(14),
+          // Con título es un resultado destacado; sin él, un aviso en línea compacto.
+          border: titulo == null
+              ? null
+              : Border.all(color: tono.texto.withValues(alpha: 0.22)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,20 +222,43 @@ class AvisoEstado extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icono, color: tono.texto, size: 20),
-                const SizedBox(width: 10),
+                if (titulo == null)
+                  Icon(icono, color: tono.texto, size: 20)
+                else
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icono, color: tono.texto, size: 20),
+                  ),
+                SizedBox(width: titulo == null ? 10 : 12),
                 Expanded(
                   child: titulo == null
-                      ? Text(texto, style: tema.bodyMedium?.copyWith(color: tono.texto))
-                      : Text(titulo!, style: tema.titleMedium?.copyWith(color: tono.texto)),
+                      ? Text(
+                          texto,
+                          style: tema.bodyMedium?.copyWith(color: tono.texto),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            titulo!,
+                            style: tema.titleMedium?.copyWith(
+                              color: tono.texto,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                 ),
               ],
             ),
             if (titulo != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(texto, style: tema.bodyMedium),
             ],
-            if (accion != null) ...[const SizedBox(height: 12), accion!],
+            if (accion != null) ...[const SizedBox(height: 14), accion!],
           ],
         ),
       ),

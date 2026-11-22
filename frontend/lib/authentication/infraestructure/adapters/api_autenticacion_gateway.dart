@@ -40,7 +40,10 @@ class ApiAutenticacionGateway implements AutenticacionGateway {
       // Un correo inexistente y una contraseña errónea se ven igual: el
       // mensaje no confirma si la cuenta existe.
       throw switch (e.statusCode) {
-        400 || 401 || 404 => ApiException(e.statusCode, MensajesUsuario.credencialesIncorrectas),
+        400 || 401 || 404 => ApiException(
+          e.statusCode,
+          MensajesUsuario.credencialesIncorrectas,
+        ),
         403 => ApiException(e.statusCode, MensajesUsuario.cuentaNoDisponible),
         _ => e,
       };
@@ -79,9 +82,13 @@ class ApiAutenticacionGateway implements AutenticacionGateway {
     } on ApiException catch (e) {
       if (e.statusCode == 409) throw SesionActivaException(e.message);
       throw switch (e.statusCode) {
-        401 when e.message.contains('Demasiados') =>
-          const ApiException(401, MensajesUsuario.demasiadosCodigos),
-        400 || 401 || 404 => ApiException(e.statusCode, MensajesUsuario.codigoIncorrecto),
+        401 when e.message.contains('Demasiados') => const ApiException(
+          401,
+          MensajesUsuario.demasiadosCodigos,
+        ),
+        400 ||
+        401 ||
+        404 => ApiException(e.statusCode, MensajesUsuario.codigoIncorrecto),
         403 => ApiException(e.statusCode, MensajesUsuario.cuentaNoDisponible),
         _ => e,
       };

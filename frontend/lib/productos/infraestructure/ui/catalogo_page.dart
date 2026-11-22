@@ -87,9 +87,9 @@ class _CatalogoPageState extends State<CatalogoPage> {
                   : SingleChildScrollView(
                       padding: const EdgeInsets.all(32),
                       child: Align(
-                        alignment: Alignment.topLeft,
+                        alignment: Alignment.topCenter,
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 560),
+                          constraints: const BoxConstraints(maxWidth: 640),
                           child: DetalleProducto(
                             key: ValueKey(seleccionado.clave),
                             producto: seleccionado,
@@ -134,7 +134,7 @@ class _DetalleAngosto extends StatelessWidget {
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
+          constraints: const BoxConstraints(maxWidth: 640),
           child: DetalleProducto(
             key: ValueKey(producto!.clave),
             producto: producto!,

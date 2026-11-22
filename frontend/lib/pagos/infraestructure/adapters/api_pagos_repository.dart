@@ -23,7 +23,7 @@ import '../../domain/ports/pagos_repository.dart';
 ///   200 -> datos: {upc,estado,mensaje,monto,comision,referencia,idTx?,numAutorizacion?}
 ///   404 no existe o es de otro usuario
 ///
-/// GET /pagos?pagina=0&tamanio=20 (Bearer)  -> compras aprobadas del usuario
+/// GET /pagos?pagina=0&tamanio=20 (Bearer)  -> pagos del usuario en cualquier estado
 ///   200 -> datos: {datos:[...],pagina,tamanoPagina,totalElementos,totalPaginas}
 class ApiPagosRepository implements PagosRepository {
   ApiPagosRepository(this._api);
@@ -130,6 +130,7 @@ class ApiPagosRepository implements PagosRepository {
       telefono: j['telefono'] as String?,
       idTx: (j['idTx'] as num?)?.toInt(),
       numAutorizacion: j['numAutorizacion'] as String?,
+      estado: (j['estado'] as String?) ?? 'APROBADO',
     );
   }
 

@@ -34,7 +34,7 @@ class AppColors {
   static const ciruela = Color(0xFF9B4F96);
   static const ciruelaTenue = Color(0xFFF3E3F2);
 
-  static const exito =Color(0xFF14724F);
+  static const exito = Color(0xFF14724F);
   static const exitoFondo = Color(0xFFDDEFE6);
   static const pendiente = Color(0xFF8A5A00);
   static const pendienteFondo = Color(0xFFFBEBC8);

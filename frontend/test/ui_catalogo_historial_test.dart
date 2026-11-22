@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/core/error/app_exception.dart';
+import 'package:frontend/core/ui/widgets_estado.dart';
 import 'package:frontend/pagos/application/historial_controller.dart';
 import 'package:frontend/pagos/domain/entities/compra_historial.dart';
+import 'package:frontend/pagos/domain/entities/estado_pago.dart';
 import 'package:frontend/pagos/infraestructure/ui/historial_page.dart';
 import 'package:frontend/productos/application/catalogo_controller.dart';
 import 'package:frontend/productos/domain/entities/producto.dart';
@@ -207,7 +209,7 @@ void main() {
         conCompras([compra('U1'), compra('U2', producto: null, servicio: null)]),
         elegidos: elegidos,
       );
-      expect(find.text('Cargando tus compras'), findsOneWidget);
+      expect(find.text('Cargando tus pagos'), findsOneWidget);
       await tester.pumpAndSettle();
       expect(find.text('Recarga 50'), findsOneWidget);
       expect(find.text('Compra'), findsOneWidget);
@@ -218,7 +220,7 @@ void main() {
     testWidgets('historial vacío', (tester) async {
       await abrir(tester, conCompras([]));
       await tester.pumpAndSettle();
-      expect(find.text('Aún no tienes compras'), findsOneWidget);
+      expect(find.text('Aún no tienes pagos'), findsOneWidget);
     });
 
     testWidgets('error con mensaje y sin él, y reintentar', (tester) async {
@@ -230,7 +232,7 @@ void main() {
         };
       await abrir(tester, pagos);
       await tester.pumpAndSettle();
-      expect(find.text('No pudimos cargar tus compras'), findsOneWidget);
+      expect(find.text('No pudimos cargar tus pagos'), findsOneWidget);
       expect(find.text('Falla'), findsOneWidget);
       falla = false;
       await tester.tap(find.text('Reintentar'));
@@ -261,6 +263,177 @@ void main() {
       espera.complete(pagina([compra('U2')], n: 1, total: 3));
       await tester.pumpAndSettle();
       expect(find.text('Ver más compras'), findsOneWidget);
+    });
+
+    // La fila de filtros se desplaza en horizontal: se acerca el chip antes de tocarlo.
+    Future<void> filtrarPor(WidgetTester tester, String etiqueta) async {
+      final chip = find.widgetWithText(ChoiceChip, etiqueta);
+      await tester.ensureVisible(chip);
+      await tester.tap(chip);
+    }
+
+    testWidgets('lista todos los estados y filtra por estado', (tester) async {
+      await abrir(
+        tester,
+        conCompras([
+          compra('U1', producto: 'Pago uno'),
+          compra('U2', producto: 'Pago dos', estado: 'RECHAZADO'),
+          compra('U3', producto: 'Pago tres', estado: 'EN_REVISION'),
+          compra('U4', producto: 'Pago cuatro', estado: 'PENDIENTE'),
+        ]),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Aprobado'), findsOneWidget);
+      expect(find.text('Rechazado'), findsOneWidget);
+      expect(find.text('En proceso'), findsNWidgets(3)); // dos filas y el filtro
+
+      await filtrarPor(tester, 'Rechazados');
+      await tester.pumpAndSettle();
+      expect(find.text('Pago dos'), findsOneWidget);
+      expect(find.text('Pago uno'), findsNothing);
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'En proceso'));
+      await tester.pumpAndSettle();
+      expect(find.text('Pago tres'), findsOneWidget);
+      expect(find.text('Pago cuatro'), findsOneWidget);
+
+      await filtrarPor(tester, 'Aprobados');
+      await tester.pumpAndSettle();
+      expect(find.text('Pago uno'), findsOneWidget);
+      expect(find.text('Pago dos'), findsNothing);
+
+      await filtrarPor(tester, 'Todos');
+      await tester.pumpAndSettle();
+      expect(find.text('Pago dos'), findsOneWidget);
+    });
+
+    testWidgets('filtro sin coincidencias avisa', (tester) async {
+      await abrir(tester, conCompras([compra('U1')]));
+      await tester.pumpAndSettle();
+      await filtrarPor(tester, 'Rechazados');
+      await tester.pumpAndSettle();
+      expect(find.text('Sin pagos con este estado'), findsOneWidget);
+    });
+
+    testWidgets('detalle de un pago rechazado dice que fue rechazado', (tester) async {
+      await abrir(
+        tester,
+        conCompras([compra('U1', estado: 'RECHAZADO')]),
+        upc: 'U1',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Pago rechazado'), findsOneWidget);
+      expect(find.text('Compra confirmada'), findsNothing);
+    });
+
+    group('buscador por UPC', () {
+      const upc = 'ABCDE12345FGHIJ';
+
+      Future<PagosFalso> buscar(
+        WidgetTester tester,
+        Future<EstadoPago> Function(String) alConsultar, {
+        List<CompraHistorial> lista = const [],
+        List<String>? elegidos,
+      }) async {
+        final pagos = conCompras(lista)..alConsultar = alConsultar;
+        await abrir(tester, pagos, elegidos: elegidos);
+        await tester.pumpAndSettle();
+        return pagos;
+      }
+
+      Future<void> escribirYBuscar(WidgetTester tester, String texto) async {
+        await tester.enterText(find.byType(TextField), texto);
+        await tester.tap(find.byTooltip('Buscar pago'));
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('consulta el pago y muestra su estado', (tester) async {
+        String? consultado;
+        await buscar(tester, (u) async {
+          consultado = u;
+          return EstadoPago(
+            upc: u,
+            estado: 'RECHAZADO',
+            mensaje: 'El pago no se realizó; no se realizó ningún cargo',
+            monto: 100,
+            comision: 5,
+            referencia: 'REF9',
+          );
+        });
+        await escribirYBuscar(tester, upc.toLowerCase());
+        expect(consultado, upc);
+        expect(find.text('Rechazado'), findsOneWidget);
+        expect(find.text('El pago no se realizó; no se realizó ningún cargo'), findsOneWidget);
+        expect(find.widgetWithText(FilaDato, upc), findsOneWidget);
+        expect(find.text('REF9'), findsOneWidget);
+        expect(find.text('Comisión'), findsOneWidget);
+        expect(find.text('Ver recibo'), findsNothing);
+      });
+
+      testWidgets('un pago aprobado ya cargado ofrece ver el recibo', (tester) async {
+        final elegidos = <String>[];
+        await buscar(
+          tester,
+          (u) async => EstadoPago(
+            upc: u,
+            estado: 'APROBADO',
+            mensaje: 'El pago fue aplicado correctamente',
+            monto: 50,
+            idTx: 5,
+            numAutorizacion: 'AUTX',
+          ),
+          lista: [compra(upc)],
+          elegidos: elegidos,
+        );
+        await escribirYBuscar(tester, upc);
+        expect(find.text('Aprobado'), findsOneWidget);
+        expect(find.text('AUTX'), findsOneWidget);
+        await tester.tap(find.text('Ver recibo'));
+        expect(elegidos, [upc]);
+      });
+
+      testWidgets('rechaza un UPC mal formado sin consultar', (tester) async {
+        var consultas = 0;
+        await buscar(tester, (u) async {
+          consultas++;
+          throw StateError('no debe llamarse');
+        });
+        await escribirYBuscar(tester, 'ABC');
+        expect(find.text('El UPC tiene 15 letras o números.'), findsOneWidget);
+        expect(consultas, 0);
+      });
+
+      testWidgets('muestra el error del servicio y se puede limpiar', (tester) async {
+        await buscar(tester, (u) async => throw const ApiException(404, 'No existe un pago con ese UPC'));
+        await escribirYBuscar(tester, upc);
+        expect(find.text('No existe un pago con ese UPC'), findsOneWidget);
+        await tester.tap(find.byTooltip('Limpiar búsqueda'));
+        await tester.pumpAndSettle();
+        expect(find.text('No existe un pago con ese UPC'), findsNothing);
+        expect(find.byTooltip('Buscar pago'), findsOneWidget);
+      });
+
+      testWidgets('error inesperado y búsqueda con Enter', (tester) async {
+        await buscar(tester, (u) async => throw StateError('boom'));
+        await tester.enterText(find.byType(TextField), upc);
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pumpAndSettle();
+        expect(find.text('No pudimos consultar el pago. Inténtalo de nuevo.'), findsOneWidget);
+      });
+
+      testWidgets('limpiar mientras consulta descarta la respuesta tardía', (tester) async {
+        final espera = Completer<EstadoPago>();
+        await buscar(tester, (u) => espera.future);
+        await tester.enterText(find.byType(TextField), upc);
+        await tester.tap(find.byTooltip('Buscar pago'));
+        await tester.pump();
+        expect(find.text('Consultando el pago'), findsOneWidget);
+        await tester.tap(find.byTooltip('Limpiar búsqueda'));
+        await tester.pump();
+        espera.complete(EstadoPago(upc: upc, estado: 'APROBADO', mensaje: 'tardío'));
+        await tester.pumpAndSettle();
+        expect(find.text('tardío'), findsNothing);
+      });
     });
 
     testWidgets('jalar para actualizar', (tester) async {

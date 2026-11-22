@@ -1,0 +1,52 @@
+import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_colors.dart';
+import '../../domain/entities/estado_pago.dart';
+
+/// Cómo se ve cada estado de un pago: etiqueta, tono y colores del recibo.
+class EstadoVisual {
+  const EstadoVisual({
+    required this.texto,
+    required this.tono,
+    required this.icono,
+    required this.titulo,
+    required this.iconoGrande,
+    required this.colores,
+  });
+
+  final String texto;
+  final Tono tono;
+  final IconData icono;
+
+  /// Encabezado del recibo.
+  final String titulo;
+  final IconData iconoGrande;
+  final List<Color> colores;
+}
+
+EstadoVisual estadoVisual(CategoriaPago categoria) => switch (categoria) {
+  CategoriaPago.aprobado => const EstadoVisual(
+    texto: 'Aprobado',
+    tono: Tono.exito,
+    icono: Icons.check_circle_outline,
+    titulo: 'Compra confirmada',
+    iconoGrande: Icons.verified,
+    colores: [AppColors.marca, AppColors.marcaOscura],
+  ),
+  CategoriaPago.enProceso => const EstadoVisual(
+    texto: 'En proceso',
+    tono: Tono.pendiente,
+    icono: Icons.schedule,
+    titulo: 'Pago en proceso',
+    iconoGrande: Icons.hourglass_top,
+    colores: [AppColors.pendiente, Color(0xFF5C3A00)],
+  ),
+  CategoriaPago.rechazado => const EstadoVisual(
+    texto: 'Rechazado',
+    tono: Tono.rechazo,
+    icono: Icons.cancel_outlined,
+    titulo: 'Pago rechazado',
+    iconoGrande: Icons.block,
+    colores: [AppColors.rechazo, Color(0xFF7A1B13)],
+  ),
+};

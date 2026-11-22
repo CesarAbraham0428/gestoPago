@@ -5,9 +5,9 @@ import 'package:flutter/services.dart';
 
 import '../../../core/error/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/ui/breakpoints.dart';
 import '../../../core/ui/campo_codigo.dart';
-import '../../../core/ui/logo_app.dart';
+import '../../../core/ui/ilustracion.dart';
+import '../../../core/ui/marco_acceso.dart';
 import '../../../core/ui/widgets_estado.dart';
 import '../../application/sesion_controller.dart';
 import '../../domain/entities/desafio_verificacion.dart';
@@ -17,18 +17,22 @@ import '../../domain/validadores_credenciales.dart';
 /// pantalla: el formulario va centrado y, en pantallas amplias, dentro de una
 /// tarjeta. El acceso tiene dos pasos: credenciales y código enviado al correo.
 class LoginPage extends StatelessWidget {
-  const LoginPage({super.key, required this.sesion});
+  const LoginPage({super.key, required this.sesion, this.alCrearCuenta});
 
   final SesionController sesion;
+
+  /// Abre la pantalla de crear cuenta; sin ella no se muestra esa sección.
+  final VoidCallback? alCrearCuenta;
 
   @override
   Widget build(BuildContext context) =>
-      Scaffold(body: _ContenedorFormulario(sesion: sesion));
+      _ContenedorFormulario(sesion: sesion, alCrearCuenta: alCrearCuenta);
 }
 
 class _ContenedorFormulario extends StatefulWidget {
-  const _ContenedorFormulario({required this.sesion});
+  const _ContenedorFormulario({required this.sesion, this.alCrearCuenta});
   final SesionController sesion;
+  final VoidCallback? alCrearCuenta;
 
   @override
   State<_ContenedorFormulario> createState() => _ContenedorFormularioState();
@@ -41,118 +45,21 @@ class _ContenedorFormularioState extends State<_ContenedorFormulario> {
   @override
   Widget build(BuildContext context) {
     final desafio = _desafio;
-    final ancho = Breakpoints.esAncho(context, Breakpoints.barraLateral);
-    final Widget paso = desafio == null
-        ? _PasoCredenciales(
-            sesion: widget.sesion,
-            alEnviarCodigo: (d) => setState(() => _desafio = d),
-          )
-        : _PasoCodigo(
-            sesion: widget.sesion,
-            desafio: desafio,
-            alVolver: () => setState(() => _desafio = null),
-          );
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.bosqueClaro, AppColors.bosque],
-        ),
-      ),
-      child: CustomPaint(
-        painter: const _FondoDecorado(),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: ancho ? 440 : 400),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Center(child: LogoApp(tamano: 44, sobreMarca: true)),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Paga tus servicios y recargas en un solo lugar',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.78),
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    Container(
-                      padding: ancho
-                          ? const EdgeInsets.fromLTRB(36, 36, 36, 28)
-                          : const EdgeInsets.fromLTRB(22, 26, 22, 20),
-                      decoration: BoxDecoration(
-                        color: AppColors.superficie,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.25),
-                            blurRadius: 32,
-                            offset: const Offset(0, 14),
-                          ),
-                        ],
-                      ),
-                      child: paso,
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.lock_outline, size: 14, color: Colors.white.withValues(alpha: 0.7)),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            'Conexión cifrada y verificación en dos pasos',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+    return MarcoAcceso(
+      lema: 'Paga tus servicios y recargas en un solo lugar',
+      tarjeta: desafio == null
+          ? _PasoCredenciales(
+              sesion: widget.sesion,
+              alEnviarCodigo: (d) => setState(() => _desafio = d),
+              alCrearCuenta: widget.alCrearCuenta,
+            )
+          : _PasoCodigo(
+              sesion: widget.sesion,
+              desafio: desafio,
+              alVolver: () => setState(() => _desafio = null),
             ),
-          ),
-        ),
-      ),
     );
   }
-}
-
-/// Círculos suaves con los colores de las secciones de la app, detrás del
-/// formulario. Solo decoran: no compiten con la tarjeta blanca.
-class _FondoDecorado extends CustomPainter {
-  const _FondoDecorado();
-
-  @override
-  void paint(Canvas canvas, Size s) {
-    void circulo(double x, double y, double r, Color c, double alfa) => canvas.drawCircle(
-      Offset(s.width * x, s.height * y),
-      r,
-      Paint()..color = c.withValues(alpha: alfa),
-    );
-    circulo(0.08, 0.12, 180, AppColors.turquesa, 0.28);
-    circulo(0.95, 0.85, 220, AppColors.azul, 0.20);
-    circulo(0.88, 0.10, 70, AppColors.coral, 0.22);
-    circulo(0.12, 0.92, 90, AppColors.ciruela, 0.22);
-    final anillo = Paint()
-      ..color = Colors.white.withValues(alpha: 0.07)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    canvas
-      ..drawCircle(Offset(s.width * 0.82, s.height * 0.35), 140, anillo)
-      ..drawCircle(Offset(s.width * 0.20, s.height * 0.62), 110, anillo);
-  }
-
-  @override
-  bool shouldRepaint(_FondoDecorado oldDelegate) => false;
 }
 
 /// Mensaje de un error de la API, o uno genérico si fue otra cosa.
@@ -202,15 +109,21 @@ String _formatoEspera(int segundos) => segundos < 60
     : '${segundos ~/ 60}:${(segundos % 60).toString().padLeft(2, '0')} min';
 
 class _PasoCredenciales extends StatefulWidget {
-  const _PasoCredenciales({required this.sesion, required this.alEnviarCodigo});
+  const _PasoCredenciales({
+    required this.sesion,
+    required this.alEnviarCodigo,
+    this.alCrearCuenta,
+  });
   final SesionController sesion;
   final ValueChanged<DesafioVerificacion> alEnviarCodigo;
+  final VoidCallback? alCrearCuenta;
 
   @override
   State<_PasoCredenciales> createState() => _PasoCredencialesState();
 }
 
-class _PasoCredencialesState extends State<_PasoCredenciales> with _EsperaPorLimite {
+class _PasoCredencialesState extends State<_PasoCredenciales>
+    with _EsperaPorLimite {
   final _clave = GlobalKey<FormState>();
   final _correo = TextEditingController();
   final _password = TextEditingController();
@@ -226,7 +139,8 @@ class _PasoCredencialesState extends State<_PasoCredenciales> with _EsperaPorLim
   }
 
   Future<void> _continuar() async {
-    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false)) return;
+    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false))
+      return;
     setState(() {
       _enviando = true;
       _error = null;
@@ -242,7 +156,12 @@ class _PasoCredencialesState extends State<_PasoCredenciales> with _EsperaPorLim
     } on Object catch (e) {
       if (mounted) {
         iniciarEsperaSiLimite(e);
-        setState(() => _error = _mensajeDe(e, 'No fue posible iniciar sesión. Inténtalo de nuevo.'));
+        setState(
+          () => _error = _mensajeDe(
+            e,
+            'No fue posible iniciar sesión. Inténtalo de nuevo.',
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _enviando = false);
@@ -258,67 +177,125 @@ class _PasoCredencialesState extends State<_PasoCredenciales> with _EsperaPorLim
         key: _clave,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Inicia sesión', style: tema.headlineMedium),
-            const SizedBox(height: 8),
-            Text(
-              'Usa el correo y la contraseña de tu cuenta. Después te pediremos un código de verificación.',
-              style: tema.bodyMedium?.copyWith(color: AppColors.tintaSuave),
-            ),
-            const SizedBox(height: 28),
-            if (_error != null || aviso != null) ...[
-              AvisoEstado(
-                tono: _error != null ? Tono.rechazo : Tono.aviso,
-                icono: _error != null ? Icons.error_outline : Icons.info_outline,
-                texto: (_error ?? aviso)!,
-              ),
-              const SizedBox(height: 20),
-            ],
-            TextFormField(
-              controller: _correo,
-              // Las `key` evitan que el aviso de error, al insertarse encima, haga que
-              // Flutter recree los campos con el foco puesto: en web el input del
-              // navegador quedaba desincronizado y dejaba de recibir texto.
-              key: const ValueKey('login-correo'),
-              readOnly: _enviando, // no `enabled`: desactivar quita el foco y en web el campo deja de recibir texto
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.email],
-              autocorrect: false,
-              inputFormatters: [LengthLimitingTextInputFormatter(100)],
-              decoration: const InputDecoration(labelText: 'Correo electrónico'),
-              validator: ValidadoresCredenciales.correo,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              key: const ValueKey('login-password'),
-              controller: _password,
-              readOnly: _enviando,
-              obscureText: _ocultar,
-              textInputAction: TextInputAction.done,
-              autofillHints: const [AutofillHints.password],
-              enableSuggestions: false,
-              autocorrect: false,
-              inputFormatters: [LengthLimitingTextInputFormatter(72)],
-              onFieldSubmitted: (_) => _continuar(),
-              decoration: InputDecoration(
-                labelText: 'Contraseña',
-                suffixIcon: IconButton(
-                  tooltip: _ocultar ? 'Mostrar contraseña' : 'Ocultar contraseña',
-                  icon: Icon(
-                    _ocultar ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Center(
+                  child: Ilustracion(
+                    icono: Icons.lock_open_outlined,
+                    color: AppColors.marca,
+                    fondo: AppColors.marcaTenue,
+                    tamano: 96,
                   ),
-                  onPressed: () => setState(() => _ocultar = !_ocultar),
                 ),
-              ),
-              validator: ValidadoresCredenciales.password,
+                const SizedBox(height: 4),
+                Text(
+                  'Inicia sesión',
+                  style: tema.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 18),
+                if (_error != null || aviso != null) ...[
+                  AvisoEstado(
+                    tono: _error != null ? Tono.rechazo : Tono.aviso,
+                    icono: _error != null
+                        ? Icons.error_outline
+                        : Icons.info_outline,
+                    texto: (_error ?? aviso)!,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                TextFormField(
+                  controller: _correo,
+                  // Las `key` evitan que el aviso de error, al insertarse encima, haga que
+                  // Flutter recree los campos con el foco puesto: en web el input del
+                  // navegador quedaba desincronizado y dejaba de recibir texto.
+                  key: const ValueKey('login-correo'),
+                  readOnly: _enviando, // no `enabled`: desactivar quita el foco y en web el campo deja de recibir texto
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.email],
+                  autocorrect: false,
+                  inputFormatters: [LengthLimitingTextInputFormatter(100)],
+                  decoration: const InputDecoration(
+                    labelText: 'Correo electrónico',
+                    prefixIcon: Icon(Icons.mail_outline, color: AppColors.marca),
+                  ),
+                  validator: ValidadoresCredenciales.correo,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  key: const ValueKey('login-password'),
+                  controller: _password,
+                  readOnly: _enviando,
+                  obscureText: _ocultar,
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.password],
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  inputFormatters: [LengthLimitingTextInputFormatter(72)],
+                  onFieldSubmitted: (_) => _continuar(),
+                  decoration: InputDecoration(
+                    labelText: 'Contraseña',
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                      color: AppColors.marca,
+                    ),
+                    suffixIcon: IconButton(
+                      tooltip: _ocultar
+                          ? 'Mostrar contraseña'
+                          : 'Ocultar contraseña',
+                      icon: Icon(
+                        _ocultar
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                      onPressed: () => setState(() => _ocultar = !_ocultar),
+                    ),
+                  ),
+                  validator: ValidadoresCredenciales.password,
+                ),
+                const SizedBox(height: 18),
+                _BotonEnvio(
+                  enviando: _enviando,
+                  etiqueta: 'Continuar',
+                  alPulsar: _continuar,
+                  esperaSegundos: segundosDeEspera,
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
-            _BotonEnvio(
-              enviando: _enviando,
-              etiqueta: 'Continuar',
-              alPulsar: _continuar,
-              esperaSegundos: segundosDeEspera,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.alCrearCuenta != null) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          '¿Aún no tienes cuenta?',
+                          style: tema.bodySmall,
+                        ),
+                      ),
+                      const Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.turquesa,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: _enviando ? null : widget.alCrearCuenta,
+                    icon: const Icon(Icons.person_add_alt_1_outlined, size: 20),
+                    label: const Text('Crear cuenta'),
+                  ),
+                ],
+              ],
             ),
           ],
         ),
@@ -355,7 +332,8 @@ class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
   }
 
   Future<void> _verificar({bool cerrarSesionAnterior = false}) async {
-    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false)) return;
+    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false))
+      return;
     setState(() {
       _enviando = true;
       _error = null;
@@ -374,7 +352,12 @@ class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
     } on Object catch (e) {
       if (mounted) {
         iniciarEsperaSiLimite(e);
-        setState(() => _error = _mensajeDe(e, 'No fue posible verificar el código. Inténtalo de nuevo.'));
+        setState(
+          () => _error = _mensajeDe(
+            e,
+            'No fue posible verificar el código. Inténtalo de nuevo.',
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _enviando = false);
@@ -413,35 +396,97 @@ class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
       key: _clave,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('Revisa tu correo', style: tema.headlineMedium),
-          const SizedBox(height: 8),
-          Text(
-            'Enviamos un código de 6 dígitos a ${widget.desafio.correoEnmascarado}. '
-            'Vence en ${widget.desafio.vigencia.inMinutes} minutos y solo sirve una vez.',
-            style: tema.bodyMedium?.copyWith(color: AppColors.tintaSuave),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Center(
+                child: Ilustracion(
+                  icono: Icons.mark_email_unread_outlined,
+                  color: AppColors.marca,
+                  fondo: AppColors.marcaTenue,
+                  tamano: 104,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Revisa tu correo',
+                style: tema.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Enviamos un código de 6 dígitos a',
+                style: tema.bodyMedium?.copyWith(color: AppColors.tintaSuave),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.marcaTenue,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.mail_outline,
+                        size: 18,
+                        color: AppColors.marca,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          widget.desafio.correoEnmascarado,
+                          overflow: TextOverflow.ellipsis,
+                          style: tema.titleSmall?.copyWith(
+                            color: AppColors.marcaOscura,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Vence en ${widget.desafio.vigencia.inMinutes} minutos y solo sirve una vez.',
+                style: tema.bodySmall?.copyWith(color: AppColors.tintaSuave),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              if (_error != null) ...[
+                AvisoEstado(
+                  tono: Tono.rechazo,
+                  icono: Icons.error_outline,
+                  texto: _error!,
+                ),
+                const SizedBox(height: 20),
+              ],
+              CampoCodigo(
+                key: const ValueKey('login-codigo'), // el aviso de error se inserta encima: ver los campos del paso 1
+                controller: _codigo,
+                enabled: !_enviando,
+                autofocus: true,
+                validator: ValidadoresCredenciales.codigo,
+                alEnviar: _verificar,
+              ),
+              const SizedBox(height: 24),
+              _BotonEnvio(
+                enviando: _enviando,
+                etiqueta: 'Verificar y entrar',
+                alPulsar: _verificar,
+                esperaSegundos: segundosDeEspera,
+              ),
+            ],
           ),
-          const SizedBox(height: 28),
-          if (_error != null) ...[
-            AvisoEstado(tono: Tono.rechazo, icono: Icons.error_outline, texto: _error!),
-            const SizedBox(height: 20),
-          ],
-          CampoCodigo(
-            key: const ValueKey('login-codigo'), // el aviso de error se inserta encima: ver los campos del paso 1
-            controller: _codigo,
-            enabled: !_enviando,
-            autofocus: true,
-            validator: ValidadoresCredenciales.codigo,
-            alEnviar: _verificar,
-          ),
-          const SizedBox(height: 24),
-          _BotonEnvio(
-            enviando: _enviando,
-            etiqueta: 'Verificar y entrar',
-            alPulsar: _verificar,
-            esperaSegundos: segundosDeEspera,
-          ),
-          const SizedBox(height: 8),
           TextButton(
             onPressed: _enviando ? null : widget.alVolver,
             child: const Text('Volver e iniciar de nuevo'),

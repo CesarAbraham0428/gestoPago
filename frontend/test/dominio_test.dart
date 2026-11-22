@@ -243,6 +243,17 @@ void main() {
     test('Cuenta y resultados de compra', () {
       const cuenta = Cuenta(id: 1, numeroCuenta: 'X', saldo: 5, activa: true);
       expect(cuenta.saldo, 5);
+      expect(cuenta.bloqueoRestante(), isNull);
+      final ahora = DateTime(2026, 3, 5, 12);
+      final bloqueada = Cuenta(
+        id: 1,
+        numeroCuenta: 'X',
+        saldo: 5,
+        activa: true,
+        pinBloqueadoHasta: ahora.add(const Duration(minutes: 15)),
+      );
+      expect(bloqueada.bloqueoRestante(ahora), const Duration(minutes: 15));
+      expect(bloqueada.bloqueoRestante(ahora.add(const Duration(minutes: 15))), isNull);
       final comprobante = Comprobante(
         estado: 'APROBADO',
         monto: 1,

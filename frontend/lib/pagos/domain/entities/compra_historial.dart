@@ -1,4 +1,6 @@
-/// Compra aprobada del usuario, tal como la lista el historial.
+import 'estado_pago.dart';
+
+/// Pago del usuario (aprobado, en proceso o rechazado), tal como lo lista el historial.
 class CompraHistorial {
   const CompraHistorial({
     required this.upc,
@@ -12,6 +14,7 @@ class CompraHistorial {
     this.telefono,
     this.idTx,
     this.numAutorizacion,
+    this.estado = 'APROBADO',
   });
 
   /// Referencia única de la operación.
@@ -26,6 +29,11 @@ class CompraHistorial {
   final String? telefono;
   final int? idTx;
   final String? numAutorizacion;
+
+  /// PENDIENTE, EN_REVISION, APROBADO o RECHAZADO.
+  final String estado;
+
+  CategoriaPago get categoria => categoriaDeEstado(estado);
 
   String get titulo => producto ?? 'Compra';
 }

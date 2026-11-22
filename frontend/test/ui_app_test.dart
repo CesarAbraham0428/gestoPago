@@ -100,7 +100,7 @@ void main() {
 
       await tester.tap(find.text('Recarga 50'));
       await tester.pumpAndSettle();
-      expect(find.text('Revisar compra'), findsOneWidget);
+      expect(find.text('Realizar compra'), findsOneWidget);
 
       await tester.tap(find.text('Mis compras'));
       await tester.pumpAndSettle();
@@ -169,7 +169,8 @@ void main() {
         find.widgetWithText(TextFormField, 'Número de celular'),
         '5512345678',
       );
-      await tester.tap(find.text('Revisar compra'));
+      await tester.ensureVisible(find.text('Realizar compra'));
+      await tester.tap(find.text('Realizar compra'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.widgetWithText(TextFormField, 'PIN de autorización'),
@@ -177,6 +178,7 @@ void main() {
       );
       await tester.tap(find.textContaining('Pagar \$'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Ver mis compras'));
       await tester.tap(find.text('Ver mis compras'));
       await tester.pumpAndSettle();
       expect(find.text('Elige una compra'), findsOneWidget);

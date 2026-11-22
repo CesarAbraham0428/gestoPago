@@ -3,8 +3,10 @@ import 'package:flutter/widgets.dart';
 import '../authentication/application/sesion_controller.dart';
 import '../authentication/domain/ports/almacen_sesion.dart';
 import '../authentication/domain/ports/autenticacion_gateway.dart';
+import '../authentication/domain/ports/registro_gateway.dart';
 import '../authentication/infraestructure/adapters/almacen_sesion_seguro.dart';
 import '../authentication/infraestructure/adapters/api_autenticacion_gateway.dart';
+import '../authentication/infraestructure/adapters/api_registro_gateway.dart';
 import '../core/config/app_config.dart';
 import '../core/network/api_client.dart';
 import '../pagos/application/historial_controller.dart';
@@ -25,6 +27,7 @@ import '../productos/infraestructure/adapters/api_catalogo_repository.dart';
 class Dependencias {
   Dependencias._({
     required this.sesion,
+    required this.registro,
     required this.catalogo,
     required this.historial,
     required this.cuentas,
@@ -34,6 +37,7 @@ class Dependencias {
   });
 
   final SesionController sesion;
+  final RegistroGateway registro;
   final CatalogoController catalogo;
   final HistorialController historial;
   final CuentasRepository cuentas;
@@ -46,6 +50,7 @@ class Dependencias {
   factory Dependencias.crear({
     String? apiBaseUrl,
     AutenticacionGateway? autenticacion,
+    RegistroGateway? registroGateway,
     AlmacenSesion? almacenSesion,
     CatalogoRepository? catalogoRepositorio,
     PagosRepository? pagosRepositorio,
@@ -82,6 +87,7 @@ class Dependencias {
 
     return Dependencias._(
       sesion: sesion,
+      registro: registroGateway ?? ApiRegistroGateway(api),
       catalogo: catalogo,
       historial: historial,
       cuentas: cuentasRepositorio ?? ApiCuentasRepository(api),

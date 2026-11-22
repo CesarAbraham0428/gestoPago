@@ -7,6 +7,10 @@ import '../../domain/ports/cuentas_repository.dart';
 /// POST /cuentas/consultar (Bearer)  {"activo":true,"pagina":0,"tamanio":20}
 ///   200 -> datos: {datos:[{id,clienteId,numeroCuenta,saldo,estaActiva,...}],
 ///                  pagina,tamanoPagina,totalElementos,totalPaginas}
+/// Fecha ISO-8601 del servidor, o `null` si falta o no se puede leer.
+DateTime? fechaDeApi(Object? valor) =>
+    valor is String ? DateTime.tryParse(valor) : null;
+
 class ApiCuentasRepository implements CuentasRepository {
   ApiCuentasRepository(this._api);
   final ApiClient _api;
@@ -31,6 +35,7 @@ class ApiCuentasRepository implements CuentasRepository {
             numeroCuenta: numero,
             saldo: saldo.toDouble(),
             activa: j['estaActiva'] == true,
+            pinBloqueadoHasta: fechaDeApi(j['pinBloqueadoHasta']),
           );
         })
         .whereType<Cuenta>()

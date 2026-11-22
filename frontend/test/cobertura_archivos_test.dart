@@ -14,7 +14,12 @@ import 'package:frontend/authentication/domain/entities/desafio_verificacion.dar
 import 'package:frontend/authentication/domain/entities/sesion.dart';
 import 'package:frontend/authentication/domain/ports/almacen_sesion.dart';
 import 'package:frontend/authentication/domain/ports/autenticacion_gateway.dart';
+import 'package:frontend/authentication/domain/ports/registro_gateway.dart';
 import 'package:frontend/authentication/domain/validadores_credenciales.dart';
+import 'package:frontend/authentication/domain/validadores_registro.dart';
+import 'package:frontend/authentication/infraestructure/adapters/api_registro_gateway.dart';
+import 'package:frontend/authentication/infraestructure/ui/registro_page.dart';
+import 'package:frontend/core/ui/fondo_acceso.dart';
 import 'package:frontend/authentication/infraestructure/adapters/almacen_sesion_seguro.dart';
 import 'package:frontend/authentication/infraestructure/adapters/api_autenticacion_gateway.dart';
 import 'package:frontend/authentication/infraestructure/ui/guardia_inactividad.dart';

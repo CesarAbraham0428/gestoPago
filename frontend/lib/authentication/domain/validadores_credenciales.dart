@@ -18,7 +18,8 @@ class ValidadoresCredenciales {
   static String? codigo(String? valor) {
     final texto = (valor ?? '').trim();
     if (texto.isEmpty) return 'Escribe el código que enviamos a tu correo.';
-    if (!RegExp(r'^\d{6}$').hasMatch(texto)) return 'El código tiene 6 dígitos.';
+    if (!RegExp(r'^\d{6}$').hasMatch(texto))
+      return 'El código tiene 6 dígitos.';
     return null;
   }
 

@@ -74,7 +74,10 @@ class _Fondo extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.6
       ..strokeCap = StrokeCap.round;
-    final rect = Rect.fromCircle(center: Offset(w / 2, h / 2), radius: w * 0.38);
+    final rect = Rect.fromCircle(
+      center: Offset(w / 2, h / 2),
+      radius: w * 0.38,
+    );
     for (var i = 0; i < 12; i++) {
       canvas.drawArc(rect, i * 0.5236, 0.28, false, anillo);
     }
@@ -82,7 +85,11 @@ class _Fondo extends CustomPainter {
     // Puntos y destellos decorativos.
     final punto = Paint()..color = color;
     canvas.drawCircle(Offset(w * 0.86, h * 0.20), w * 0.035, punto);
-    canvas.drawCircle(Offset(w * 0.14, h * 0.76), w * 0.025, punto..color = color.withValues(alpha: 0.6));
+    canvas.drawCircle(
+      Offset(w * 0.14, h * 0.76),
+      w * 0.025,
+      punto..color = color.withValues(alpha: 0.6),
+    );
     final destello = Paint()
       ..color = color.withValues(alpha: 0.7)
       ..strokeWidth = 2
