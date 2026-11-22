@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../core/ui/ilustracion.dart';
 import '../../../core/ui/monograma.dart';
+import '../../../core/ui/tarjeta_debito.dart';
 import '../../../core/ui/widgets_estado.dart';
 import '../../../pagos/domain/entities/cuenta.dart';
 import '../../application/perfil_controller.dart';
@@ -187,7 +186,7 @@ class _PerfilPageState extends State<PerfilPage> {
   }
 }
 
-/// "Cuentas bancarias": cuentas del cliente con saldo y estado.
+/// "Cuenta bancaria": cuenta del cliente con saldo y estado.
 class CuentasBancariasPage extends StatelessWidget {
   const CuentasBancariasPage({super.key, required this.controller});
   final PerfilController controller;
@@ -215,8 +214,6 @@ class CuentasBancariasPage extends StatelessWidget {
     return _ConPerfil(
       controller: controller,
       construir: (context, p) {
-        final activas = p.cuentas.where((c) => c.activa);
-        final total = activas.fold<double>(0, (s, c) => s + c.saldo);
         return _Lienzo(
           children: [
             _Encabezado(
@@ -237,28 +234,6 @@ class CuentasBancariasPage extends StatelessWidget {
                 detalle: 'No tienes cuentas bancarias registradas.',
               )
             else ...[
-              _Tarjeta(
-                child: Row(
-                  children: [
-                    const Icon(Icons.savings_outlined, color: AppColors.marca),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Saldo disponible en cuentas activas',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                    Text(
-                      formatoMoneda(total),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontFeatures: cifrasTabulares,
-                        color: AppColors.marcaOscura,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
               for (final c in p.cuentas)
                 _TarjetaCuenta(cuenta: c, alCambiarPin: () => _cambiarPin(context, c)),
             ],
@@ -297,27 +272,43 @@ class _Encabezado extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context).textTheme;
+    final nombre = Text(perfil.nombreCompleto, style: tema.titleLarge);
+    final correo = Text(
+      perfil.correoElectronico,
+      style: tema.bodyMedium?.copyWith(color: AppColors.tintaSuave),
+    );
     return _Tarjeta(
-      child: Row(
-        children: [
-          Monograma(nombre: perfil.nombreCompleto, tamano: 56),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: LayoutBuilder(
+        builder: (context, restricciones) {
+          // En pantallas angostas el nombre no cabe junto al botón: se apila y centra.
+          if (restricciones.maxWidth < 520) {
+            return Column(
               children: [
-                Text(perfil.nombreCompleto, style: tema.titleLarge),
-                const SizedBox(height: 2),
-                Text(
-                  perfil.correoElectronico,
-                  style: tema.bodyMedium?.copyWith(color: AppColors.tintaSuave),
-                ),
+                Monograma(nombre: perfil.nombreCompleto, tamano: 72),
+                const SizedBox(height: 14),
+                DefaultTextStyle.merge(textAlign: TextAlign.center, child: nombre),
+                const SizedBox(height: 4),
+                DefaultTextStyle.merge(textAlign: TextAlign.center, child: correo),
+                const SizedBox(height: 18),
+                SizedBox(width: double.infinity, child: accion),
               ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          accion,
-        ],
+            );
+          }
+          return Row(
+            children: [
+              Monograma(nombre: perfil.nombreCompleto, tamano: 56),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [nombre, const SizedBox(height: 2), correo],
+                ),
+              ),
+              const SizedBox(width: 12),
+              accion,
+            ],
+          );
+        },
       ),
     );
   }
@@ -399,8 +390,24 @@ class _TarjetaCuenta extends StatelessWidget {
       margen: const EdgeInsets.only(bottom: 12),
       child: Column(
         children: [
-          _datos(context, tema),
-          const Divider(height: 24, color: AppColors.lineaSuave),
+          Row(
+            children: [
+              Expanded(
+                child: Text('Cuenta ${cuentaEnmascarada(cuenta.numeroCuenta)}', style: tema.titleMedium),
+              ),
+              EtiquetaEstado(
+                texto: cuenta.activa ? 'Activa' : 'Inactiva',
+                tono: cuenta.activa ? Tono.exito : Tono.neutro,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TarjetaDebito(
+            numeroCuenta: cuenta.numeroCuenta,
+            saldo: cuenta.saldo,
+            activa: cuenta.activa,
+          ),
+          const Divider(height: 32, color: AppColors.lineaSuave),
           Row(
             children: [
               const Icon(Icons.lock_outline, size: 18, color: AppColors.tintaSuave),
@@ -420,74 +427,6 @@ class _TarjetaCuenta extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _datos(BuildContext context, TextTheme tema) {
-    return Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.marcaTenue,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.account_balance_outlined, color: AppColors.marcaOscura),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Cuenta ${cuentaEnmascarada(cuenta.numeroCuenta)}', style: tema.titleMedium),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: SelectableText(
-                        cuenta.numeroCuenta,
-                        style: tema.bodySmall?.copyWith(
-                          color: AppColors.tintaSuave,
-                          fontFeatures: cifrasTabulares,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Copiar número de cuenta',
-                      visualDensity: VisualDensity.compact,
-                      iconSize: 16,
-                      color: AppColors.tintaSuave,
-                      icon: const Icon(Icons.copy_outlined),
-                      onPressed: () async {
-                        final mensajes = ScaffoldMessenger.of(context);
-                        await Clipboard.setData(ClipboardData(text: cuenta.numeroCuenta));
-                        mensajes.showSnackBar(
-                          const SnackBar(content: Text('Número de cuenta copiado.')),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                formatoMoneda(cuenta.saldo),
-                style: tema.titleMedium?.copyWith(fontFeatures: cifrasTabulares),
-              ),
-              const SizedBox(height: 4),
-              EtiquetaEstado(
-                texto: cuenta.activa ? 'Activa' : 'Inactiva',
-                tono: cuenta.activa ? Tono.exito : Tono.neutro,
-              ),
-            ],
-          ),
-        ],
     );
   }
 }

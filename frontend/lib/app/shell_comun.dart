@@ -21,10 +21,14 @@ class DestinoNavegacion {
     required this.color,
     required this.fondo,
     required this.descripcion,
+    this.etiquetaCorta,
   });
 
   final String ruta;
   final String etiqueta;
+
+  /// Versión de una sola palabra para la barra inferior móvil, donde no cabe la larga.
+  final String? etiquetaCorta;
   final IconData icono;
   final IconData iconoActivo;
   final Color color;
@@ -62,12 +66,13 @@ const destinos = [
   ),
   DestinoNavegacion(
     ruta: '/cuentas',
-    etiqueta: 'Cuentas bancarias',
+    etiqueta: 'Cuenta bancaria',
+    etiquetaCorta: 'Cuenta',
     icono: Icons.account_balance_outlined,
     iconoActivo: Icons.account_balance,
     color: AppColors.coral,
     fondo: AppColors.coralTenue,
-    descripcion: 'Saldos y estado de tus cuentas',
+    descripcion: 'Saldo y estado de tu cuenta',
   ),
 ];
 
@@ -157,8 +162,9 @@ class MenuUsuario extends StatelessWidget {
 PreferredSizeWidget barraSuperior(
   BuildContext context,
   GoRouterState state,
-  SesionController sesion,
-) {
+  SesionController sesion, {
+  Widget? menu,
+}) {
   final detalle = esDetalle(state);
   return AppBar(
     automaticallyImplyLeading: false,
@@ -170,6 +176,6 @@ PreferredSizeWidget barraSuperior(
           )
         : null,
     title: Text(tituloPantalla(state)),
-    actions: [MenuUsuario(sesion: sesion), const SizedBox(width: 4)],
+    actions: [menu ?? MenuUsuario(sesion: sesion), const SizedBox(width: 4)],
   );
 }
