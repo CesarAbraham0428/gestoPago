@@ -10,6 +10,7 @@ import 'package:frontend/authentication/domain/ports/almacen_sesion.dart';
 import 'package:frontend/authentication/domain/ports/autenticacion_gateway.dart';
 import 'package:frontend/authentication/infraestructure/ui/login_page.dart';
 import 'package:frontend/core/error/app_exception.dart';
+import 'package:frontend/core/ui/widgets_estado.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 
 class _Gateway implements AutenticacionGateway {
@@ -50,6 +51,15 @@ class _Gateway implements AutenticacionGateway {
 
   @override
   Future<void> cerrarSesion() async {}
+}
+
+/// Cuenta inactiva: el servidor responde 403 ya al validar la contraseña.
+class _GatewayBloqueado extends _Gateway {
+  @override
+  Future<DesafioVerificacion> iniciarSesion({
+    required String correo,
+    required String password,
+  }) async => throw const ApiException(403, 'Tu cuenta está bloqueada.');
 }
 
 class _Almacen implements AlmacenSesion {
@@ -176,5 +186,25 @@ void main() {
     await tester.pump();
     expect(copiado, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567');
     expect(find.text('Clave copiada'), findsOneWidget);
+  });
+
+  testWidgets('una cuenta inactiva muestra el aviso destacado de cuenta bloqueada', (tester) async {
+    final sesion = SesionController(gateway: _GatewayBloqueado(), almacen: _Almacen());
+    tester.view.physicalSize = const Size(500, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(theme: AppTheme.light(), home: LoginPage(sesion: sesion)),
+    );
+    await tester.enterText(find.widgetWithText(TextFormField, 'Correo electrónico'), 'ana@example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Contraseña'), 'Segura123!');
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AvisoCuentaBloqueada), findsOneWidget);
+    expect(find.text('Cuenta bloqueada'), findsOneWidget);
+    expect(find.text('Comunícate con soporte para reactivarla'), findsOneWidget);
+    expect(find.byType(AvisoEstado), findsNothing);
   });
 }
