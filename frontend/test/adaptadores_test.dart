@@ -423,7 +423,9 @@ void main() {
       expect(p.pagina, 1);
       expect(p.totalPaginas, 4);
       expect(p.totalElementos, 40);
-      expect(s.ultima!.url.queryParameters, {'pagina': '1', 'tamanio': '20'});
+      expect(s.ultima!.method, 'POST');
+      expect(s.ultima!.url.path, '/pagos/historial');
+      expect(s.cuerpo, {'pagina': 1, 'tamanio': 20});
     });
 
     test('historial sin metadatos usa la página pedida', () async {
