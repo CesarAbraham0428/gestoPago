@@ -63,7 +63,7 @@ lib/
 | HTTPS | La URL base se define al compilar (`API_BASE_URL`). Una compilación de producción con HTTP hacia un host que no sea el propio equipo se niega a arrancar. |
 | Autenticación | Acceso en dos pasos: contraseña (`/auth/login`) y código de 6 dígitos de una app autenticadora (TOTP: Google Authenticator, Microsoft Authenticator, Authy) (`/auth/verificar`); la primera vez la pantalla muestra el QR (`qr_flutter`) y la clave para enlazarla; el servidor valida ambos. El JWT resultante se envía como `Authorization: Bearer`. |
 | Control de acceso | `redirect` del enrutador: sin sesión solo existe `/login`. El servidor valida cada petición. |
-| Sesión única | Si el usuario ya tiene sesión en otro dispositivo (web o móvil), el servidor responde `409`; la app pide confirmar y reenvía el código con `cerrarSesionAnterior: true`. La sesión desplazada vuelve al login con el motivo en máximo 10 s, aunque el usuario no esté navegando: la app consulta `GET /auth/sesion` cada 10 s y al volver a la app o pestaña. |
+| Sesión única | Si el usuario ya tiene sesión en otro dispositivo (web o móvil), el servidor responde `409`; la app pide confirmar y reenvía el código con `cerrarSesionAnterior: true`. La sesión desplazada vuelve al login con el motivo **al instante**, aunque el usuario no esté navegando: la app mantiene abierto un canal Server-Sent Events (`GET /auth/sesion/eventos`) y el servidor le avisa. Si el canal se corta, se reabre con espera creciente (2 s, 4 s… hasta 64 s) y al volver a la app o pestaña; reabrirlo vuelve a validar la sesión (401 → login). |
 | Expiración de sesión | El token trae `expiraEnMs`; un temporizador cierra la sesión al vencer. Además se cierra tras 15 min sin interacción (`GuardiaInactividad`). Un `401` en cualquier ruta protegida también la cierra. |
 | Cierre de sesión | Llama a `/auth/logout` (el JWT queda revocado en el servidor) y borra el token del dispositivo y los datos en memoria (catálogo, historial). Si no hay red, igual se cierra localmente. |
 | Credenciales | Token en `flutter_secure_storage`; la contraseña y el PIN no se guardan, no se registran y los campos los ocultan. |
@@ -85,7 +85,7 @@ Contrato general de respuesta: `{ "codigo": 0|1, "mensaje": "...", "datos": ... 
 | Paso 1 | `POST /auth/login` (público) · `{ "correo", "password" }` → `datos: { desafioId, expiraEnMs, enrolamiento }` (`enrolamiento` = `{ secreto, otpauthUri }`, solo mientras la app no está enlazada). 401 credenciales incorrectas · 403 inactivo · 429 demasiados intentos |
 | Paso 2 | `POST /auth/verificar` (público) · `{ "desafioId", "codigo", "cerrarSesionAnterior" }` → `datos: { token, tipo, expiraEnMs, usuario, nombreCompleto }`. 401 código incorrecto/vencido · 409 hay otra sesión activa · 429 demasiados intentos |
 | Cierre | `POST /auth/logout` (Bearer) → 200; revoca la sesión en el servidor |
-| Sondeo de sesión | `GET /auth/sesion` (Bearer) → 200 sesión activa · 401 cerrada, vencida o reemplazada por otro dispositivo (la app cierra la sesión). Se llama cada 10 s y al volver a la app; un fallo de red no cierra la sesión |
+| Avisos de sesión | `GET /auth/sesion/eventos` (Bearer, `Accept: text/event-stream`) → flujo SSE: `event: conectado` al abrir, `: latido` cada 25 s y `event: sesion_cerrada` + `data: <motivo>` cuando la sesión se cierra o la reemplaza otro dispositivo (la app cierra la sesión con ese motivo). 401 al conectar → la sesión ya no era válida. Un fallo de red no cierra la sesión: reconecta. En web se lee con `fetch_client` (el cliente XHR por omisión no entrega el flujo por partes) |
 | Validación en la app | Correo con formato válido (máx. 100); contraseña obligatoria (máx. 72); código de exactamente 6 dígitos |
 | Adaptador | `authentication/infraestructure/adapters/api_autenticacion_gateway.dart` |
 
@@ -185,7 +185,7 @@ Un 401 cierra la sesión.
 1. `POST /pagos/historial` (historial): `PagoController`, `HistorialPagoRequest`, `PagoService`, `PagoRegistroService`, `PagoRepository` y `HistorialPagoResponse`. El nombre del producto sale del catálogo local.
 2. CORS configurable en `SecurityConfiguration` (antes estaba deshabilitado y el navegador bloqueaba a la web).
 3. `POST /clientes/disponibilidad`: avisa por campo de los datos repetidos durante el registro.
-4. `GET /auth/sesion`: permite a las apps detectar en segundos que otro dispositivo cerró la sesión.
+4. `GET /auth/sesion/eventos` (Server-Sent Events): avisa al instante a la app cuando otro dispositivo toma la sesión o se cierra.
 
 ## Pruebas
 
