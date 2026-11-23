@@ -14,6 +14,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends git curl unzip xz-utils ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 RUN git clone --depth 1 --branch ${FLUTTER_VERSION} https://github.com/flutter/flutter.git /flutter
+# El build de Render no deja a tar (como root) restaurar propietarios al extraer los artefactos de Flutter.
+RUN mv /usr/bin/tar /usr/bin/tar.real \
+    && printf '#!/bin/sh\nexec /usr/bin/tar.real --no-same-owner "$@"\n' > /usr/bin/tar \
+    && chmod +x /usr/bin/tar
 ENV PATH="/flutter/bin:${PATH}"
 RUN git config --global --add safe.directory /flutter \
     && flutter config --no-analytics --enable-web
