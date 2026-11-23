@@ -86,11 +86,8 @@ mixin _EsperaPorLimite<T extends StatefulWidget> on State<T> {
     final espera = error.reintentarEn ?? _esperaPorOmision;
     _segundos = espera.inSeconds < 1 ? 1 : espera.inSeconds;
     _reloj?.cancel();
+    // dispose cancela el temporizador, así que aquí el widget sigue montado.
     _reloj = Timer.periodic(const Duration(seconds: 1), (temporizador) {
-      if (!mounted) {
-        temporizador.cancel();
-        return;
-      }
       setState(() => _segundos--);
       if (_segundos <= 0) temporizador.cancel();
     });
@@ -140,8 +137,9 @@ class _PasoCredencialesState extends State<_PasoCredenciales>
   }
 
   Future<void> _continuar() async {
-    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false))
+    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false)) {
       return;
+    }
     setState(() {
       _enviando = true;
       _error = null;
@@ -333,8 +331,9 @@ class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
   }
 
   Future<void> _verificar({bool cerrarSesionAnterior = false}) async {
-    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false))
+    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false)) {
       return;
+    }
     setState(() {
       _enviando = true;
       _error = null;

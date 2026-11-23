@@ -18,8 +18,9 @@ class ValidadoresCredenciales {
   static String? codigo(String? valor) {
     final texto = (valor ?? '').trim();
     if (texto.isEmpty) return 'Escribe el código que muestra tu app de autenticación.';
-    if (!RegExp(r'^\d{6}$').hasMatch(texto))
+    if (!RegExp(r'^\d{6}$').hasMatch(texto)) {
       return 'El código tiene 6 dígitos.';
+    }
     return null;
   }
 
