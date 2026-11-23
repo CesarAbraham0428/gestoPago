@@ -32,8 +32,8 @@ URL local predeterminada: `http://localhost:8080`. El registro y los dos pasos d
 | Método | Ruta | Función |
 | --- | --- | --- |
 | POST | `/clientes` | Registrar cliente, domicilio, cuenta y usuario. |
-| POST | `/auth/login` | Paso 1 del acceso: valida `correo` y `password` y envía un código de 6 dígitos al correo. Devuelve un `desafioId`, no un token. |
-| POST | `/auth/verificar` | Paso 2: valida `desafioId` y `codigo` en el servidor y entrega el JWT. `cerrarSesionAnterior: true` confirma terminar la sesión abierta en otro dispositivo (409 si no). |
+| POST | `/auth/login` | Paso 1 del acceso: valida `correo` y `password`. Devuelve un `desafioId`, no un token; la primera vez trae además `enrolamiento` (`secreto` y `otpauthUri` del QR) para enlazar la app autenticadora. |
+| POST | `/auth/verificar` | Paso 2: valida `desafioId` y el `codigo` TOTP de 6 dígitos de la app autenticadora en el servidor y entrega el JWT. `cerrarSesionAnterior: true` confirma terminar la sesión abierta en otro dispositivo (409 si no). |
 | POST | `/auth/logout` | Cierra la sesión del usuario; su JWT deja de ser válido de inmediato. |
 | POST | `/clientes/consultar` | Consultar clientes completos con filtros en un request JSON. |
 | PATCH | `/clientes` | Identificar por RFC/CURP y modificar solo los campos enviados. |
@@ -121,7 +121,7 @@ El saldo se obtiene dentro de cada cuenta devuelta por `POST /cuentas/consultar`
 
 | Control | Cómo funciona |
 | --- | --- |
-| 2FA | Tras validar la contraseña se genera un código aleatorio de 6 dígitos (`SecureRandom`), se guarda **solo su hash** (tabla `desafios_autenticacion`) y se envía por correo. Vence en 5 minutos, admite 5 intentos, se invalida al usarse y un nuevo código reemplaza al anterior (con 30 s de espera entre solicitudes). Se valida siempre en el servidor. |
+| 2FA | TOTP (RFC 6238: HMAC-SHA1, 6 dígitos, 30 s) con una app autenticadora (Google Authenticator, Microsoft Authenticator, Authy). Tras validar la contraseña se abre un desafío (tabla `desafios_autenticacion`) que vence en 5 minutos y admite 5 intentos. El código se valida siempre en el servidor, con ±1 paso de tolerancia de reloj, y **no se puede reutilizar** (`usuarios.totp_ultimo_paso`). El secreto de cada usuario se guarda **cifrado con AES-256-GCM** (la misma llave `GESTOPAGO_TOKEN_KEY`). La primera vez la API entrega el secreto y la URI del QR (`enrolamiento`) y la app queda enlazada al verificar el primer código. No requiere correo ni variables nuevas. |
 | Sesión única | La tabla `sesiones_usuario` guarda una fila por usuario con el `jti` de su JWT. Cada petición debe traer el JWT de esa sesión; si el usuario entra desde otro dispositivo, la API responde `409` hasta que confirme (`cerrarSesionAnterior`), y el token anterior recibe `401 "…iniciaste sesión en otro dispositivo"`. La sesión se reemplaza de forma atómica (`INSERT … ON CONFLICT`). Solo se cierra la sesión anterior **después** de validar contraseña y código. |
 | Cierre de sesión | `POST /auth/logout` borra la sesión: el JWT queda revocado aunque no haya vencido. Cambiar la contraseña también la cierra. |
 | Expiración | El JWT dura `APP_JWT_EXPIRATION_MS` (2 h por omisión). Una sesión vencida no bloquea un nuevo acceso. |
@@ -130,19 +130,27 @@ El saldo se obtiene dentro de cada cuenta devuelta por `POST /cuentas/consultar`
 | Si falla la verificación de sesión | La API rechaza la petición (no autentica "a ciegas"). |
 | Cabeceras y exposición | Swagger apagado por omisión (`SWAGGER_ENABLED`); actuator solo expone `health`; HSTS, `Content-Security-Policy: default-src 'none'`, `Permissions-Policy`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `nosniff` y `Cache-Control: no-store`; CORS sin comodín y cuerpos de petición de hasta 64 KB. |
 
-**Correo del segundo factor.** La API no arranca sin un medio de entrega. Elige uno: la **API de Gmail** por HTTPS (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` y `MAIL_REMITENTE`; sirve en hosts que bloquean el SMTP, como Render gratis) o **SMTP** (`MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` y `MAIL_REMITENTE`; en Gmail, una contraseña de aplicación). Si están ambos, se usa la API de Gmail. Para desarrollo local sin correo, `APP_2FA_CONSOLA=true` escribe el código en el log de la API; **nunca lo actives en producción**.
+**App autenticadora (2FA).** Cada usuario enlaza su app la primera vez que inicia sesión: escanea el QR (web) o escribe la clave (celular) y confirma con el primer código. Después, cada acceso pide el código que muestra la app. Puntos a tener en cuenta:
+
+- El reloj del servidor debe estar sincronizado (NTP): el TOTP depende de la hora.
+- Mientras una cuenta no tiene la app enlazada, cualquiera que inicie sesión con su contraseña ve el mismo secreto y puede enlazar su propia app; seguirá generando códigos válidos aunque el dueño enlace la suya después. Todas las cuentas existentes están en ese estado hasta su próximo acceso. Si pasa, reinicia el enlace con el SQL de abajo.
+- `GESTOPAGO_TOKEN_KEY` también cifra estos secretos: si se cambia, nadie podrá iniciar sesión hasta reiniciar el enlace de todos (SQL de abajo sin `WHERE`).
+- Si un usuario pierde su teléfono no hay recuperación automática. Un administrador puede reiniciar su enlace (tendrá que enlazar de nuevo en su siguiente acceso): `UPDATE usuarios SET totp_secreto = NULL, totp_confirmado = false, totp_ultimo_paso = 0 WHERE correo = '…';`
+- Las variables `MAIL_*`, `GMAIL_*` y `APP_2FA_CONSOLA` ya no se usan; se pueden borrar de `backend/.env` y del despliegue.
 
 Ejemplo de acceso completo:
 
 ```json
 POST /auth/login      {"correo":"ana@example.com","password":"Segura123!"}
-200 -> {"codigo":0,"mensaje":"Te enviamos un código de verificación",
-        "datos":{"desafioId":"…43 caracteres…","expiraEnMs":300000,"correoEnmascarado":"a***@example.com"}}
+200 -> {"codigo":0,"mensaje":"Ingresa el código de tu app autenticadora",
+        "datos":{"desafioId":"…43 caracteres…","expiraEnMs":300000,
+                 "enrolamiento":{"secreto":"JBSWY3DP…","otpauthUri":"otpauth://totp/GestoPago:ana%40example.com?secret=…&issuer=GestoPago"}}}
+        (`enrolamiento` solo viene mientras la cuenta no tiene la app enlazada; después es null)
 
 POST /auth/verificar  {"desafioId":"…","codigo":"123456","cerrarSesionAnterior":false}
 200 -> {"codigo":0,"mensaje":"Sesión iniciada","datos":{"token":"…","tipo":"Bearer","expiraEnMs":7200000,"usuario":"ana@example.com","nombreCompleto":"…"}}
 409 -> ya existe una sesión activa: repetir con "cerrarSesionAnterior": true (el código sigue siendo válido)
-401 -> código incorrecto, vencido o con demasiados intentos · 429 demasiados intentos · 503 no se pudo enviar el correo
+401 -> código incorrecto, vencido o con demasiados intentos · 429 demasiados intentos
 ```
 
 ## Pagos con GestoPago
@@ -367,7 +375,7 @@ Guía paso a paso para **Render** (API, web y Redis desde `render.yaml`; usa tu 
 ## Ejecución local
 
 1. Instala Java 17 e inicia PostgreSQL y Redis.
-2. Copia `backend/.env.example` a `backend/.env` y configura las credenciales de PostgreSQL, GestoPago, `APP_JWT_SECRET` (valor aleatorio de al menos 32 bytes) y el correo del segundo factor (`MAIL_*`, o `APP_2FA_CONSOLA=true` solo en desarrollo). No compartas este archivo.
+2. Copia `backend/.env.example` a `backend/.env` y configura las credenciales de PostgreSQL, GestoPago, `APP_JWT_SECRET` (valor aleatorio de al menos 32 bytes) y `GESTOPAGO_TOKEN_KEY` (también cifra los secretos del 2FA). Para el segundo factor solo necesitas una app autenticadora en tu teléfono. No compartas este archivo.
 3. Ejecuta desde la carpeta `backend/`:
 
    ```powershell

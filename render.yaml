@@ -49,6 +49,7 @@ services:
       # Secretos generados por Render (base64 de 256 bits).
       - key: APP_JWT_SECRET
         generateValue: true
+      # Cifra el token de GestoPago y los secretos 2FA de los usuarios: no la regeneres.
       - key: GESTOPAGO_TOKEN_KEY
         generateValue: true
 
@@ -63,20 +64,6 @@ services:
         sync: false
       - key: GESTOPAGO_PAGOS_IV
         sync: false
-
-      # Segundo factor (2FA) por la API HTTPS de Gmail: Render gratis bloquea el SMTP (puertos 25, 465 y 587),
-      # pero no el 443. MAIL_REMITENTE es la cuenta de Gmail que autorizaste en Google Cloud.
-      - key: GMAIL_CLIENT_ID
-        sync: false
-      - key: GMAIL_CLIENT_SECRET
-        sync: false
-      - key: GMAIL_REFRESH_TOKEN
-        sync: false
-      - key: MAIL_REMITENTE
-        sync: false
-      # "true" escribe el código en el log en vez de enviarlo (solo para pruebas sin Gmail).
-      - key: APP_2FA_CONSOLA
-        value: "false"
 
       # Origen autorizado por CORS: la URL HTTPS del frontend.
       - key: CORS_ORIGENES
