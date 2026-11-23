@@ -16,8 +16,7 @@ RUN apt-get update \
 RUN git clone --depth 1 --branch ${FLUTTER_VERSION} https://github.com/flutter/flutter.git /flutter
 ENV PATH="/flutter/bin:${PATH}"
 RUN git config --global --add safe.directory /flutter \
-    && flutter config --no-analytics --enable-web \
-    && flutter precache --web
+    && flutter config --no-analytics --enable-web
 
 WORKDIR /app
 
