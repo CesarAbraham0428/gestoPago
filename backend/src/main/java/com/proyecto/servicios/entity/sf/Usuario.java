@@ -10,4 +10,11 @@ public class Usuario extends Auditado {
     @Column(nullable=false, length=100) private String correo;
     @Column(name="password_hash", nullable=false, length=60) private String passwordHash;
     @Column(nullable=false) private boolean activo = true;
+    /** Secreto TOTP de la app autenticadora; se guarda cifrado (AES-GCM). */
+    @Convert(converter=com.proyecto.servicios.utils.CifradoTokenConverter.class)
+    @Column(name="totp_secreto", length=255) private String totpSecreto;
+    /** Verdadero cuando el usuario ya demostró con un código que su app tiene el secreto. */
+    @Column(name="totp_confirmado", nullable=false) private boolean totpConfirmado;
+    /** Último paso de 30 s aceptado: un código no se puede usar dos veces. */
+    @Column(name="totp_ultimo_paso", nullable=false) private long totpUltimoPaso;
 }

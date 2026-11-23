@@ -6,13 +6,16 @@ import com.proyecto.servicios.models.request.LoginRequest;
 import com.proyecto.servicios.models.request.VerificacionCodigoRequest;
 import com.proyecto.servicios.models.response.AuthResponse;
 import com.proyecto.servicios.models.response.DesafioResponse;
+import com.proyecto.servicios.models.response.DesafioResponse.Enrolamiento;
 import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import com.proyecto.servicios.security.JwtTokenService;
 import com.proyecto.servicios.security.JwtTokenService.TokenEmitido;
 import com.proyecto.servicios.service.AutenticacionService;
 import com.proyecto.servicios.service.CodigoVerificacionService;
 import com.proyecto.servicios.service.CodigoVerificacionService.Desafio;
+import com.proyecto.servicios.service.CodigoVerificacionService.Verificado;
 import com.proyecto.servicios.service.SesionService;
+import com.proyecto.servicios.service.TotpService;
 import com.proyecto.servicios.service.exception.AutenticacionException;
 import com.proyecto.servicios.service.exception.AutenticacionException.Tipo;
 import com.proyecto.servicios.service.exception.NegocioException;
@@ -27,7 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Inicio de sesión en dos pasos: 1) usuario y contraseña, 2) código enviado por correo. Solo después del
+ * Inicio de sesión en dos pasos: 1) usuario y contraseña, 2) código de la app autenticadora (TOTP). Solo después del
  * segundo paso se emite el JWT y se registra la sesión única del usuario.
  */
 @Service
@@ -38,16 +41,18 @@ public class AutenticacionServiceImpl implements AutenticacionService {
     private final JwtTokenService tokens;
     private final CodigoVerificacionService codigos;
     private final SesionService sesiones;
+    private final TotpService totp;
     /** Se compara contra este hash cuando el correo no existe, para que la respuesta tarde lo mismo. */
     private final String hashFicticio;
 
     public AutenticacionServiceImpl(UsuarioRepository usuarios, PasswordEncoder encoder, JwtTokenService tokens,
-            CodigoVerificacionService codigos, SesionService sesiones) {
+            CodigoVerificacionService codigos, SesionService sesiones, TotpService totp) {
         this.usuarios = usuarios;
         this.encoder = encoder;
         this.tokens = tokens;
         this.codigos = codigos;
         this.sesiones = sesiones;
+        this.totp = totp;
         this.hashFicticio = encoder.encode(UUID.randomUUID().toString());
     }
 
@@ -62,24 +67,35 @@ public class AutenticacionServiceImpl implements AutenticacionService {
         }
         Usuario u = encontrado.get();
         validarActivo(u);
-        Desafio desafio = codigos.emitir(u.getId(), u.getCorreo());
-        return new DesafioResponse(desafio.id(), desafio.vigencia().toMillis(), enmascarar(u.getCorreo()));
+        Enrolamiento enrolamiento = null;
+        if (!u.isTotpConfirmado()) {
+            // Se conserva el secreto aún sin confirmar: regenerarlo invalidaría una app ya escaneada.
+            if (u.getTotpSecreto() == null) {
+                u.setTotpSecreto(totp.nuevoSecreto());
+            }
+            enrolamiento = new Enrolamiento(u.getTotpSecreto(), totp.uri(u.getCorreo(), u.getTotpSecreto()));
+        }
+        Desafio desafio = codigos.emitir(u.getId());
+        return new DesafioResponse(desafio.id(), desafio.vigencia().toMillis(), enrolamiento);
     }
 
     @Override
     @Transactional(noRollbackFor = {NegocioException.class, AutenticacionException.class})
     public AuthResponse verificarCodigo(VerificacionCodigoRequest r) {
-        Integer usuarioId = codigos.verificar(r.desafioId(), r.codigo());
-        Usuario u = usuarios.findById(usuarioId)
-                .orElseThrow(() -> new AutenticacionException(Tipo.CREDENCIALES_INVALIDAS));
+        Verificado verificado = codigos.verificar(r.desafioId(), r.codigo());
+        Usuario u = verificado.usuario();
+        Integer usuarioId = u.getId();
         validarActivo(u);
 
         TokenEmitido token = tokens.emitir(usuarioId.toString());
         if (!sesiones.abrir(usuarioId, token, r.cerrarSesionAnterior())) {
-            // El código no se consume: el cliente confirma y reenvía la misma verificación.
+            // El desafío queda verificado: el cliente confirma y reenvía sin necesitar otro código.
             throw new NegocioException(HttpStatus.CONFLICT,
                     "Ya tienes una sesión activa en otro dispositivo. Ciérrala para continuar aquí");
         }
+        // Solo ahora el código cuenta como usado y la app como enlazada.
+        u.setTotpUltimoPaso(verificado.paso());
+        u.setTotpConfirmado(true);
         codigos.consumir(r.desafioId());
         return new AuthResponse(token.token(), "Bearer", tokens.getExpirationMs(), u.getCorreo(),
                 nombreCompleto(u.getCliente()));
@@ -99,11 +115,5 @@ public class AutenticacionServiceImpl implements AutenticacionService {
     private static String nombreCompleto(Cliente c) {
         return Stream.of(c.getPrimerNombre(), c.getSegundoNombre(), c.getApellidoPaterno(), c.getApellidoMaterno())
                 .filter(Objects::nonNull).reduce((a, b) -> a + " " + b).orElse("");
-    }
-
-    /** ana@correo.com -> a***@correo.com */
-    static String enmascarar(String correo) {
-        int arroba = correo.indexOf('@');
-        return arroba <= 0 ? "***" : correo.charAt(0) + "***" + correo.substring(arroba);
     }
 }

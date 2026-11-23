@@ -29,12 +29,12 @@ public class AutenticacionController {
         this.limite = limite;
     }
 
-    /** Paso 1: credenciales. Responde con un desafío; el token se entrega hasta verificar el código. */
+    /** Paso 1: credenciales. Responde con un desafío (y los datos para enlazar la app la primera vez); el token se entrega hasta verificar el código. */
     @PostMapping("/login")
     public GenericResponse<DesafioResponse> iniciarSesion(@Valid @RequestBody LoginRequest request,
             HttpServletRequest http) {
         limite.verificarInicioDeSesion(DireccionCliente.de(http), request.correo());
-        return GenericResponse.exito("Te enviamos un código de verificación", service.iniciarSesion(request));
+        return GenericResponse.exito("Ingresa el código de tu app autenticadora", service.iniciarSesion(request));
     }
 
     /** Paso 2: código del segundo factor. 409 si ya hay otra sesión y no se confirmó cerrarla. */

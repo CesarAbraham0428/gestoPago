@@ -24,6 +24,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
+import com.proyecto.servicios.utils.LimitadorVentanaFija;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,14 +55,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class PagosPostgresTest {
     @SpringBootConfiguration @EnableAutoConfiguration
-    @Import({ConfigDB.class, FlywayConfig.class, SecurityConfiguration.class, JwtTokenService.class, ApiSecurityErrorWriter.class,
+    @Import({ConfigDB.class, FlywayConfig.class, SecurityConfiguration.class, JwtTokenService.class, ApiSecurityErrorWriter.class, LimitadorVentanaFija.class,
         ClienteController.class, CuentaController.class, UsuarioController.class, AutenticacionController.class,
         PagoController.class, GlobalExceptionHandler.class,
         ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class, UsuarioService.class,
         AutenticacionServiceImpl.class, PagoServiceImpl.class, PagoRegistroService.class, PinAutorizacionService.class,
         GestoPagoPagosGateway.class, ResolutorDestinoPago.class, VerificadorAdeudo.class, ConciliacionPagoService.class,
         FirmaGestoPago.class, CifradoTokenConverter.class,
-        CodigoVerificacionService.class, SesionService.class, EnviadorCodigoDePrueba.class})
+        CodigoVerificacionService.class, SesionService.class, TotpService.class, RelojDePrueba.class,
+        CodigosDePrueba.class})
     static class Config {}
 
     @DynamicPropertySource static void propiedades(DynamicPropertyRegistry r) {
@@ -69,7 +71,10 @@ class PagosPostgresTest {
         r.add("spring.datasource.username", () -> System.getenv("TEST_DB_USERNAME"));
         r.add("spring.datasource.password", () -> System.getenv("TEST_DB_PASSWORD"));
         r.add("gestopago.app.jwt.secret", () -> "test-only-secret-012345678901234567890123456789");
-        r.add("gestopago.app.2fa.espera-segundos", () -> "0");
+        // Estas pruebas hacen cientos de llamadas desde una sola IP: los límites globales no son lo que se prueba aquí.
+        r.add("gestopago.app.limites.global-por-ip", () -> "1000000");
+        r.add("gestopago.app.limites.global-por-usuario", () -> "1000000");
+        r.add("gestopago.app.limites.rafaga-publica-por-ip", () -> "1000000");
         r.add("gestopago.auth.token-key", () -> "HPo7OLqB4Fkk4E2yGOtwqw8H5fHR9kNx67OR4g4UdlA=");
         r.add("gestopago.pagos.secret_key", () -> "HPo7OLqB4Fkk4E2yGOtwqw8H5fHR9kNx67OR4g4UdlA=");
         r.add("gestopago.pagos.iv", () -> "p5ldmBPdd/9pjC0bDC/nSg==");
@@ -95,7 +100,7 @@ class PagosPostgresTest {
     @MockBean GestoPagoTokenService tokens;
     @MockBean LimitePagosService limite;
     @MockBean LimiteAutenticacionService limiteAutenticacion;
-    @Autowired EnviadorCodigoDePrueba correo;
+    @Autowired CodigosDePrueba codigos;
     private JdbcTemplate jdbc;
     private String token;
     private String numeroCuenta;
@@ -279,7 +284,7 @@ class PagosPostgresTest {
             .content("{\"correo\":\"" + usuario + "\",\"password\":\"Segura123!\"}"))
             .andExpect(status().isOk())).get("desafioId").asText();
         return datos(mvc.perform(post("/auth/verificar").contentType("application/json")
-            .content("{\"desafioId\":\"" + desafio + "\",\"codigo\":\"" + correo.ultimoCodigo()
+            .content("{\"desafioId\":\"" + desafio + "\",\"codigo\":\"" + codigos.nuevoCodigo(usuario)
                 + "\",\"cerrarSesionAnterior\":true}")).andExpect(status().isOk())).get("token").asText();
     }
 

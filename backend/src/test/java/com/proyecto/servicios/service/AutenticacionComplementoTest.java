@@ -16,11 +16,11 @@ import com.proyecto.servicios.models.response.AuthResponse;
 import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import com.proyecto.servicios.security.JwtTokenService;
 import com.proyecto.servicios.security.JwtTokenService.TokenEmitido;
+import com.proyecto.servicios.service.CodigoVerificacionService.Verificado;
 import com.proyecto.servicios.service.Impl.AutenticacionServiceImpl;
 import com.proyecto.servicios.service.exception.AutenticacionException;
 import com.proyecto.servicios.service.exception.NegocioException;
 import java.time.Instant;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -33,7 +33,8 @@ class AutenticacionComplementoTest {
     private final CodigoVerificacionService codigos = mock(CodigoVerificacionService.class);
     private final SesionService sesiones = mock(SesionService.class);
     private final AutenticacionServiceImpl servicio =
-            new AutenticacionServiceImpl(usuarios, new BCryptPasswordEncoder(4), tokens, codigos, sesiones);
+            new AutenticacionServiceImpl(usuarios, new BCryptPasswordEncoder(4), tokens, codigos, sesiones,
+                    mock(TotpService.class));
 
     private static Usuario usuario(String primerNombre, String segundoNombre, String correo) {
         Cliente cliente = new Cliente();
@@ -51,36 +52,22 @@ class AutenticacionComplementoTest {
     }
 
     @Test
-    void siElUsuarioDelDesafioYaNoExisteSeRechazanLasCredenciales() {
-        when(codigos.verificar(DESAFIO, "123456")).thenReturn(7);
-        when(usuarios.findById(7)).thenReturn(Optional.empty());
-
-        AutenticacionException error =
-                assertThrows(AutenticacionException.class, () -> servicio.verificarCodigo(verificacion(false)));
-
-        assertEquals(AutenticacionException.Tipo.CREDENCIALES_INVALIDAS, error.getTipo());
-        verify(tokens, never()).emitir(any());
-    }
-
-    @Test
     void unUsuarioOClienteInactivoNoObtieneSesion() {
         Usuario inactivo = usuario("Ana", null, "ana@example.com");
         inactivo.setActivo(false);
-        when(codigos.verificar(DESAFIO, "123456")).thenReturn(7);
-        when(usuarios.findById(7)).thenReturn(Optional.of(inactivo));
+        when(codigos.verificar(DESAFIO, "123456")).thenReturn(new Verificado(inactivo, 1));
         assertEquals(AutenticacionException.Tipo.CUENTA_INACTIVA, assertThrows(AutenticacionException.class,
                 () -> servicio.verificarCodigo(verificacion(false))).getTipo());
 
         Usuario clienteInactivo = usuario("Ana", null, "ana@example.com");
         clienteInactivo.getCliente().setActivo(false);
-        when(usuarios.findById(7)).thenReturn(Optional.of(clienteInactivo));
+        when(codigos.verificar(DESAFIO, "123456")).thenReturn(new Verificado(clienteInactivo, 1));
         assertThrows(AutenticacionException.class, () -> servicio.verificarCodigo(verificacion(false)));
     }
 
     @Test
     void conUnaSesionActivaSinPermisoParaCerrarlaSeResponde409YElCodigoNoSeConsume() {
-        when(codigos.verificar(DESAFIO, "123456")).thenReturn(7);
-        when(usuarios.findById(7)).thenReturn(Optional.of(usuario("Ana", null, "ana@example.com")));
+        when(codigos.verificar(DESAFIO, "123456")).thenReturn(new Verificado(usuario("Ana", null, "ana@example.com"), 1));
         when(tokens.emitir("7")).thenReturn(new TokenEmitido("jwt", "jti", Instant.now()));
         when(sesiones.abrir(any(), any(), anyBoolean())).thenReturn(false);
 
@@ -93,8 +80,7 @@ class AutenticacionComplementoTest {
 
     @Test
     void unaVerificacionCorrectaAbreLaSesionConsumeElCodigoYArmaElNombre() {
-        when(codigos.verificar(DESAFIO, "123456")).thenReturn(7);
-        when(usuarios.findById(7)).thenReturn(Optional.of(usuario("Ana", "María", "ana@example.com")));
+        when(codigos.verificar(DESAFIO, "123456")).thenReturn(new Verificado(usuario("Ana", "María", "ana@example.com"), 1));
         TokenEmitido emitido = new TokenEmitido("jwt", "jti", Instant.now());
         when(tokens.emitir("7")).thenReturn(emitido);
         when(tokens.getExpirationMs()).thenReturn(60_000L);
@@ -110,8 +96,7 @@ class AutenticacionComplementoTest {
 
     @Test
     void sinNingunNombreElNombreCompletoEsVacio() {
-        when(codigos.verificar(DESAFIO, "123456")).thenReturn(7);
-        when(usuarios.findById(7)).thenReturn(Optional.of(usuario(null, null, "ana@example.com")));
+        when(codigos.verificar(DESAFIO, "123456")).thenReturn(new Verificado(usuario(null, null, "ana@example.com"), 1));
         TokenEmitido emitido = new TokenEmitido("jwt", "jti", Instant.now());
         when(tokens.emitir("7")).thenReturn(emitido);
         when(sesiones.abrir(7, emitido, false)).thenReturn(true);

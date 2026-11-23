@@ -6,7 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** Código de verificación (segundo factor) pendiente de un usuario. Nunca guarda el código en claro. */
+/** Primer paso del acceso superado (contraseña correcta); queda pendiente el código TOTP del segundo factor. */
 @Entity
 @Table(name = "desafios_autenticacion")
 @Getter
@@ -20,11 +20,16 @@ public class DesafioAutenticacion {
     @Column(name = "usuario_id", nullable = false, updatable = false)
     private Integer usuarioId;
 
-    @Column(name = "codigo_hash", nullable = false, length = 64, updatable = false)
-    private String codigoHash;
-
     @Column(nullable = false)
     private int intentos;
+
+    /** El código ya fue aceptado; se reintenta solo la confirmación de cerrar otra sesión. */
+    @Column(nullable = false)
+    private boolean verificado;
+
+    /** Paso TOTP del código aceptado. */
+    @Column(nullable = false)
+    private long paso;
 
     @Column(name = "creado_en", nullable = false, updatable = false)
     private Instant creadoEn;

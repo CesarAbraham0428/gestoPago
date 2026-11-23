@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Cifra el token Bearer de GestoPago en la BD con AES-256-GCM. Se guarda en Base64 como IV (12 bytes) + texto cifrado.
+ * Cifra en la BD el token Bearer de GestoPago y el secreto TOTP de los usuarios con AES-256-GCM. Se guarda en Base64 como IV (12 bytes) + texto cifrado.
  * La llave (32 bytes en Base64) llega por variable de entorno y es distinta de la llave de firma de GestoPago.
  */
 @Component
@@ -68,7 +68,7 @@ public class CifradoTokenConverter implements AttributeConverter<String, String>
             return cipher.doFinal(datos);
         } catch (GeneralSecurityException e) {
             // Sin causa: el mensaje del proveedor criptográfico no debe llegar a los logs.
-            throw new IllegalStateException("No se pudo procesar el token cifrado de GestoPago");
+            throw new IllegalStateException("No se pudo cifrar o descifrar un dato protegido (revisa gestopago.auth.token-key)");
         }
     }
 }

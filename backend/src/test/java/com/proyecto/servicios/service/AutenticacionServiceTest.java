@@ -11,6 +11,7 @@ import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import com.proyecto.servicios.security.JwtTokenService;
 import com.proyecto.servicios.security.JwtTokenService.TokenEmitido;
 import com.proyecto.servicios.service.CodigoVerificacionService.Desafio;
+import com.proyecto.servicios.service.CodigoVerificacionService.Verificado;
 import com.proyecto.servicios.service.Impl.AutenticacionServiceImpl;
 import com.proyecto.servicios.service.exception.AutenticacionException;
 import com.proyecto.servicios.service.exception.AutenticacionException.Tipo;
@@ -35,12 +36,13 @@ class AutenticacionServiceTest {
     @Mock JwtTokenService tokens;
     @Mock CodigoVerificacionService codigos;
     @Mock SesionService sesiones;
+    @Mock TotpService totp;
     final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
     AutenticacionService service;
 
     @BeforeEach
     void preparar() {
-        service = new AutenticacionServiceImpl(usuarios, encoder, tokens, codigos, sesiones);
+        service = new AutenticacionServiceImpl(usuarios, encoder, tokens, codigos, sesiones, totp);
     }
 
     private Usuario usuario() {
@@ -61,16 +63,49 @@ class AutenticacionServiceTest {
     }
 
     @Test
-    void loginValidoEnviaCodigoYNoEmiteToken() {
-        when(usuarios.findByCorreoIgnoreCase("ana@example.com")).thenReturn(Optional.of(usuario()));
-        when(codigos.emitir(7, "ana@example.com")).thenReturn(new Desafio(DESAFIO, Duration.ofMinutes(5)));
+    void primerLoginEntregaElSecretoParaEnlazarLaAppYNoEmiteToken() {
+        Usuario u = usuario();
+        when(usuarios.findByCorreoIgnoreCase("ana@example.com")).thenReturn(Optional.of(u));
+        when(codigos.emitir(7)).thenReturn(new Desafio(DESAFIO, Duration.ofMinutes(5)));
+        when(totp.nuevoSecreto()).thenReturn("SECRETO");
+        when(totp.uri("ana@example.com", "SECRETO")).thenReturn("otpauth://totp/x");
 
         var r = service.iniciarSesion(new LoginRequest(" ANA@EXAMPLE.COM ", "Segura123!"));
 
         assertEquals(DESAFIO, r.desafioId());
-        assertEquals("a***@example.com", r.correoEnmascarado());
         assertEquals(300_000, r.expiraEnMs());
+        assertEquals("SECRETO", r.enrolamiento().secreto());
+        assertEquals("otpauth://totp/x", r.enrolamiento().otpauthUri());
+        assertEquals("SECRETO", u.getTotpSecreto());
         verifyNoInteractions(tokens, sesiones);
+    }
+
+    @Test
+    void siElSecretoAunNoSeConfirmoSeReutilizaEnLugarDeRegenerarlo() {
+        Usuario u = usuario();
+        u.setTotpSecreto("YAESCANEADO");
+        when(usuarios.findByCorreoIgnoreCase("ana@example.com")).thenReturn(Optional.of(u));
+        when(codigos.emitir(7)).thenReturn(new Desafio(DESAFIO, Duration.ofMinutes(5)));
+        when(totp.uri("ana@example.com", "YAESCANEADO")).thenReturn("otpauth://totp/y");
+
+        var r = service.iniciarSesion(new LoginRequest("ana@example.com", "Segura123!"));
+
+        assertEquals("YAESCANEADO", r.enrolamiento().secreto());
+        verify(totp, never()).nuevoSecreto();
+    }
+
+    @Test
+    void conLaAppYaEnlazadaNoSeVuelveAEntregarElSecreto() {
+        Usuario u = usuario();
+        u.setTotpSecreto("SECRETO");
+        u.setTotpConfirmado(true);
+        when(usuarios.findByCorreoIgnoreCase("ana@example.com")).thenReturn(Optional.of(u));
+        when(codigos.emitir(7)).thenReturn(new Desafio(DESAFIO, Duration.ofMinutes(5)));
+
+        var r = service.iniciarSesion(new LoginRequest("ana@example.com", "Segura123!"));
+
+        assertNull(r.enrolamiento());
+        verifyNoInteractions(totp);
     }
 
     @Test
@@ -78,7 +113,7 @@ class AutenticacionServiceTest {
         when(usuarios.findByCorreoIgnoreCase("ana@example.com")).thenReturn(Optional.of(usuario()));
         assertEquals(Tipo.CREDENCIALES_INVALIDAS,
                 tipo(() -> service.iniciarSesion(new LoginRequest("ana@example.com", "incorrecta"))));
-        verifyNoInteractions(tokens, codigos, sesiones);
+        verifyNoInteractions(tokens, codigos, sesiones, totp);
     }
 
     @Test
@@ -86,7 +121,7 @@ class AutenticacionServiceTest {
         when(usuarios.findByCorreoIgnoreCase("nadie@example.com")).thenReturn(Optional.empty());
         assertEquals(Tipo.CREDENCIALES_INVALIDAS,
                 tipo(() -> service.iniciarSesion(new LoginRequest("nadie@example.com", "Segura123!"))));
-        verifyNoInteractions(tokens, codigos, sesiones);
+        verifyNoInteractions(tokens, codigos, sesiones, totp);
     }
 
     @Test
@@ -101,13 +136,12 @@ class AutenticacionServiceTest {
             assertEquals(Tipo.CUENTA_INACTIVA,
                     tipo(() -> service.iniciarSesion(new LoginRequest("ana@example.com", "Segura123!"))));
         }
-        verifyNoInteractions(tokens, codigos, sesiones);
+        verifyNoInteractions(tokens, codigos, sesiones, totp);
     }
 
     @Test
     void codigoCorrectoAbreLaSesionYConsumeElDesafio() {
-        when(codigos.verificar(DESAFIO, "123456")).thenReturn(7);
-        when(usuarios.findById(7)).thenReturn(Optional.of(usuario()));
+        when(codigos.verificar(DESAFIO, "123456")).thenReturn(new Verificado(usuario(), 42));
         TokenEmitido token = new TokenEmitido("jwt", "jti-1", Instant.now().plusSeconds(60));
         when(tokens.emitir("7")).thenReturn(token);
         when(tokens.getExpirationMs()).thenReturn(60000L);
@@ -124,9 +158,37 @@ class AutenticacionServiceTest {
     }
 
     @Test
+    void alAbrirLaSesionElCodigoQuedaUsadoYLaAppEnlazada() {
+        Usuario u = usuario();
+        when(codigos.verificar(DESAFIO, "123456")).thenReturn(new Verificado(u, 42));
+        TokenEmitido token = new TokenEmitido("jwt", "jti-1", Instant.now().plusSeconds(60));
+        when(tokens.emitir("7")).thenReturn(token);
+        when(sesiones.abrir(7, token, false)).thenReturn(true);
+
+        service.verificarCodigo(new VerificacionCodigoRequest(DESAFIO, "123456", false));
+
+        assertEquals(42, u.getTotpUltimoPaso());
+        assertTrue(u.isTotpConfirmado());
+    }
+
+    @Test
+    void conSesionActivaElPasoNoSeAnotaParaPoderReintentarConElMismoCodigo() {
+        Usuario u = usuario();
+        when(codigos.verificar(DESAFIO, "123456")).thenReturn(new Verificado(u, 42));
+        TokenEmitido token = new TokenEmitido("jwt", "jti-1", Instant.now().plusSeconds(60));
+        when(tokens.emitir("7")).thenReturn(token);
+        when(sesiones.abrir(7, token, false)).thenReturn(false);
+
+        assertThrows(NegocioException.class,
+                () -> service.verificarCodigo(new VerificacionCodigoRequest(DESAFIO, "123456", false)));
+
+        assertEquals(0, u.getTotpUltimoPaso());
+        assertFalse(u.isTotpConfirmado());
+    }
+
+    @Test
     void conSesionActivaSinConfirmarResponde409YConservaElDesafio() {
-        when(codigos.verificar(DESAFIO, "123456")).thenReturn(7);
-        when(usuarios.findById(7)).thenReturn(Optional.of(usuario()));
+        when(codigos.verificar(DESAFIO, "123456")).thenReturn(new Verificado(usuario(), 42));
         TokenEmitido token = new TokenEmitido("jwt", "jti-1", Instant.now().plusSeconds(60));
         when(tokens.emitir("7")).thenReturn(token);
         when(sesiones.abrir(7, token, false)).thenReturn(false);
@@ -140,8 +202,7 @@ class AutenticacionServiceTest {
 
     @Test
     void confirmandoElCierreReemplazaLaSesionAnterior() {
-        when(codigos.verificar(DESAFIO, "123456")).thenReturn(7);
-        when(usuarios.findById(7)).thenReturn(Optional.of(usuario()));
+        when(codigos.verificar(DESAFIO, "123456")).thenReturn(new Verificado(usuario(), 42));
         TokenEmitido token = new TokenEmitido("jwt", "jti-2", Instant.now().plusSeconds(60));
         when(tokens.emitir("7")).thenReturn(token);
         when(sesiones.abrir(7, token, true)).thenReturn(true);

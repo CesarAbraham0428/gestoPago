@@ -9,6 +9,8 @@ import com.proyecto.servicios.controller.advice.GlobalExceptionHandler;
 import com.proyecto.servicios.security.*;
 import com.proyecto.servicios.service.*;
 import com.proyecto.servicios.service.Impl.*;
+import com.proyecto.servicios.utils.CifradoTokenConverter;
+import com.proyecto.servicios.utils.LimitadorVentanaFija;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -43,12 +45,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class ClientesPostgresTest {
     @SpringBootConfiguration @EnableAutoConfiguration
-    @Import({ConfigDB.class, FlywayConfig.class, SecurityConfiguration.class, JwtTokenService.class, ApiSecurityErrorWriter.class,
+    @Import({ConfigDB.class, FlywayConfig.class, SecurityConfiguration.class, JwtTokenService.class, ApiSecurityErrorWriter.class, LimitadorVentanaFija.class,
         ClienteController.class, CuentaController.class, UsuarioController.class, AutenticacionController.class,
         GlobalExceptionHandler.class,
         ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class,
         UsuarioService.class, AutenticacionServiceImpl.class, PinAutorizacionService.class,
-        CodigoVerificacionService.class, SesionService.class, EnviadorCodigoDePrueba.class})
+        CodigoVerificacionService.class, SesionService.class, TotpService.class, CifradoTokenConverter.class, RelojDePrueba.class,
+        CodigosDePrueba.class})
     static class Config {}
 
     @DynamicPropertySource static void propiedades(DynamicPropertyRegistry r) {
@@ -56,7 +59,10 @@ class ClientesPostgresTest {
         r.add("spring.datasource.username", () -> System.getenv("TEST_DB_USERNAME"));
         r.add("spring.datasource.password", () -> System.getenv("TEST_DB_PASSWORD"));
         r.add("gestopago.app.jwt.secret", () -> "test-only-secret-012345678901234567890123456789");
-        r.add("gestopago.app.2fa.espera-segundos", () -> "0");
+        // Estas pruebas hacen cientos de llamadas desde una sola IP: los límites globales no son lo que se prueba aquí.
+        r.add("gestopago.app.limites.global-por-ip", () -> "1000000");
+        r.add("gestopago.app.limites.global-por-usuario", () -> "1000000");
+        r.add("gestopago.app.limites.rafaga-publica-por-ip", () -> "1000000");
         r.add("gestopago.auth.token-key", () -> "HPo7OLqB4Fkk4E2yGOtwqw8H5fHR9kNx67OR4g4UdlA=");
     }
     @Autowired MockMvc mvc;
@@ -64,7 +70,7 @@ class ClientesPostgresTest {
     @Autowired DataSource datasource;
     @SpyBean PasswordEncoder encoder;
     @MockBean LimiteAutenticacionService limiteAutenticacion;
-    @Autowired EnviadorCodigoDePrueba correo;
+    @Autowired CodigosDePrueba codigos;
     private JdbcTemplate jdbc;
 
     @BeforeEach void aislarDatos() {
@@ -619,22 +625,44 @@ class ClientesPostgresTest {
         return json(mvc.perform(post("/auth/login").contentType("application/json").content(credenciales(correo, password)))
             .andExpect(status().isOk()).andExpect(jsonPath("datos.token").doesNotExist()).andReturn()).get("desafioId").asText();
     }
-    @Test void elLoginSoloEmiteTokenDespuesDeVerificarElCodigoYGuardaSoloSuHash() throws Exception {
+    @Test void elPrimerLoginEntregaElSecretoYSoloSeEmiteTokenDespuesDeVerificarElCodigoTotp() throws Exception {
         crear(registro("1"));
-        String desafio = desafio("ana1@example.com", "Segura123!");
-        String codigo = this.correo.ultimoCodigo();
-        assertEquals(1, jdbc.queryForObject("select count(*) from desafios_autenticacion", Integer.class));
-        assertNotEquals(codigo, jdbc.queryForObject("select codigo_hash from desafios_autenticacion", String.class));
+        JsonNode primero = json(mvc.perform(post("/auth/login").contentType("application/json")
+            .content(credenciales("ana1@example.com", "Segura123!"))).andExpect(status().isOk())
+            .andExpect(jsonPath("datos.token").doesNotExist()).andReturn());
+        String desafio = primero.get("desafioId").asText();
+        String secreto = primero.get("enrolamiento").get("secreto").asText();
+        assertTrue(primero.get("enrolamiento").get("otpauthUri").asText().contains("secret=" + secreto));
+        // El secreto se guarda cifrado y todavía sin confirmar.
+        assertNotEquals(secreto, jdbc.queryForObject("select totp_secreto from usuarios", String.class));
+        assertFalse(jdbc.queryForObject("select totp_confirmado from usuarios", Boolean.class));
         assertEquals(0, jdbc.queryForObject("select count(*) from sesiones_usuario", Integer.class));
-        mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(desafio, codigo, false)))
+        mvc.perform(post("/auth/verificar").contentType("application/json")
+            .content(verificar(desafio, codigos.nuevoCodigo("ana1@example.com"), false)))
             .andExpect(status().isOk()).andExpect(jsonPath("datos.token").isNotEmpty());
         assertEquals(1, jdbc.queryForObject("select count(*) from sesiones_usuario", Integer.class));
         assertEquals(0, jdbc.queryForObject("select count(*) from desafios_autenticacion", Integer.class));
+        assertTrue(jdbc.queryForObject("select totp_confirmado from usuarios", Boolean.class));
+        // Con la app ya enlazada el secreto no se vuelve a mostrar.
+        JsonNode segundo = json(mvc.perform(post("/auth/login").contentType("application/json")
+            .content(credenciales("ana1@example.com", "Segura123!"))).andExpect(status().isOk()).andReturn());
+        assertTrue(segundo.get("enrolamiento").isNull());
+    }
+    @Test void elMismoCodigoTotpNoSirveParaDosInicios() throws Exception {
+        crear(registro("1"));
+        login("ana1@example.com", "Segura123!");
+        String desafio = desafio("ana1@example.com", "Segura123!");
+        String repetido = codigos.nuevoCodigo("ana1@example.com");
+        mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(desafio, repetido, true)))
+            .andExpect(status().isOk());
+        String otro = desafio("ana1@example.com", "Segura123!");
+        mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(otro, repetido, true)))
+            .andExpect(status().isUnauthorized());
     }
     @Test void elCodigoSoloSirveUnaVezYTrasLosIntentosMaximosSeInvalida() throws Exception {
         crear(registro("1"));
         String desafio = desafio("ana1@example.com", "Segura123!");
-        String correcto = this.correo.ultimoCodigo();
+        String correcto = codigos.nuevoCodigo("ana1@example.com");
         String incorrecto = "000000".equals(correcto) ? "000001" : "000000";
         for (int i = 0; i < 4; i++) {
             mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(desafio, incorrecto, false)))
@@ -649,7 +677,7 @@ class ClientesPostgresTest {
     @Test void unCodigoUsadoNoSeReutiliza() throws Exception {
         crear(registro("1"));
         String desafio = desafio("ana1@example.com", "Segura123!");
-        String codigo = this.correo.ultimoCodigo();
+        String codigo = codigos.nuevoCodigo("ana1@example.com");
         mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(desafio, codigo, false)))
             .andExpect(status().isOk());
         mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(desafio, codigo, true)))
@@ -659,7 +687,7 @@ class ClientesPostgresTest {
         crear(registro("1"));
         String primera = login("ana1@example.com", "Segura123!");
         String desafio = desafio("ana1@example.com", "Segura123!");
-        String codigo = this.correo.ultimoCodigo();
+        String codigo = codigos.nuevoCodigo("ana1@example.com");
         mvc.perform(post("/auth/verificar").contentType("application/json").content(verificar(desafio, codigo, false)))
             .andExpect(status().isConflict());
         // La primera sesión sigue activa y el código no se consumió.
@@ -678,7 +706,7 @@ class ClientesPostgresTest {
         mvc.perform(get("/usuarios/me").header("Authorization", "Bearer " + token)).andExpect(status().isUnauthorized());
         String desafio = desafio("ana1@example.com", "Segura123!");
         mvc.perform(post("/auth/verificar").contentType("application/json")
-            .content(verificar(desafio, this.correo.ultimoCodigo(), false))).andExpect(status().isOk());
+            .content(verificar(desafio, codigos.nuevoCodigo("ana1@example.com"), false))).andExpect(status().isOk());
     }
     @Test void unaSesionVencidaNoBloqueaUnNuevoInicioDeSesion() throws Exception {
         crear(registro("1"));
@@ -686,7 +714,7 @@ class ClientesPostgresTest {
         jdbc.update("update sesiones_usuario set expira_en = now() - interval '1 minute'");
         String desafio = desafio("ana1@example.com", "Segura123!");
         mvc.perform(post("/auth/verificar").contentType("application/json")
-            .content(verificar(desafio, this.correo.ultimoCodigo(), false))).andExpect(status().isOk());
+            .content(verificar(desafio, codigos.nuevoCodigo("ana1@example.com"), false))).andExpect(status().isOk());
     }
     @Test void cambiarLaPasswordCierraLaSesionActual() throws Exception {
         crear(registro("1"));
@@ -708,7 +736,7 @@ class ClientesPostgresTest {
         String desafio = json(mvc.perform(post("/auth/login").contentType("application/json").content(credenciales(correo, password)))
             .andExpect(status().isOk()).andReturn()).get("desafioId").asText();
         return json(mvc.perform(post("/auth/verificar").contentType("application/json")
-            .content(mapper.createObjectNode().put("desafioId", desafio).put("codigo", this.correo.ultimoCodigo())
+            .content(mapper.createObjectNode().put("desafioId", desafio).put("codigo", codigos.nuevoCodigo(correo))
                 .put("cerrarSesionAnterior", true).toString()))
             .andExpect(status().isOk()).andReturn()).get("token").asText();
     }

@@ -39,11 +39,13 @@ class AutenticacionControllerTest {
     @Test
     void loginDevuelveElDesafioSinTokenNiContrasena() throws Exception {
         when(service.iniciarSesion(new LoginRequest("ana@example.com", "Segura123!")))
-                .thenReturn(new DesafioResponse(DESAFIO, 300000, "a***@example.com"));
+                .thenReturn(new DesafioResponse(DESAFIO, 300000, new DesafioResponse.Enrolamiento("SECRETO", "otpauth://totp/x")));
         mvc.perform(post("/auth/login").contentType("application/json")
                 .content("{\"correo\":\"ana@example.com\",\"password\":\"Segura123!\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("codigo").value(0))
                 .andExpect(jsonPath("datos.desafioId").value(DESAFIO))
+                .andExpect(jsonPath("datos.enrolamiento.secreto").value("SECRETO"))
+                .andExpect(jsonPath("datos.enrolamiento.otpauthUri").value("otpauth://totp/x"))
                 .andExpect(jsonPath("datos.token").doesNotExist())
                 .andExpect(jsonPath("datos.password").doesNotExist());
         verify(limite).verificarInicioDeSesion(any(), eq("ana@example.com"));

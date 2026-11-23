@@ -7,7 +7,7 @@ import com.proyecto.servicios.models.response.DesafioResponse;
 
 public interface AutenticacionService {
 
-    /** Paso 1: valida usuario y contraseña y envía el código del segundo factor. No emite token. */
+    /** Paso 1: valida usuario y contraseña y abre el desafío del segundo factor (código de la app autenticadora). No emite token. */
     DesafioResponse iniciarSesion(LoginRequest request);
 
     /** Paso 2: valida el código en el servidor y abre la sesión única del usuario. */
