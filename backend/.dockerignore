@@ -1,0 +1,14 @@
+# Fuera de la imagen: secretos, salidas de compilación y archivos del IDE.
+.env
+.env.*
+!.env.example
+.gradle
+build
+bin
+out
+.idea
+.vscode
+*.iml
+scripts
+Dockerfile
+.dockerignore

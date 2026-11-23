@@ -1,6 +1,6 @@
 # GestoAPI
 
-API REST para registrar y administrar clientes, domicilios, cuentas bancarias y usuarios de acceso. Incluye autenticación con JWT y consulta del catálogo de productos de GestoPago. Está desarrollada con Java 17, Spring Boot, PostgreSQL y Redis; el backend se ejecuta de forma independiente del contenido de `frontend/`.
+API REST para registrar y administrar clientes, domicilios, cuentas bancarias y usuarios de acceso. Incluye autenticación con JWT, consulta del catálogo de productos de GestoPago y pago de recargas y servicios con el saldo de la cuenta. Está desarrollada con Java 17, Spring Boot, PostgreSQL y Redis; el backend se ejecuta de forma independiente del contenido de `frontend/`.
 
 ## Solución implementada
 
@@ -27,12 +27,16 @@ El catálogo se consulta en el orden Redis → PostgreSQL → GestoPago. Los dat
 
 ## Endpoints de la API
 
-URL local predeterminada: `http://localhost:8080`. El registro y el login son públicos; los demás endpoints de esta tabla requieren JWT.
+URL local predeterminada: `http://localhost:8080`. El registro y los dos pasos del acceso son públicos; los demás endpoints de esta tabla requieren JWT.
 
 | Método | Ruta | Función |
 | --- | --- | --- |
 | POST | `/clientes` | Registrar cliente, domicilio, cuenta y usuario. |
-| POST | `/auth/login` | Iniciar sesión con `correo` y `password`. |
+| POST | `/auth/login` | Paso 1 del acceso: valida `correo` y `password`. Devuelve un `desafioId`, no un token; la primera vez trae además `enrolamiento` (`secreto` y `otpauthUri` del QR) para enlazar la app autenticadora. |
+| POST | `/auth/verificar` | Paso 2: valida `desafioId` y el `codigo` TOTP de 6 dígitos de la app autenticadora en el servidor y entrega el JWT. `cerrarSesionAnterior: true` confirma terminar la sesión abierta en otro dispositivo (409 si no). |
+| POST | `/auth/logout` | Cierra la sesión del usuario; su JWT deja de ser válido de inmediato. |
+| GET | `/auth/sesion/eventos` | Canal Server-Sent Events (`text/event-stream`) de la sesión del JWT. Envía `conectado` al abrir, un comentario de latido cada 25 s y `sesion_cerrada` (con el motivo en `data`) en cuanto la sesión se cierra o la reemplaza otro dispositivo; después cierra el canal. 401 si la sesión ya no era válida al conectar. |
+| POST | `/clientes/disponibilidad` | Público. Recibe `curp`, `rfc`, `telefonoMovil` y/o `correoElectronico` y devuelve `datos.duplicados` con los que ya pertenecen a otra cuenta. |
 | POST | `/clientes/consultar` | Consultar clientes completos con filtros en un request JSON. |
 | PATCH | `/clientes` | Identificar por RFC/CURP y modificar solo los campos enviados. |
 | POST | `/clientes/desactivar` | Dar de baja lógica mediante RFC o CURP. |
@@ -42,8 +46,12 @@ URL local predeterminada: `http://localhost:8080`. El registro y el login son p�
 | POST | `/usuarios/consultar` | Consultar usuarios mediante filtros combinables en JSON. |
 | PUT | `/usuarios/me/password` | Cambiar su contraseña con `passwordActual` y `passwordNueva`. |
 | GET | `/productos` | Consultar el catálogo de GestoPago. |
+| PUT | `/cuentas/pin` | Configurar o cambiar el PIN de autorización de pagos de una cuenta. |
+| POST | `/pagos` | Pagar una recarga (`tipoFront 1`) o un servicio con referencia (`tipoFront 2`) con el saldo de la cuenta. |
+| POST | `/pagos/consulta` | Consultar el estado de un pago con su `upc`. |
+| POST | `/pagos/historial` | Historial paginado de pagos del usuario autenticado, del más reciente al más antiguo. Cuerpo `{"pagina":0,"tamanio":20}` (ambos opcionales; `pagina` ≥ 0 y `tamanio` de 1 a 100, si no, 400). |
 
-Los controladores no utilizan `@PathVariable`, `@RequestParam` ni `@ModelAttribute`: todas las entradas y criterios se reciben mediante Request DTO con `@Valid @RequestBody`. Cada recurso tiene un único endpoint de búsqueda con filtros combinables. RFC, CURP y número de cuenta identifican el recurso, pero no conceden acceso: `AutorizacionService` consulta el usuario y el rol reales en la base. Un cliente solo puede acceder a sus propios datos, usuario y cuentas; un administrador activo puede administrar otros clientes. Las listas aplican el permiso antes de paginar y contar. La consulta y contraseña de `/usuarios/me` siempre corresponden al usuario autenticado, incluso para administradores.
+Los controladores no utilizan `@PathVariable`, `@RequestParam` ni `@ModelAttribute`: todas las entradas y criterios se reciben mediante Request DTO con `@Valid @RequestBody`. Los únicos `GET` son los que no reciben datos (`/usuarios/me`, `/productos` y el canal `/auth/sesion/eventos`). Cada recurso tiene un único endpoint de búsqueda con filtros combinables. RFC, CURP y número de cuenta identifican el recurso, pero no conceden acceso: `AutorizacionService` consulta el usuario y el rol reales en la base. Un cliente solo puede acceder a sus propios datos, usuario y cuentas; un administrador activo puede administrar otros clientes. Las listas aplican el permiso antes de paginar y contar. La consulta y contraseña de `/usuarios/me` siempre corresponden al usuario autenticado, incluso para administradores.
 
 **Filtros de clientes:** `rfc`, `curp`, `nombre`, `correo`, `numeroCuenta`, `activo`, `desde`, `hasta`, `pagina` y `tamanio`. Los filtros presentes se combinan con AND; nombre busca una coincidencia parcial en nombres o apellidos. RFC y CURP se comparan completos sin distinguir mayúsculas. Las fechas usan `YYYY-MM-DD`, años de 1 a 9999 y filtran la fecha de registro incluyendo ambos días en `America/Mexico_City`. No se admite filtrar por `id`.
 
@@ -112,6 +120,192 @@ Envíalo a `PATCH /clientes`. Los campos omitidos conservan su valor; `null` exp
 
 El saldo se obtiene dentro de cada cuenta devuelta por `POST /cuentas/consultar`; puedes filtrar por `numeroCuenta`. Para cambiar su estado, envía `{"numeroCuenta":"000000000000000001","activa":false}` a `PATCH /cuentas/estado`. Un cliente no puede consultar, activar ni desactivar cuentas ajenas.
 
+## Acceso, doble factor y sesión única
+
+| Control | Cómo funciona |
+| --- | --- |
+| 2FA | TOTP (RFC 6238: HMAC-SHA1, 6 dígitos, 30 s) con una app autenticadora (Google Authenticator, Microsoft Authenticator, Authy). Tras validar la contraseña se abre un desafío (tabla `desafios_autenticacion`) que vence en 5 minutos y admite 5 intentos. El código se valida siempre en el servidor, con ±1 paso de tolerancia de reloj, y **no se puede reutilizar** (`usuarios.totp_ultimo_paso`). El secreto de cada usuario se guarda **cifrado con AES-256-GCM** (la misma llave `GESTOPAGO_TOKEN_KEY`). La primera vez la API entrega el secreto y la URI del QR (`enrolamiento`) y la app queda enlazada al verificar el primer código. No requiere correo ni variables nuevas. |
+| Sesión única | La tabla `sesiones_usuario` guarda una fila por usuario con el `jti` de su JWT. Cada petición debe traer el JWT de esa sesión; si el usuario entra desde otro dispositivo, la API responde `409` hasta que confirme (`cerrarSesionAnterior`), y el token anterior recibe `401 "…iniciaste sesión en otro dispositivo"`. La sesión se reemplaza de forma atómica (`INSERT … ON CONFLICT`). Solo se cierra la sesión anterior **después** de validar contraseña y código. |
+| Cierre de sesión | `POST /auth/logout` borra la sesión: el JWT queda revocado aunque no haya vencido. Cambiar la contraseña también la cierra. |
+| Aviso inmediato | `NotificadorSesiones` mantiene un canal SSE por sesión (`GET /auth/sesion/eventos`). Cuando la sesión se reemplaza o se cierra, `SesionService` publica un evento y, **después del commit**, el dispositivo afectado recibe `sesion_cerrada` y sale al instante, sin consultas periódicas. Las conexiones viven en la memoria de la instancia: con varias instancias habría que difundir el evento por Redis pub/sub. |
+| Expiración | El JWT dura `APP_JWT_EXPIRATION_MS` (2 h por omisión). Una sesión vencida no bloquea un nuevo acceso. |
+| Fuerza bruta | Límite general por minuto en todas las rutas (por IP y por usuario) y de ráfaga en login/registro; intentos de login por correo (10 / 15 min) y por IP (40 / 15 min), registro por IP (10 / hora) y pagos por usuario, en Redis con respaldo en memoria si cae. Responde 429 con `Retry-After`. Detrás de un proxy usa `FORWARD_HEADERS=native` para ver la IP real. |
+| Enumeración de usuarios | Un correo inexistente tarda lo mismo que uno existente (se compara contra un hash ficticio) y devuelve el mismo error. |
+| Si falla la verificación de sesión | La API rechaza la petición (no autentica "a ciegas"). |
+| Cabeceras y exposición | Swagger apagado por omisión (`SWAGGER_ENABLED`); actuator solo expone `health`; HSTS, `Content-Security-Policy: default-src 'none'`, `Permissions-Policy`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `nosniff` y `Cache-Control: no-store`; CORS sin comodín y cuerpos de petición de hasta 64 KB. |
+
+**App autenticadora (2FA).** Cada usuario enlaza su app la primera vez que inicia sesión: escanea el QR (web) o escribe la clave (celular) y confirma con el primer código. Después, cada acceso pide el código que muestra la app. Puntos a tener en cuenta:
+
+- El reloj del servidor debe estar sincronizado (NTP): el TOTP depende de la hora.
+- Mientras una cuenta no tiene la app enlazada, cualquiera que inicie sesión con su contraseña ve el mismo secreto y puede enlazar su propia app; seguirá generando códigos válidos aunque el dueño enlace la suya después. Todas las cuentas existentes están en ese estado hasta su próximo acceso. Si pasa, reinicia el enlace con el SQL de abajo.
+- `GESTOPAGO_TOKEN_KEY` también cifra estos secretos: si se cambia, nadie podrá iniciar sesión hasta reiniciar el enlace de todos (SQL de abajo sin `WHERE`).
+- Si un usuario pierde su teléfono no hay recuperación automática. Un administrador puede reiniciar su enlace (tendrá que enlazar de nuevo en su siguiente acceso): `UPDATE usuarios SET totp_secreto = NULL, totp_confirmado = false, totp_ultimo_paso = 0 WHERE correo = '…';`
+- Las variables `MAIL_*`, `GMAIL_*` y `APP_2FA_CONSOLA` ya no se usan; se pueden borrar de `backend/.env` y del despliegue.
+
+Ejemplo de acceso completo:
+
+```json
+POST /auth/login      {"correo":"ana@example.com","password":"Segura123!"}
+200 -> {"codigo":0,"mensaje":"Ingresa el código de tu app autenticadora",
+        "datos":{"desafioId":"…43 caracteres…","expiraEnMs":300000,
+                 "enrolamiento":{"secreto":"JBSWY3DP…","otpauthUri":"otpauth://totp/GestoPago:ana%40example.com?secret=…&issuer=GestoPago"}}}
+        (`enrolamiento` solo viene mientras la cuenta no tiene la app enlazada; después es null)
+
+POST /auth/verificar  {"desafioId":"…","codigo":"123456","cerrarSesionAnterior":false}
+200 -> {"codigo":0,"mensaje":"Sesión iniciada","datos":{"token":"…","tipo":"Bearer","expiraEnMs":7200000,"usuario":"ana@example.com","nombreCompleto":"…"}}
+409 -> ya existe una sesión activa: repetir con "cerrarSesionAnterior": true (el código sigue siendo válido)
+401 -> código incorrecto, vencido o con demasiados intentos · 429 demasiados intentos
+```
+
+## Pagos con GestoPago
+
+`POST /pagos` descuenta el saldo de la cuenta del cliente y envía la operación a GestoPago (`sendTx.do`). El cliente no indica si es recarga o servicio: la API lo decide con el `tipoFront` del producto en el catálogo local.
+
+| Campo | Regla |
+| --- | --- |
+| `numeroCuenta` | Obligatorio, 18 dígitos; debe pertenecer al usuario autenticado y estar activa. |
+| `idProducto`, `idServicio` | Obligatorios; deben existir juntos en el catálogo. |
+| `monto` | Obligatorio, mayor a cero y con máximo 2 decimales. En recargas debe ser igual al precio del catálogo; en servicios con consulta de adeudo, igual al adeudo de la referencia. |
+| `telefono` | 10 dígitos. Obligatorio en recargas (`tipoFront 1`); no se usa en servicios. |
+| `referencia` | Alfanumérica. Obligatoria en servicios (`tipoFront 2`); no se usa en recargas. |
+| `pinAutorizacion` | Obligatorio, de 4 a 6 dígitos. |
+
+Cualquier campo no listado se rechaza. El estado de un pago es `PENDIENTE`, `APROBADO`, `RECHAZADO` o `EN_REVISION`; los pagos aprobados devuelven los mismos datos que GestoPago (`idTx`, `numAutorizacion`, `fecha`) y, en artículos canjeables, `pin` y `legend`. El detalle del flujo está en [docs/pagosApi.md](docs/pagosApi.md) y el contrato del proveedor en [docs/pagosGestoPago.md](docs/pagosGestoPago.md).
+
+### Ejemplos
+
+Recarga sin referencia (`tipoFront 1`):
+
+```json
+{
+  "numeroCuenta": "000000000000000002",
+  "idProducto": 307,
+  "idServicio": 116,
+  "monto": 100,
+  "telefono": "4181500241",
+  "referencia": null,
+  "pinAutorizacion": "123456"
+}
+```
+
+Respuesta:
+
+```json
+{
+    "codigo": 0,
+    "mensaje": "Pago realizado correctamente",
+    "datos": {
+        "estado": "APROBADO",
+        "idTx": 950755597,
+        "numAutorizacion": "100061757",
+        "monto": 100,
+        "comision": 0,
+        "saldoDisponible": 999900,
+        "fecha": "29/Oct/2026 13:37:43"
+    }
+}
+```
+
+Artículo canjeable (por ejemplo, una tarjeta de regalo): la respuesta incluye además el `pin` y el `legend` con las instrucciones de uso.
+
+```json
+{
+    "codigo": 0,
+    "mensaje": "Pago realizado correctamente",
+    "datos": {
+        "estado": "APROBADO",
+        "idTx": 950766454,
+        "numAutorizacion": "100018520",
+        "monto": 100.00,
+        "comision": 0.00,
+        "saldoDisponible": 999670.00,
+        "fecha": "29/Oct/2026 13:46:59",
+        "pin": "343942",
+        "legend": "Para usar tu tarjeta ingresa a www.amazon.com.mx/gc/redeem/ e ingresa el código de tu tarjeta. Las tarjetas de regalo de Amazon.com.mx pueden ser utilizadas únicamente en la compra de productos participantes en Amazon.com.mx. Salvo que sea requerido por la ley, las tarjetas de regalo no pueden ser transferidas o redimidas por dinero en efectivo. Las compras son descontadas del saldo de la tarjeta de regalo. Para redimir o consultar el saldo de la tarjeta de regalo visita ´´Tu cuenta´´ en Amazon.com.mx. Amazon.com.mx no es responsable por la pérdida, robo, destrucción o uso no autorizado de la tarjeta de regalo. Para consultar los términos y condiciones completos de las tarjetas de regalo visita www.amazon.com.mx/terminos_tr. Conserva tu comprobante de pago."
+    }
+}
+```
+
+Pago de servicio con referencia (`tipoFront 2`):
+
+```json
+{
+  "numeroCuenta": "000000000000000002",
+  "idProducto": 530,
+  "idServicio": 158,
+  "monto": 100,
+  "telefono": "4181500241",
+  "referencia": "5555555555",
+  "pinAutorizacion": "123456"
+}
+```
+
+Respuesta:
+
+```json
+{
+    "codigo": 0,
+    "mensaje": "Pago realizado correctamente",
+    "datos": {
+        "estado": "APROBADO",
+        "idTx": 950787320,
+        "numAutorizacion": "100027590",
+        "monto": 100,
+        "comision": 0,
+        "referencia": "5555555555",
+        "saldoDisponible": 999570,
+        "fecha": "29/Oct/2026 14:05:29",
+        "pin": "102735",
+        "legend": "Consulte los Términos & Condiciones específicos de su producto."
+    }
+}
+```
+
+En pagos de servicio, el cargo a la cuenta es `monto + comision`, y la comisión es el precio del producto en el catálogo; en recargas es cero.
+
+### Consultar un pago
+
+Si GestoPago no responde a tiempo, `POST /pagos` devuelve HTTP 504 con la referencia (`upc`) del pago, que queda `EN_REVISION` con el monto retenido hasta que se concilie con `confirmTx.do`. El cliente no debe reintentar el pago; puede consultar su estado enviando el `upc` a `POST /pagos/consulta`:
+
+```json
+{
+  "upc": "ABCDEFGHIJ12345"
+}
+```
+
+Respuesta de ejemplo:
+
+```json
+{
+    "codigo": 0,
+    "mensaje": "Consulta realizada correctamente",
+    "datos": {
+        "upc": "ABCDEFGHIJ12345",
+        "estado": "APROBADO",
+        "mensaje": "El pago fue aplicado correctamente",
+        "monto": 100.00,
+        "comision": 0.00,
+        "idTx": 950755597,
+        "numAutorizacion": "100061757"
+    }
+}
+```
+
+`idTx` y `numAutorizacion` solo aparecen cuando el pago está `APROBADO`. La consulta lee el registro local, no llama a GestoPago, y un `upc` inexistente o de otro usuario responde 404.
+
+### Diseño de seguridad e integridad
+
+- **Validación de entrada y montos:** los Request DTO validan formato y rechazan campos desconocidos. El producto debe existir en el catálogo; el monto se compara con el precio del catálogo (recargas, que deben tener precio positivo) o con el adeudo real de la referencia (`verifyReference.do`, en los servicios que ofrecen la consulta). Una petición inválida, incompleta o con monto manipulado se rechaza antes de tocar el saldo.
+- **Identidad y autorización:** el usuario sale del JWT, nunca del body. Antes de cobrar se comprueba que la cuenta sea del usuario, que usuario y cliente estén activos, que la cuenta esté activa, que el PIN sea correcto (guardado como hash; se bloquea 15 minutos tras 5 intentos fallidos) y que el saldo alcance.
+- **Descuento del saldo:** el saldo se retiene antes de llamar a GestoPago y se devuelve solo cuando hay certeza de que el proveedor no cobró. Cada paso de base de datos es una transacción corta, para no mantener bloqueada la cuenta durante la llamada externa.
+- **Concurrencia y duplicados:** la cuenta se bloquea con `SELECT ... FOR UPDATE`, por lo que dos pagos simultáneos no gastan el mismo saldo. Cada pago lleva un `upc` aleatorio y único que identifica la operación ante GestoPago; además hay un límite de solicitudes por usuario (5 por minuto, configurable, contador en Redis) y GestoPago rechaza con código `06` los pagos duplicados.
+- **Fallos y tiempos de espera:** un timeout no se interpreta como pago fallido. El pago queda `EN_REVISION` con el monto retenido y un proceso programado lo resuelve con `confirmTx.do` (mismos parámetros, a partir de 62 s y dentro de 24 h); solo entonces se confirma o se devuelve el saldo. Si el token de GestoPago vence, se renueva y se reintenta una sola vez con el mismo `upc`.
+- **Secretos:** credenciales, llaves de firma y de cifrado se leen de variables de entorno (`.env` está en `.gitignore`). El token Bearer de GestoPago se guarda cifrado con AES-256-GCM, se envía solo en la cabecera `Authorization` y no aparece en respuestas ni en logs. La petición a GestoPago se firma con AES-256.
+- **Sin información sensible:** al cliente se le responde con mensajes propios, nunca con el texto del proveedor (que solo se guarda en la base de datos). Los logs omiten el token, el PIN y el cuerpo firmado.
+- **Errores centralizados:** `GlobalExceptionHandler` (`@RestControllerAdvice`) traduce cada escenario a su código HTTP (ver la tabla de errores).
+- **Capas:** `PagoController` solo recibe y delega; `PagoServiceImpl` orquesta el pago, apoyado en `ResolutorDestinoPago` (reglas por `tipoFront`), `VerificadorAdeudo`, `GestoPagoPagosGateway` (token y llamadas a GestoPago) y `ConciliacionPagoService`; `PagoRegistroService` y `PagoRepository` persisten el estado.
+- **Pruebas:** pruebas unitarias por componente, pruebas del controller y pruebas de integración contra PostgreSQL que incluyen pagos simultáneos, timeout con conciliación y bloqueo del PIN.
+
 ## Organización de DTO y errores
 
 Los DTO de entrada están en `models/request`; los de salida en `models/response`, incluidos los DTO de integración en `models/response/gestopago`. `ClienteMapper` pertenece a `mapper`; las entidades JPA permanecen en `entity/sf`.
@@ -153,34 +347,84 @@ Las excepciones de negocio conservan mensajes específicos para correos, RFC y C
 | 401 | Credenciales incorrectas o falta de autenticación válida. |
 | 403 | Usuario o cliente inactivo en el login, o acceso a otro usuario. |
 | 404 | Cliente, cuenta o usuario no encontrado. |
-| 409 | Registro duplicado o conflicto con el estado del cliente. |
+| 409 | Registro duplicado o conflicto con el estado del cliente, cuenta inactiva o sin PIN, o pago duplicado. |
 | 405 / 406 / 415 | Método HTTP, formato de respuesta o tipo de contenido no admitido. |
+| 422 | Pago: saldo insuficiente, referencia sin adeudo o rechazo del proveedor. |
+| 423 | El PIN de la cuenta está bloqueado por intentos fallidos. |
+| 429 | Demasiadas solicitudes de pago del mismo usuario. |
 | 500 | Error interno o de persistencia. |
 | 502 | Error al comunicarse con GestoPago. |
+| 503 | Servicio de pagos no disponible por el momento; no se realizó ningún cargo. |
+| 504 | GestoPago no confirmó el pago; queda en revisión con el monto retenido. |
+
+## Modelo de datos
+
+Diagrama entidad-relación de la base: un cliente reside en un domicilio, tiene acceso mediante un usuario y posee cuentas; el catálogo de productos y el token de GestoPago se guardan aparte.
+
+![Diagrama entidad-relación de GestoPago](docs/img/modelo-er.png)
+
+## Estructura del repositorio
+
+```
+backend/    API Spring Boot (Gradle, Dockerfile, migraciones Flyway, .env.example)
+frontend/   App Flutter (web y móvil, Dockerfile + nginx para la versión web)
+docs/       Documentación
+scripts/    Análisis SonarQube (ambos proyectos)
+tools/      Scanner y plugins de SonarQube (local)
+render.yaml Blueprint de Render: API, web, PostgreSQL y Redis
+```
+
+## Despliegue
+
+El despliegue en **Render** se define en `render.yaml` (API, web y Redis; usa tu PostgreSQL existente). Cada servicio solo se redespliega cuando cambian los archivos de su carpeta.
+
+- `CORS_ORIGENES` (API) y `API_BASE_URL` (web) deben ser las URL HTTPS reales de cada servicio; ajústalas si Render asigna un nombre distinto.
+- La API construye `DB_URL` a partir de `DB_HOST`, `DB_PORT` y `DB_NAME` si no se define `DB_URL`; Flyway crea las tablas en la base vacía.
+- Imágenes en local: `docker build -t gestopago-api backend` y `docker build -t gestopago-web --build-arg API_BASE_URL=https://tu-api frontend`.
 
 ## Ejecución local
 
 1. Instala Java 17 e inicia PostgreSQL y Redis.
-2. Copia `.env.example` a `.env` y configura las credenciales de PostgreSQL, GestoPago y `APP_JWT_SECRET` con un valor aleatorio de al menos 32 bytes. No compartas este archivo.
-3. Ejecuta desde la raíz del proyecto:
+2. Copia `backend/.env.example` a `backend/.env` y configura las credenciales de PostgreSQL, GestoPago, `APP_JWT_SECRET` (valor aleatorio de al menos 32 bytes) y `GESTOPAGO_TOKEN_KEY` (también cifra los secretos del 2FA). Para el segundo factor solo necesitas una app autenticadora en tu teléfono. No compartas este archivo.
+3. Ejecuta desde la carpeta `backend/`:
 
    ```powershell
+   cd backend
    .\gradlew.bat bootRun
    ```
 
-Flyway crea el esquema en una base vacía. Para la instalación mediante SQL manual, consulta [las instrucciones de base de datos](docs/ENTREGA-BASE-DATOS.md) y [el script de creación](scripts/crear-base-datos.sql); con ese script, configura `SPRING_FLYWAY_BASELINE_VERSION=5` en el primer inicio. Las tablas históricas `personas` y `registro` se conservan, pero ya no participan en la API.
+Flyway crea el esquema en una base vacía. Para la instalación mediante SQL manual, usa [el script de creación](backend/scripts/crear-base-datos.sql); con ese script, configura `SPRING_FLYWAY_BASELINE_VERSION=5` en el primer inicio. Las tablas históricas `personas` y `registro` se conservan, pero ya no participan en la API.
 
 ## Pruebas
 
 ```powershell
+cd backend
 .\gradlew.bat test
 ```
 
-La suite cubre validación, clientes, cuentas, usuarios, autenticación, JWT y catálogo. Para verificar también PostgreSQL, instala sus herramientas cliente en `PATH` y ejecuta:
+La suite cubre validación, clientes, cuentas, usuarios, autenticación, JWT, catálogo y pagos. Para verificar también PostgreSQL, instala sus herramientas cliente en `PATH` y ejecuta desde la raíz del repositorio:
 
 ```powershell
-.\scripts\test-postgres.ps1
-.\scripts\test-postgres.ps1 -EsquemaManual
+.\backend\scripts\test-postgres.ps1
+.\backend\scripts\test-postgres.ps1 -EsquemaManual
 ```
 
-Estas ejecuciones verifican, respectivamente, las migraciones en una base vacía y la adopción del esquema manual. Crean y eliminan una base temporal, por lo que requieren permiso para crear bases. Sin `TEST_DB_URL`, las pruebas de PostgreSQL se omiten en `gradlew test`.
+Estas ejecuciones verifican, respectivamente, las migraciones en una base vacía y la adopción del esquema manual, y corren también las pruebas de integración de pagos (pagos simultáneos sobre una misma cuenta, conciliación tras un timeout y bloqueo del PIN). Crean y eliminan una base temporal, por lo que requieren permiso para crear bases. Sin `TEST_DB_URL`, las pruebas de PostgreSQL se omiten en `gradlew test`.
+
+## Calidad del código (SonarQube)
+
+Backend y frontend se analizan con SonarQube local. Ambos pasan el Quality Gate con 100 % de cobertura, 0 vulnerabilidades, 0 bugs, 0 code smells, 0 hotspots y 0 % de duplicación.
+
+![Resultados de SonarQube del backend y del frontend](docs/img/sonarqube-cobertura.png)
+
+Para repetir los análisis, ejecuta desde la raíz del repositorio (cada script levanta SonarQube con Docker si no está activo):
+
+```powershell
+powershell -File scripts/sonar-analisis.ps1
+```
+
+```powershell
+powershell -File scripts/sonar-frontend.ps1
+```
+
+Reportes: `http://localhost:9001/dashboard?id=gestopago-api` y `http://localhost:9001/dashboard?id=gestopago-frontend`.
