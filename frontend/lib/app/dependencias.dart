@@ -1,4 +1,7 @@
+import 'package:fetch_client/fetch_client.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
+import 'package:http/http.dart' as http;
 
 import '../authentication/application/sesion_controller.dart';
 import '../authentication/domain/ports/almacen_sesion.dart';
@@ -56,12 +59,17 @@ class Dependencias {
     PagosRepository? pagosRepositorio,
     CuentasRepository? cuentasRepositorio,
     PerfilRepository? perfilRepositorio,
+    http.Client? clienteEventos,
   }) {
     late final SesionController sesion;
     final api = ApiClient(
       baseUrl: apiBaseUrl ?? AppConfig.apiBaseUrl,
       tokenReader: () => sesion.token,
       onUnauthorized: (mensaje) => sesion.sesionInvalidada(mensaje),
+      // En web, `fetch` entrega el flujo de avisos por partes; XHR esperaría a que termine.
+      clienteEventos:
+          clienteEventos ??
+          (kIsWeb ? FetchClient(mode: RequestMode.cors) : null), // coverage:ignore-line
     );
     sesion = SesionController(
       gateway: autenticacion ?? ApiAutenticacionGateway(api),

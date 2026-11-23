@@ -57,7 +57,7 @@ class _Gateway implements AutenticacionGateway {
   }
 
   @override
-  Future<void> verificarSesion() async {}
+  Stream<String> cierresDeSesion() => Stream<String>.multi((_) {});
 }
 
 class _Almacen implements AlmacenSesion {

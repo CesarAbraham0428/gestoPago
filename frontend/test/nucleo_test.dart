@@ -77,6 +77,99 @@ void main() {
   });
 
   group('ApiClient', () {
+    group('eventos (Server-Sent Events)', () {
+      http.Response sse(String cuerpo, [int estado = 200]) => http.Response(
+        cuerpo,
+        estado,
+        headers: {'content-type': 'text/event-stream; charset=utf-8'},
+      );
+
+      test('arma cada evento, une datos de varias líneas e ignora comentarios', () async {
+        late http.BaseRequest recibida;
+        final api = ApiClient(
+          baseUrl: 'http://api',
+          tokenReader: () => 'jwt',
+          client: MockClient((_) async => fail('debe usar el cliente de eventos')),
+          clienteEventos: MockClient((r) async {
+            recibida = r;
+            return sse(
+              ': latido\n\n'
+              'event: aviso\ndata: uno\ndata:  dos\nid: 7\n\n'
+              'data: sin nombre\n\n'
+              '\n'
+              'event: ultimo\ndata: x',
+            );
+          }),
+        );
+        final eventos = await api.eventos('/e').toList();
+        expect(eventos, [
+          (nombre: 'aviso', datos: 'uno\ndos'),
+          (nombre: 'message', datos: 'sin nombre'),
+        ]);
+        expect(recibida.method, 'GET');
+        expect(recibida.headers['Accept'], 'text/event-stream');
+        expect(recibida.headers['Authorization'], 'Bearer jwt');
+      });
+
+      test('sin token no manda Authorization', () async {
+        late http.BaseRequest recibida;
+        final api = ApiClient(
+          baseUrl: 'http://api',
+          client: MockClient((r) async {
+            recibida = r;
+            return sse('');
+          }),
+        );
+        expect(await api.eventos('/e').toList(), isEmpty);
+        expect(recibida.headers.containsKey('Authorization'), isFalse);
+      });
+
+      test('401 al conectar avisa a la sesión y falla con el mensaje', () async {
+        String? avisado;
+        final api = ApiClient(
+          baseUrl: 'http://api',
+          tokenReader: () => 'jwt',
+          onUnauthorized: (m) => avisado = m,
+          client: MockClient(
+            (_) async => _json({'mensaje': 'Tu sesión ya no está activa'}, 401),
+          ),
+        );
+        await expectLater(
+          api.eventos('/e').toList(),
+          throwsA(isA<ApiException>().having((e) => e.statusCode, 'estado', 401)),
+        );
+        expect(avisado, isNotNull);
+      });
+
+      test('un error del servidor sin JSON falla como ApiException', () async {
+        final api = ApiClient(
+          baseUrl: 'http://api',
+          client: MockClient((_) async => http.Response('caído', 503)),
+        );
+        await expectLater(api.eventos('/e').toList(), throwsA(isA<ApiException>()));
+      });
+
+      test('sin red o sin respuesta falla como ConexionException', () async {
+        final sinRed = ApiClient(
+          baseUrl: 'http://api',
+          client: MockClient((_) async => throw Exception('sin red')),
+        );
+        await expectLater(sinRed.eventos('/e').toList(), throwsA(isA<ConexionException>()));
+
+        final lento = ApiClient(
+          baseUrl: 'http://api',
+          client: MockClient((_) async {
+            await Future<void>.delayed(const Duration(milliseconds: 200));
+            return sse('');
+          }),
+        );
+        await expectLater(
+          lento.eventos('/e', timeout: const Duration(milliseconds: 10)).toList(),
+          throwsA(isA<ConexionException>()),
+        );
+      });
+    });
+
     test('GET con token, query y datos desenvueltos', () async {
       late http.BaseRequest recibida;
       final api = ApiClient(

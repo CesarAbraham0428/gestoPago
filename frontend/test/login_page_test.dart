@@ -53,7 +53,7 @@ class _Gateway implements AutenticacionGateway {
   Future<void> cerrarSesion() async {}
 
   @override
-  Future<void> verificarSesion() async {}
+  Stream<String> cierresDeSesion() => Stream<String>.multi((_) {});
 }
 
 /// Cuenta inactiva: el servidor responde 403 ya al validar la contraseña.

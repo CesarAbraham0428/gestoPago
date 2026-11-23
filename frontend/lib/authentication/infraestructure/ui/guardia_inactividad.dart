@@ -7,7 +7,7 @@ import '../../application/sesion_controller.dart';
 
 /// Cierra la sesión tras un rato sin interacción (toques, desplazamiento o
 /// teclado). Protege un equipo desatendido con la sesión abierta. Al volver a
-/// la app (o a la pestaña) verifica de inmediato que la sesión siga activa.
+/// la app (o a la pestaña) reabre el canal de avisos de cierre de sesión.
 class GuardiaInactividad extends StatefulWidget {
   const GuardiaInactividad({
     super.key,
@@ -31,7 +31,7 @@ class _GuardiaInactividadState extends State<GuardiaInactividad> {
   @override
   void initState() {
     super.initState();
-    _ciclo = AppLifecycleListener(onResume: widget.sesion.verificarSesion);
+    _ciclo = AppLifecycleListener(onResume: widget.sesion.reconectarAvisos);
     widget.sesion.addListener(_reiniciar);
     HardwareKeyboard.instance.addHandler(_alTeclear);
     _reiniciar();

@@ -78,7 +78,7 @@ class GatewayFalso implements AutenticacionGateway {
   Future<void> cerrarSesion() async => cierres++;
 
   @override
-  Future<void> verificarSesion() async {}
+  Stream<String> cierresDeSesion() => Stream<String>.multi((_) {});
 }
 
 class AlmacenFalso implements AlmacenSesion {

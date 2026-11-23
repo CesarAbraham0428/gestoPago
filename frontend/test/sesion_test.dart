@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -56,17 +57,14 @@ class _GatewayFalso implements AutenticacionGateway {
     if (falloDeRed) throw const ConexionException();
   }
 
-  /// Simula que otro dispositivo cerró esta sesión en el servidor.
-  bool sesionCerradaEnServidor = false;
-  int verificaciones = 0;
+  /// Cada conexión al canal de avisos abre uno nuevo; la prueba decide qué llega.
+  final List<StreamController<String>> canales = [];
 
   @override
-  Future<void> verificarSesion() async {
-    verificaciones++;
-    if (falloDeRed) throw const ConexionException();
-    if (sesionCerradaEnServidor) {
-      throw const ApiException(401, 'Tu sesión se cerró desde otro dispositivo');
-    }
+  Stream<String> cierresDeSesion() {
+    final canal = StreamController<String>();
+    canales.add(canal);
+    return canal.stream;
   }
 }
 
@@ -157,37 +155,75 @@ void main() {
     });
   });
 
-  group('Sondeo de sesión', () {
-    test('si otro dispositivo la cerró, se cierra aquí sin navegar', () async {
-      await sesion.verificarCodigo(desafio: _desafio, codigo: '123456');
-      gateway.sesionCerradaEnServidor = true;
-      await sesion.verificarSesion();
-      expect(sesion.autenticado, isFalse);
-      expect(sesion.aviso, contains('otro dispositivo'));
+  group('Avisos de cierre (Server-Sent Events)', () {
+    late SesionController rapida;
+
+    setUp(() async {
+      rapida = SesionController(
+        gateway: gateway,
+        almacen: almacen,
+        esperaReconexion: const Duration(milliseconds: 10),
+      );
+      await rapida.verificarCodigo(desafio: _desafio, codigo: '123456');
+    });
+
+    tearDown(() => rapida.dispose());
+
+    Future<void> espera(int ms) => Future<void>.delayed(Duration(milliseconds: ms));
+
+    test('al iniciar sesión se abre el canal de avisos', () {
+      expect(gateway.canales, hasLength(1));
+    });
+
+    test('si otro dispositivo toma la sesión, se cierra al instante sin navegar', () async {
+      gateway.canales.single.add('Tu sesión se cerró porque iniciaste sesión en otro dispositivo');
+      await espera(0);
+      expect(rapida.autenticado, isFalse);
+      expect(rapida.aviso, contains('otro dispositivo'));
       expect(almacen.guardada, isNull);
     });
 
-    test('un fallo de red no cierra la sesión', () async {
-      await sesion.verificarCodigo(desafio: _desafio, codigo: '123456');
-      gateway.falloDeRed = true;
-      await sesion.verificarSesion();
-      expect(sesion.autenticado, isTrue);
+    test('un 401 al conectar cierra la sesión', () async {
+      gateway.canales.single.addError(const ApiException(401, 'Tu sesión ya no está activa'));
+      await espera(0);
+      expect(rapida.autenticado, isFalse);
+      expect(rapida.aviso, 'Tu sesión ya no está activa');
     });
 
-    test('se verifica sola cada intervalo y deja de hacerlo al cerrar', () async {
-      final rapida = SesionController(
-        gateway: gateway,
-        almacen: almacen,
-        intervaloVerificacion: const Duration(milliseconds: 20),
-      );
-      addTearDown(rapida.dispose);
-      await rapida.verificarCodigo(desafio: _desafio, codigo: '123456');
-      gateway.sesionCerradaEnServidor = true;
-      await Future<void>.delayed(const Duration(milliseconds: 60));
-      expect(rapida.autenticado, isFalse);
-      final hechas = gateway.verificaciones;
-      await Future<void>.delayed(const Duration(milliseconds: 60));
-      expect(gateway.verificaciones, hechas);
+    test('un fallo de red no cierra la sesión: reconecta con espera creciente', () async {
+      gateway.canales.single.addError(const ConexionException());
+      await espera(5);
+      expect(gateway.canales, hasLength(1)); // aún esperando 20 ms
+      await espera(30);
+      expect(gateway.canales, hasLength(2));
+      expect(rapida.autenticado, isTrue);
+    });
+
+    test('si el servidor renueva el canal, se reabre enseguida', () async {
+      await gateway.canales.single.close();
+      await espera(30);
+      expect(gateway.canales, hasLength(2));
+    });
+
+    test('tras muchos fallos la espera deja de crecer', () async {
+      for (var i = 0; i < 7; i++) {
+        gateway.canales.last.addError(const ConexionException());
+        await espera(10 * 33);
+      }
+      expect(gateway.canales, hasLength(8));
+    });
+
+    test('al volver a la app se reabre el canal de inmediato', () {
+      rapida.reconectarAvisos();
+      expect(gateway.canales, hasLength(2));
+    });
+
+    test('sin sesión no se reconecta', () async {
+      await rapida.cerrarSesion();
+      await gateway.canales.single.close();
+      rapida.reconectarAvisos();
+      await espera(30);
+      expect(gateway.canales, hasLength(1));
     });
   });
 
@@ -218,12 +254,22 @@ void main() {
       return ApiAutenticacionGateway(ApiClient(baseUrl: 'http://localhost', client: cliente));
     }
 
-    test('el sondeo de sesión acepta 200 y propaga el 401', () async {
-      await conRespuesta(200, {'codigo': 0, 'mensaje': 'Sesión activa'}).verificarSesion();
-      await expectLater(
-        conRespuesta(401, {'codigo': 1, 'mensaje': 'Sesión cerrada'}).verificarSesion(),
-        throwsA(isA<ApiException>().having((e) => e.statusCode, 'estado', 401)),
+    test('el canal de avisos solo entrega los cierres de sesión', () async {
+      late http.BaseRequest recibida;
+      final cliente = MockClient((r) async {
+        recibida = r;
+        return http.Response(
+          'event: conectado\ndata: ok\n\n: latido\n\n'
+          'event: sesion_cerrada\ndata: Tu sesión se cerró\n\n',
+          200,
+          headers: {'content-type': 'text/event-stream; charset=utf-8'},
+        );
+      });
+      final gateway = ApiAutenticacionGateway(
+        ApiClient(baseUrl: 'http://localhost', client: cliente),
       );
+      expect(await gateway.cierresDeSesion().toList(), ['Tu sesión se cerró']);
+      expect(recibida.url.path, '/auth/sesion/eventos');
     });
 
     test('409 al verificar es una sesión activa por confirmar', () async {
