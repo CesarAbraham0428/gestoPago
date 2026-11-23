@@ -62,7 +62,7 @@ class PagosPostgresTest {
         AutenticacionServiceImpl.class, PagoServiceImpl.class, PagoRegistroService.class, PinAutorizacionService.class,
         GestoPagoPagosGateway.class, ResolutorDestinoPago.class, VerificadorAdeudo.class, ConciliacionPagoService.class,
         FirmaGestoPago.class, CifradoTokenConverter.class,
-        CodigoVerificacionService.class, SesionService.class, TotpService.class, RelojDePrueba.class,
+        CodigoVerificacionService.class, SesionService.class, NotificadorSesiones.class, TotpService.class, RelojDePrueba.class,
         CodigosDePrueba.class})
     static class Config {}
 

@@ -56,6 +56,7 @@ class JwtAuthenticationFilterTest {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         assertNotNull(auth);
         assertEquals("1", auth.getName());
+        assertEquals("jti-1", auth.getDetails());
         assertTrue(auth.isAuthenticated());
     }
 

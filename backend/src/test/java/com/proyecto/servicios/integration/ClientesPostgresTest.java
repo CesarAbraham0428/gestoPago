@@ -50,7 +50,7 @@ class ClientesPostgresTest {
         GlobalExceptionHandler.class,
         ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class,
         UsuarioService.class, AutenticacionServiceImpl.class, PinAutorizacionService.class,
-        CodigoVerificacionService.class, SesionService.class, TotpService.class, CifradoTokenConverter.class, RelojDePrueba.class,
+        CodigoVerificacionService.class, SesionService.class, NotificadorSesiones.class, TotpService.class, CifradoTokenConverter.class, RelojDePrueba.class,
         CodigosDePrueba.class})
     static class Config {}
 

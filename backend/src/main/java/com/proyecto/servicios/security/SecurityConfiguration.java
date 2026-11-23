@@ -4,6 +4,7 @@ import static org.springframework.security.web.util.matcher.AntPathRequestMatche
 
 import com.proyecto.servicios.service.SesionService;
 import com.proyecto.servicios.utils.LimitadorVentanaFija;
+import jakarta.servlet.DispatcherType;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -85,6 +86,8 @@ public class SecurityConfiguration {
                         errores.escribir(response, HttpStatus.FORBIDDEN,
                                 "No tienes permiso para realizar esta operación")))
                 .authorizeHttpRequests(authorize -> authorize
+                        // El despacho ASYNC solo reanuda una petición ya autorizada (canal SSE de la sesión).
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, POST_PUBLICOS.toArray(String[]::new)).permitAll()
                         // Sonda de salud de la plataforma (Render); solo devuelve {"status":"UP"} sin detalles.
