@@ -35,9 +35,11 @@ class _HistorialPageState extends State<HistorialPage> {
   @override
   void initState() {
     super.initState();
-    if (widget.controller.estado == EstadoHistorial.inicial) {
-      widget.controller.recargar();
-    }
+    // Siempre se vuelve a consultar al entrar: un pago rechazado o pendiente no pasa por la compra.
+    // Tras el primer cuadro: notificar durante el build rompería a los demás oyentes del controlador.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => widget.controller.recargar(),
+    );
   }
 
   @override
@@ -51,7 +53,10 @@ class _HistorialPageState extends State<HistorialPage> {
             : widget.controller.porReferencia(widget.referenciaSeleccionada!);
 
         if (!ancho && widget.referenciaSeleccionada != null) {
-          return _DetalleCompra(compra: seleccion, controller: widget.controller);
+          return _DetalleCompra(
+            compra: seleccion,
+            controller: widget.controller,
+          );
         }
         final lista = _Lista(
           controller: widget.controller,
@@ -78,7 +83,9 @@ class _HistorialPageState extends State<HistorialPage> {
                         alignment: Alignment.topCenter,
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 520),
-                          child: Recibo(datos: DatosRecibo.deHistorial(seleccion)),
+                          child: Recibo(
+                            datos: DatosRecibo.deHistorial(seleccion),
+                          ),
                         ),
                       ),
                     ),
@@ -134,13 +141,17 @@ class _Lista extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final conFiltros =
-        controller.estado == EstadoHistorial.listo && controller.compras.isNotEmpty;
+        controller.estado == EstadoHistorial.listo &&
+        controller.compras.isNotEmpty;
     return Column(
       children: [
         _Buscador(controller: controller),
         if (controller.busquedaActiva)
           Expanded(
-            child: _Resultado(controller: controller, alSeleccionar: alSeleccionar),
+            child: _Resultado(
+              controller: controller,
+              alSeleccionar: alSeleccionar,
+            ),
           )
         else ...[
           if (conFiltros) _Filtros(controller: controller),
@@ -185,35 +196,51 @@ class _BuscadorState extends State<_Buscador> {
     final activa = widget.controller.busquedaActiva;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: TextField(
-        controller: _texto,
-        textInputAction: TextInputAction.search,
-        textCapitalization: TextCapitalization.characters,
-        autocorrect: false,
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')),
-          LengthLimitingTextInputFormatter(15),
-          TextInputFormatter.withFunction(
-            (anterior, nuevo) => nuevo.copyWith(text: nuevo.text.toUpperCase()),
+      child: Row(
+        children: [
+          Expanded(child: _campo(activa)),
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'Actualizar pagos',
+            icon: const Icon(Icons.refresh),
+            onPressed: widget.controller.estado == EstadoHistorial.cargando
+                ? null
+                : widget.controller.recargar,
           ),
         ],
-        decoration: InputDecoration(
-          hintText: 'Buscar un pago por su UPC',
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: activa
-              ? IconButton(
-                  tooltip: 'Limpiar búsqueda',
-                  icon: const Icon(Icons.close),
-                  onPressed: _limpiar,
-                )
-              : IconButton(
-                  tooltip: 'Buscar pago',
-                  icon: const Icon(Icons.arrow_forward),
-                  onPressed: () => widget.controller.buscar(_texto.text),
-                ),
-        ),
-        onSubmitted: widget.controller.buscar,
       ),
+    );
+  }
+
+  Widget _campo(bool activa) {
+    return TextField(
+      controller: _texto,
+      textInputAction: TextInputAction.search,
+      textCapitalization: TextCapitalization.characters,
+      autocorrect: false,
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')),
+        LengthLimitingTextInputFormatter(15),
+        TextInputFormatter.withFunction(
+          (anterior, nuevo) => nuevo.copyWith(text: nuevo.text.toUpperCase()),
+        ),
+      ],
+      decoration: InputDecoration(
+        hintText: 'Buscar un pago por su UPC',
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: activa
+            ? IconButton(
+                tooltip: 'Limpiar búsqueda',
+                icon: const Icon(Icons.close),
+                onPressed: _limpiar,
+              )
+            : IconButton(
+                tooltip: 'Buscar pago',
+                icon: const Icon(Icons.arrow_forward),
+                onPressed: () => widget.controller.buscar(_texto.text),
+              ),
+      ),
+      onSubmitted: widget.controller.buscar,
     );
   }
 }
@@ -297,7 +324,10 @@ class _Resultado extends StatelessWidget {
               if (r.monto != null)
                 FilaDato(etiqueta: 'Importe', valor: formatoMoneda(r.monto!)),
               if (r.comision != null && r.comision! > 0)
-                FilaDato(etiqueta: 'Comisión', valor: formatoMoneda(r.comision!)),
+                FilaDato(
+                  etiqueta: 'Comisión',
+                  valor: formatoMoneda(r.comision!),
+                ),
               if (r.referencia != null)
                 FilaDato(etiqueta: 'Referencia de pago', valor: r.referencia!),
               if (r.idTx != null)
@@ -343,7 +373,8 @@ class _Contenido extends StatelessWidget {
           color: AppColors.coral,
           fondo: AppColors.coralTenue,
           titulo: 'No pudimos cargar tus pagos',
-          detalle: controller.error ?? 'Revisa tu conexión e inténtalo de nuevo.',
+          detalle:
+              controller.error ?? 'Revisa tu conexión e inténtalo de nuevo.',
           accion: controller.recargar,
         );
       case EstadoHistorial.listo:
@@ -400,7 +431,8 @@ class _PieLista extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
                 controller.errorMas!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.rechazo),
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: AppColors.rechazo),
               ),
             ),
           OutlinedButton(
@@ -442,7 +474,9 @@ class _FilaCompra extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: seleccionada ? AppColors.marcaTenue : AppColors.superficie,
-            border: const Border(bottom: BorderSide(color: AppColors.lineaSuave)),
+            border: const Border(
+              bottom: BorderSide(color: AppColors.lineaSuave),
+            ),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
@@ -457,7 +491,9 @@ class _FilaCompra extends StatelessWidget {
                       compra.titulo,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: tema.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                      style: tema.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Wrap(
@@ -465,7 +501,10 @@ class _FilaCompra extends StatelessWidget {
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Text(formatoFechaHora(compra.fecha), style: tema.bodySmall),
+                        Text(
+                          formatoFechaHora(compra.fecha),
+                          style: tema.bodySmall,
+                        ),
                         EtiquetaEstado(
                           texto: visual.texto,
                           tono: visual.tono,

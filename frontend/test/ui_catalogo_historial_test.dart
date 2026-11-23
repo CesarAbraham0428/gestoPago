@@ -486,7 +486,7 @@ void main() {
       expect(find.text('Compra confirmada'), findsOneWidget);
     });
 
-    testWidgets('no vuelve a cargar si el controlador ya tiene datos', (tester) async {
+    testWidgets('vuelve a consultar al entrar aunque el controlador ya tenga datos', (tester) async {
       final pagos = conCompras([compra('U1')]);
       final controller = HistorialController(pagos);
       await controller.recargar();
@@ -499,7 +499,26 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      expect(pagos.historiales, 2);
+    });
+
+    testWidgets('el botón actualizar vuelve a consultar los pagos', (tester) async {
+      final pagos = conCompras([compra('U1')]);
+      final controller = HistorialController(pagos);
+      await montar(
+        tester,
+        HistorialPage(
+          controller: controller,
+          referenciaSeleccionada: null,
+          alSeleccionar: (_) {},
+        ),
+      );
+      await tester.pumpAndSettle();
       expect(pagos.historiales, 1);
+
+      await tester.tap(find.byTooltip('Actualizar pagos'));
+      await tester.pumpAndSettle();
+      expect(pagos.historiales, 2);
     });
   });
 }
