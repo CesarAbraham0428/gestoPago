@@ -41,7 +41,6 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
     final p = widget.perfil;
     final d = p.domicilio;
     _c = {
-      'telefonoMovil': p.telefonoMovil,
       'telefonoAlternativo': p.telefonoAlternativo ?? '',
       'ocupacion': p.ocupacion,
       'empresa': p.empresa,
@@ -71,7 +70,8 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
 
   Map<String, Object?> _editado() => {
     'estadoCivil': _estadoCivil,
-    'telefonoMovil': _t('telefonoMovil'),
+    // No es editable, pero la API recibe el perfil completo.
+    'telefonoMovil': widget.perfil.telefonoMovil,
     'telefonoAlternativo': _opcional('telefonoAlternativo'),
     'ocupacion': _t('ocupacion'),
     'empresa': _t('empresa'),
@@ -149,7 +149,7 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
           Text('Editar perfil', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 4),
           Text(
-            'Solo puedes cambiar tu estado civil, teléfonos, empleo y domicilio.',
+            'Solo puedes cambiar tu estado civil, teléfono alternativo, empleo y domicilio.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.tintaSuave),
           ),
           const SizedBox(height: 20),
@@ -174,7 +174,7 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
           ]),
           _Grupo(titulo: 'Contacto', campos: [
             _fijo('Correo electrónico', p.correoElectronico),
-            _campo('telefonoMovil', 'Teléfono móvil', digitos: 10, validar: _digitos(10)),
+            _fijo('Teléfono móvil', p.telefonoMovil),
             _campo(
               'telefonoAlternativo',
               'Teléfono alternativo (opcional)',

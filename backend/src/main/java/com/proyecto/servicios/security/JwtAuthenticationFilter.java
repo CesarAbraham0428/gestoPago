@@ -28,8 +28,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Map<Estado, String> MENSAJES_DE_RECHAZO = Map.of(
             Estado.USUARIO_INACTIVO, "Usuario inactivo o inexistente",
-            Estado.REEMPLAZADA, "Tu sesión se cerró porque iniciaste sesión en otro dispositivo",
-            Estado.FINALIZADA, "Tu sesión ya no está activa; inicia sesión de nuevo");
+            Estado.REEMPLAZADA, SesionService.MOTIVO_REEMPLAZADA,
+            Estado.FINALIZADA, SesionService.MOTIVO_FINALIZADA);
 
     private final JwtTokenService tokens;
     private final SesionService sesiones;
@@ -59,9 +59,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     rechazar(response, MENSAJES_DE_RECHAZO.get(estado));
                     return;
                 }
-                SecurityContextHolder.getContext().setAuthentication(
-                        new UsernamePasswordAuthenticationToken(usuarioId.toString(), null,
-                                List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+                var autenticacion = new UsernamePasswordAuthenticationToken(usuarioId.toString(), null,
+                        List.of(new SimpleGrantedAuthority("ROLE_USER")));
+                autenticacion.setDetails(jwt.getId()); // jti: identifica la sesión (canal de avisos de cierre)
+                SecurityContextHolder.getContext().setAuthentication(autenticacion);
             } catch (JWTVerificationException | IllegalArgumentException ex) {
                 rechazar(response, "Tu sesión expiró o no es válida; inicia sesión de nuevo");
                 return;

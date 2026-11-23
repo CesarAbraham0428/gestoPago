@@ -4,10 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import com.proyecto.servicios.utils.LimitadorVentanaFija.Resultado;
 import java.time.Duration;
@@ -111,5 +113,50 @@ class LimitadorVentanaFijaTest {
         reloj.addAndGet(VENTANA.toMillis() + 1);
 
         assertFalse(limitador.excede("k", 1, VENTANA), "la ventana vencida reinicia la cuenta");
+    }
+
+    @Test
+    void siRedisNoInformaElVencimientoSeReparaElContador() {
+        when(valores.increment("k")).thenReturn(9L);
+        when(redis.getExpire("k", TimeUnit.SECONDS)).thenReturn(null);
+
+        assertEquals(60, limitador.registrar("k", 3, VENTANA).reintentarEnSegundos());
+        verify(redis).expire("k", VENTANA);
+    }
+
+    @Test
+    void anteUnaInundacionDeClavesSeDescartanLasVencidas() {
+        LimitadorVentanaFija enMemoria = soloMemoria();
+        llenar(enMemoria);
+        reloj.addAndGet(VENTANA.toMillis());
+
+        assertFalse(enMemoria.excede("nueva", 1, VENTANA));
+        assertFalse(enMemoria.excede("clave-0", 1, VENTANA), "las vencidas se descartaron");
+    }
+
+    @Test
+    void siLaInundacionSigueVigenteSeReinicianLosContadores() {
+        LimitadorVentanaFija enMemoria = soloMemoria();
+        llenar(enMemoria);
+
+        // Sin el reinicio, "clave-0" ya habría agotado su máximo de 1.
+        assertFalse(enMemoria.excede("clave-0", 1, VENTANA), "los contadores se reiniciaron");
+        assertTrue(enMemoria.excede("clave-0", 1, VENTANA));
+    }
+
+    /** Redis sin respuesta; los mocks no guardan invocaciones para que 100 001 llamadas sean rápidas. */
+    @SuppressWarnings("unchecked")
+    private LimitadorVentanaFija soloMemoria() {
+        StringRedisTemplate sinRedis = mock(StringRedisTemplate.class, withSettings().stubOnly());
+        ValueOperations<String, String> sinValores = mock(ValueOperations.class, withSettings().stubOnly());
+        when(sinRedis.opsForValue()).thenReturn(sinValores);
+        when(sinValores.increment(anyString())).thenReturn(null);
+        return new LimitadorVentanaFija(sinRedis, reloj::get);
+    }
+
+    private static void llenar(LimitadorVentanaFija enMemoria) {
+        for (int i = 0; i <= 100_000; i++) {
+            enMemoria.excede("clave-" + i, 1, VENTANA);
+        }
     }
 }

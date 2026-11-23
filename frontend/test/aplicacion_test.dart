@@ -55,6 +55,9 @@ class _Gateway implements AutenticacionGateway {
     cierres++;
     if (fallaCierre) throw const ConexionException();
   }
+
+  @override
+  Stream<String> cierresDeSesion() => Stream<String>.multi((_) {});
 }
 
 class _Almacen implements AlmacenSesion {

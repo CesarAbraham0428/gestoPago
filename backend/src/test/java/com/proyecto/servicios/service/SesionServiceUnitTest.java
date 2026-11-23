@@ -5,25 +5,29 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.proyecto.servicios.repositorys.sf.SesionUsuarioRepository;
 import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import com.proyecto.servicios.security.JwtTokenService.TokenEmitido;
+import com.proyecto.servicios.service.NotificadorSesiones.SesionTerminada;
 import com.proyecto.servicios.service.SesionService.Estado;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 class SesionServiceUnitTest {
 
     private static final Instant AHORA = Instant.parse("2026-11-01T10:00:00Z");
     private final SesionUsuarioRepository sesiones = mock(SesionUsuarioRepository.class);
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
+    private final ApplicationEventPublisher eventos = mock(ApplicationEventPublisher.class);
     private final SesionService servicio =
-            new SesionService(sesiones, usuarios, Clock.fixed(AHORA, ZoneOffset.UTC));
+            new SesionService(sesiones, usuarios, eventos, Clock.fixed(AHORA, ZoneOffset.UTC));
 
     @Test
     void elTokenDeLaSesionVigenteEsValido() {
@@ -64,13 +68,17 @@ class SesionServiceUnitTest {
 
         assertTrue(servicio.abrir(1, new TokenEmitido("t", "j", expira), false));
         assertFalse(servicio.abrir(2, new TokenEmitido("t", "j", expira), false));
+        // Solo la sesión abierta avisa a los demás dispositivos del usuario.
+        verify(eventos).publishEvent(new SesionTerminada(1, "j", SesionService.MOTIVO_REEMPLAZADA));
+        verifyNoMoreInteractions(eventos);
     }
 
     @Test
-    void cerrarEliminaLaSesion() {
+    void cerrarEliminaLaSesionYAvisaASusDispositivos() {
         servicio.cerrar(5);
 
         verify(sesiones).cerrar(5);
+        verify(eventos).publishEvent(new SesionTerminada(5, null, SesionService.MOTIVO_FINALIZADA));
     }
 
     @Test
@@ -78,6 +86,6 @@ class SesionServiceUnitTest {
         when(sesiones.jtiVigente(org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(Optional.of("j"));
 
-        assertEquals(Estado.VALIDA, new SesionService(sesiones, usuarios).estado(1, "j"));
+        assertEquals(Estado.VALIDA, new SesionService(sesiones, usuarios, eventos).estado(1, "j"));
     }
 }

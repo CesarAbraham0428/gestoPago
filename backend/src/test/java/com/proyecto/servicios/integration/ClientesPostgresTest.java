@@ -50,7 +50,7 @@ class ClientesPostgresTest {
         GlobalExceptionHandler.class,
         ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class,
         UsuarioService.class, AutenticacionServiceImpl.class, PinAutorizacionService.class,
-        CodigoVerificacionService.class, SesionService.class, TotpService.class, CifradoTokenConverter.class, RelojDePrueba.class,
+        CodigoVerificacionService.class, SesionService.class, NotificadorSesiones.class, TotpService.class, CifradoTokenConverter.class, RelojDePrueba.class,
         CodigosDePrueba.class})
     static class Config {}
 
@@ -110,7 +110,7 @@ class ClientesPostgresTest {
         assertNotEquals(numero(primero), numero(segundo));
         assertEquals(2, jdbc.queryForObject("select count(distinct numero_cuenta) from cuentas", Integer.class));
     }
-    @ParameterizedTest @ValueSource(strings={"curp", "rfc", "correoElectronico"})
+    @ParameterizedTest @ValueSource(strings={"curp", "rfc", "correoElectronico", "telefonoMovil"})
     void rechazaDuplicadosSinCrearRegistrosParciales(String campo) throws Exception {
         ObjectNode original = registro("1"); crear(original);
         ObjectNode duplicado = registro("2"); duplicado.set(campo, original.get(campo));
@@ -156,7 +156,7 @@ class ClientesPostgresTest {
             .andExpect(jsonPath("datos.datos[0].curp").value(c.get("curp").asText()))
             .andExpect(jsonPath("datos.datos[0].rfc").value(c.get("rfc").asText()))
             .andExpect(jsonPath("datos.datos[0].correoElectronico").value("ana1@example.com"))
-            .andExpect(jsonPath("datos.datos[0].telefonoMovil").value("5512345678"))
+            .andExpect(jsonPath("datos.datos[0].telefonoMovil").value("5512345671"))
             .andExpect(jsonPath("datos.datos[0].fechaNacimiento").value("1990-01-01"))
             .andExpect(jsonPath("datos.datos[0].ingresoMensual").value(12000.50))
             .andExpect(jsonPath("datos.datos[0].empresa").value("Empresa"))
@@ -604,7 +604,7 @@ class ClientesPostgresTest {
              "municipio":"Cuauhtemoc","estado":"Ciudad de Mexico","codigoPostal":"06000","pais":"Mexico"},
              "password":"Segura123!"}
             """ )).put("curp", "PERA900101MDFRZN0" + sufijo).put("rfc", "PERA900101AB" + sufijo)
-            .put("correoElectronico", "ana" + sufijo + "@example.com");
+            .put("correoElectronico", "ana" + sufijo + "@example.com").put("telefonoMovil", "551234567" + sufijo);
     }
     private JsonNode json(MvcResult r) throws Exception {
         JsonNode respuesta = mapper.readTree(r.getResponse().getContentAsString());

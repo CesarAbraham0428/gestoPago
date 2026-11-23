@@ -22,6 +22,19 @@ class _RegistroFalso implements RegistroGateway {
   Object? error;
   final List<Map<String, Object?>> enviados = [];
 
+  /// Nombres de la API que el servidor dirá que ya existen.
+  List<String> repetidosEnServidor = [];
+  final List<Map<String, String>> consultas = [];
+  Object? errorAlComprobar;
+
+  @override
+  Future<List<String>> repetidos(Map<String, String> datos) async {
+    // ignore: only_throw_errors
+    if (errorAlComprobar != null) throw errorAlComprobar!;
+    consultas.add(datos);
+    return repetidosEnServidor.where(datos.containsKey).toList();
+  }
+
   @override
   Future<void> registrar(Map<String, Object?> datos) async {
     // ignore: only_throw_errors
@@ -145,7 +158,13 @@ void main() {
   });
 
   group('ApiRegistroGateway', () {
-    ApiClient api(int estado, {void Function(http.Request)? alVer}) =>
+    ApiClient api(
+      int estado, {
+      void Function(http.Request)? alVer,
+      Object? datos,
+      String mensaje =
+          'Verifique la información capturada e intente nuevamente.',
+    }) =>
         ApiClient(
           baseUrl: 'http://api',
           tokenReader: () => 'jwt',
@@ -153,9 +172,8 @@ void main() {
             alVer?.call(r);
             return http.Response(
               jsonEncode({
-                'mensaje':
-                    'Verifique la información capturada e intente nuevamente.',
-                'datos': null,
+                'mensaje': mensaje,
+                'datos': datos,
               }),
               estado,
               headers: {'content-type': 'application/json; charset=utf-8'},
@@ -173,21 +191,45 @@ void main() {
       expect(jsonDecode(vista!.body), {'primerNombre': 'Ana'});
     });
 
-    test(
-      '409 se traduce a un mensaje único sin decir qué dato existe',
-      () async {
-        await expectLater(
-          ApiRegistroGateway(api(409)).registrar({}),
-          throwsA(
-            isA<ApiException>().having(
-              (e) => e.message,
-              'mensaje',
-              MensajesUsuario.cuentaYaExiste,
-            ),
+    test('409 conserva el mensaje del servidor que nombra los datos', () async {
+      await expectLater(
+        ApiRegistroGateway(
+          api(409, mensaje: 'Ya están registrados: CURP y RFC'),
+        ).registrar({}),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.message,
+            'mensaje',
+            'Ya están registrados: CURP y RFC.',
           ),
-        );
-      },
-    );
+        ),
+      );
+    });
+
+    test('repetidos consulta /clientes/disponibilidad sin token', () async {
+      http.Request? vista;
+      final r = await ApiRegistroGateway(
+        api(
+          200,
+          alVer: (q) => vista = q,
+          datos: {
+            'duplicados': ['rfc', 'telefonoMovil'],
+          },
+        ),
+      ).repetidos({'rfc': 'VECJ880326XXX', 'telefonoMovil': '5512345678'});
+      expect(r, ['rfc', 'telefonoMovil']);
+      expect(vista!.method, 'POST');
+      expect(vista!.url.path, '/clientes/disponibilidad');
+      expect(vista!.headers.containsKey('Authorization'), isFalse);
+      expect(jsonDecode(vista!.body), {
+        'rfc': 'VECJ880326XXX',
+        'telefonoMovil': '5512345678',
+      });
+    });
+
+    test('repetidos sin la lista devuelve vacío', () async {
+      expect(await ApiRegistroGateway(api(200)).repetidos({'curp': 'X'}), isEmpty);
+    });
 
     test('otros errores se propagan', () async {
       await expectLater(
@@ -350,6 +392,23 @@ void main() {
       expect(find.text('Paso 2 de 5'), findsOneWidget);
     });
 
+    testWidgets('el ojito muestra la contraseña y "hecho" en la confirmación envía', (tester) async {
+      await abrir(tester);
+      await paso1(tester);
+      await paso2(tester);
+      await paso3(tester);
+      await paso4(tester);
+
+      await tester.tap(find.byTooltip('Mostrar contraseña'));
+      await tester.pump();
+      expect(find.byTooltip('Ocultar contraseña'), findsOneWidget);
+
+      await tester.showKeyboard(campo('confirmacion'));
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(registro.enviados, hasLength(1));
+    });
+
     testWidgets('las contraseñas distintas bloquean el envío', (tester) async {
       await abrir(tester);
       await paso1(tester);
@@ -368,7 +427,7 @@ void main() {
       (tester) async {
         registro.error = const ApiException(
           409,
-          MensajesUsuario.cuentaYaExiste,
+          'Ya están registrados: CURP y RFC.',
         );
         await abrir(tester, tamano: const Size(400, 2200));
         await paso1(tester);
@@ -376,7 +435,7 @@ void main() {
         await paso3(tester);
         await paso4(tester);
         await boton(tester, 'Crear mi cuenta');
-        expect(find.text(MensajesUsuario.cuentaYaExiste), findsOneWidget);
+        expect(find.text('Ya están registrados: CURP y RFC.'), findsOneWidget);
         expect(find.text('Paso 5 de 5'), findsOneWidget);
 
         registro.error = null;
@@ -384,6 +443,80 @@ void main() {
         expect(find.text('¡Tu cuenta está lista!'), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'avisa en el paso de datos qué dato está repetido y deja corregirlo',
+      (tester) async {
+        registro.repetidosEnServidor = ['rfc', 'telefonoMovil'];
+        await abrir(tester);
+        await pasoNombre(tester);
+        await pasoIdentidad(tester);
+
+        expect(find.text('Paso 2 de 5'), findsOneWidget);
+        expect(find.text('Este RFC ya está registrado.'), findsOneWidget);
+        expect(find.text('Este teléfono ya está registrado.'), findsOneWidget);
+        expect(find.text('Esta CURP ya está registrada.'), findsNothing);
+        expect(registro.consultas.single, {
+          'curp': 'HEGG560427MVZRRL04',
+          'rfc': 'VECJ880326XXX',
+          'telefonoMovil': '5512345678',
+        });
+
+        // Al corregir un dato desaparece su aviso; el otro permanece.
+        await escribir(tester, 'telefonoMovil', '5599999999');
+        await tester.pumpAndSettle();
+        expect(find.text('Este teléfono ya está registrado.'), findsNothing);
+        expect(find.text('Este RFC ya está registrado.'), findsOneWidget);
+
+        // Mientras el RFC siga repetido no se avanza (sin volver a consultar).
+        await boton(tester, 'Continuar');
+        expect(find.text('Paso 2 de 5'), findsOneWidget);
+        expect(registro.consultas, hasLength(1));
+
+        await escribir(tester, 'rfc', 'VECJ880326YYY');
+        registro.repetidosEnServidor = [];
+        await boton(tester, 'Continuar');
+        expect(find.text('Paso 3 de 5'), findsOneWidget);
+      },
+    );
+
+    testWidgets('avisa en el paso de acceso que el correo está repetido', (
+      tester,
+    ) async {
+      registro.repetidosEnServidor = ['correoElectronico'];
+      await abrir(tester);
+      await paso1(tester);
+      await paso2(tester);
+      await paso3(tester);
+      await paso4(tester);
+      await boton(tester, 'Crear mi cuenta');
+
+      expect(
+        find.text('Este correo ya está registrado. Inicia sesión o usa otro.'),
+        findsOneWidget,
+      );
+      expect(find.text('Paso 5 de 5'), findsOneWidget);
+      expect(registro.consultas.last, {'correoElectronico': 'ana@example.com'});
+      expect(registro.enviados, isEmpty);
+    });
+
+    testWidgets('si falla la comprobación se queda en el paso con un aviso', (
+      tester,
+    ) async {
+      registro.errorAlComprobar = const ConexionException();
+      await abrir(tester);
+      await pasoNombre(tester);
+      await elegir(tester, 'Estado civil', 'Union libre');
+      await escribir(tester, 'curp', 'hegg560427mvzrrl04');
+      await escribir(tester, 'rfc', 'VECJ880326XXX');
+      await escribir(tester, 'telefonoMovil', '5512345678');
+      await boton(tester, 'Continuar');
+      expect(find.text('Paso 2 de 5'), findsOneWidget);
+      expect(
+        find.text(MensajesUsuario.sinConexion),
+        findsOneWidget,
+      );
+    });
 
     testWidgets('un error inesperado muestra un mensaje genérico', (
       tester,

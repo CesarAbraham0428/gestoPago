@@ -2,6 +2,7 @@ package com.proyecto.servicios.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -12,10 +13,12 @@ import com.proyecto.servicios.models.response.AuthResponse;
 import com.proyecto.servicios.models.response.DesafioResponse;
 import com.proyecto.servicios.service.AutenticacionService;
 import com.proyecto.servicios.service.LimiteAutenticacionService;
+import com.proyecto.servicios.service.NotificadorSesiones;
 import com.proyecto.servicios.service.exception.NegocioException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
@@ -28,11 +31,12 @@ class AutenticacionControllerTest {
 
     private final AutenticacionService service = mock(AutenticacionService.class);
     private final LimiteAutenticacionService limite = mock(LimiteAutenticacionService.class);
+    private final NotificadorSesiones notificador = mock(NotificadorSesiones.class);
     private MockMvc mvc;
 
     @BeforeEach
     void preparar() {
-        mvc = MockMvcBuilders.standaloneSetup(new AutenticacionController(service, limite))
+        mvc = MockMvcBuilders.standaloneSetup(new AutenticacionController(service, limite, notificador))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
@@ -84,6 +88,19 @@ class AutenticacionControllerTest {
                 .principal(new UsernamePasswordAuthenticationToken("7", null, List.of())))
                 .andExpect(status().isOk()).andExpect(jsonPath("codigo").value(0));
         verify(service).cerrarSesion(7);
+    }
+
+    @Test
+    void elCanalDeEventosSeSuscribeConLaSesionDelToken() throws Exception {
+        var autenticacion = new UsernamePasswordAuthenticationToken("7", null, List.of());
+        autenticacion.setDetails("jti-7");
+        when(notificador.suscribir(7, "jti-7")).thenReturn(new SseEmitter());
+
+        mvc.perform(get("/auth/sesion/eventos").principal(autenticacion))
+                .andExpect(request().asyncStarted())
+                .andExpect(header().string("X-Accel-Buffering", "no"));
+        verify(notificador).suscribir(7, "jti-7");
+        verifyNoInteractions(service);
     }
 
     @ParameterizedTest

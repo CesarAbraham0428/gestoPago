@@ -2,9 +2,11 @@ package com.proyecto.servicios.controller;
 
 import com.proyecto.servicios.models.request.ClienteActualizacionPorIdentidadRequest;
 import com.proyecto.servicios.models.request.ClienteConsultaRequest;
+import com.proyecto.servicios.models.request.ClienteDisponibilidadRequest;
 import com.proyecto.servicios.models.request.ClienteIdentificacionRequest;
 import com.proyecto.servicios.models.request.ClienteRequest;
 import com.proyecto.servicios.models.response.ClienteResponse;
+import com.proyecto.servicios.models.response.DisponibilidadResponse;
 import com.proyecto.servicios.models.response.ListaGenericResponse;
 import com.proyecto.servicios.models.response.GenericResponse;
 import com.proyecto.servicios.service.ClienteService;
@@ -40,6 +42,15 @@ public class ClienteController {
         limite.verificarRegistro(DireccionCliente.de(http));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(GenericResponse.exito("Cliente registrado", service.registrar(request)));
+    }
+
+    /** Pública: permite avisar de un dato repetido en el paso del formulario donde se captura. */
+    @PostMapping("/disponibilidad")
+    public GenericResponse<DisponibilidadResponse> disponibilidad(
+            @Valid @RequestBody ClienteDisponibilidadRequest request, HttpServletRequest http) {
+        limite.verificarDisponibilidad(DireccionCliente.de(http));
+        return GenericResponse.exito("Disponibilidad consultada",
+                new DisponibilidadResponse(service.datosDuplicados(request)));
     }
 
     @PostMapping("/consultar")

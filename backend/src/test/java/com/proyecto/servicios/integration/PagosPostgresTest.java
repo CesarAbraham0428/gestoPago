@@ -62,7 +62,7 @@ class PagosPostgresTest {
         AutenticacionServiceImpl.class, PagoServiceImpl.class, PagoRegistroService.class, PinAutorizacionService.class,
         GestoPagoPagosGateway.class, ResolutorDestinoPago.class, VerificadorAdeudo.class, ConciliacionPagoService.class,
         FirmaGestoPago.class, CifradoTokenConverter.class,
-        CodigoVerificacionService.class, SesionService.class, TotpService.class, RelojDePrueba.class,
+        CodigoVerificacionService.class, SesionService.class, NotificadorSesiones.class, TotpService.class, RelojDePrueba.class,
         CodigosDePrueba.class})
     static class Config {}
 
@@ -274,7 +274,8 @@ class PagosPostgresTest {
     private String registrarOtroClienteYIniciarSesion() throws Exception {
         mvc.perform(post("/clientes").contentType("application/json").content(CLIENTE
             .replace("PERA900101MDFRZN01", "PERA900102MDFRZN02").replace("PERA900101AB1", "PERA900102AB2")
-            .replace("ana1@example.com", "ana2@example.com"))).andExpect(status().isCreated());
+            .replace("ana1@example.com", "ana2@example.com")
+            .replace("\"telefonoMovil\":\"5512345678\"", "\"telefonoMovil\":\"5512345679\""))).andExpect(status().isCreated());
         return iniciarSesion("ana2@example.com");
     }
 

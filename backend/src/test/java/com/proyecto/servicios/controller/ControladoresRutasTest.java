@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -64,6 +65,33 @@ class ControladoresRutasTest {
     }
 
     @Test
+    void disponibilidadLimitaPorIpYListaLosCamposRepetidos() throws Exception {
+        ClienteService clientes = mock(ClienteService.class);
+        LimiteAutenticacionService limite = mock(LimiteAutenticacionService.class);
+        when(clientes.datosDuplicados(any())).thenReturn(List.of("rfc", "telefonoMovil"));
+
+        mvc(new ClienteController(clientes, limite))
+                .perform(post("/clientes/disponibilidad").contentType(JSON)
+                        .content("{\"rfc\":\"PERA900101AB1\",\"telefonoMovil\":\"5512345678\"}")
+                        .with(r -> {
+                            r.setRemoteAddr("10.0.0.6");
+                            return r;
+                        }))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("datos.duplicados[0]").value("rfc"))
+                .andExpect(jsonPath("datos.duplicados[1]").value("telefonoMovil"));
+
+        verify(limite).verificarDisponibilidad("10.0.0.6");
+    }
+
+    @Test
+    void disponibilidadRechazaFormatosInvalidos() throws Exception {
+        mvc(new ClienteController(mock(ClienteService.class), mock(LimiteAutenticacionService.class)))
+                .perform(post("/clientes/disponibilidad").contentType(JSON).content("{\"telefonoMovil\":\"12\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void desactivarUsaLaIdentidadAutenticada() throws Exception {
         ClienteService clientes = mock(ClienteService.class);
 
@@ -91,21 +119,32 @@ class ControladoresRutasTest {
     }
 
     @Test
-    void elHistorialAcotaLaPaginacion() throws Exception {
+    void elHistorialRecibeLaPaginaEnElCuerpo() throws Exception {
         PagoService pagos = mock(PagoService.class);
         when(pagos.historial(anyInt(), anyInt(), anyInt()))
                 .thenReturn(new ListaGenericResponse<>(List.of(), 0, 20, 0, 0));
         MockMvc mvc = mvc(new PagoController(pagos, mock(LimitePagosService.class)));
 
-        mvc.perform(get("/pagos").principal(usuario)).andExpect(status().isOk())
-                .andExpect(jsonPath("mensaje").value("Historial consultado"));
+        mvc.perform(post("/pagos/historial").principal(usuario).contentType(JSON).content("{}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("mensaje").value("Historial consultado"));
         verify(pagos).historial(7, 0, 20);
 
-        mvc.perform(get("/pagos").principal(usuario).param("pagina", "-4").param("tamanio", "1000"))
-                .andExpect(status().isOk());
-        verify(pagos).historial(7, 0, 100);
+        mvc.perform(post("/pagos/historial").principal(usuario).contentType(JSON)
+                .content("{\"pagina\":2,\"tamanio\":100}")).andExpect(status().isOk());
+        verify(pagos).historial(7, 2, 100);
+    }
 
-        mvc.perform(get("/pagos").principal(usuario).param("tamanio", "0")).andExpect(status().isOk());
-        verify(pagos).historial(7, 0, 1);
+    @Test
+    void elHistorialRechazaPaginasFueraDeRangoYCamposExtra() throws Exception {
+        PagoService pagos = mock(PagoService.class);
+        MockMvc mvc = mvc(new PagoController(pagos, mock(LimitePagosService.class)));
+
+        for (String cuerpo : List.of("{\"pagina\":-1}", "{\"tamanio\":0}", "{\"tamanio\":101}",
+                "{\"usuarioId\":9}")) {
+            mvc.perform(post("/pagos/historial").principal(usuario).contentType(JSON).content(cuerpo))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(get("/pagos").principal(usuario)).andExpect(status().isMethodNotAllowed());
+        verifyNoInteractions(pagos);
     }
 }

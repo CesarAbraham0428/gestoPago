@@ -78,7 +78,11 @@ public class TotpService {
         return clock.instant().getEpochSecond() / PERIODO_SEGUNDOS;
     }
 
-    /** Código de 6 dígitos del paso dado (HOTP, RFC 4226). */
+    /**
+     * Código de 6 dígitos del paso dado (HOTP, RFC 4226). HMAC-SHA1 es el algoritmo del RFC 6238 y el único que todas
+     * las apps autenticadoras aceptan; la debilidad de SHA-1 ante colisiones no afecta a HMAC.
+     */
+    @SuppressWarnings("java:S4790")
     public String codigo(String secreto, long paso) {
         try {
             Mac mac = Mac.getInstance("HmacSHA1");

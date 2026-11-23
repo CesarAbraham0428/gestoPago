@@ -18,11 +18,12 @@ import com.proyecto.servicios.models.request.DomicilioRequest;
 import com.proyecto.servicios.models.request.LoginRequest;
 import com.proyecto.servicios.models.request.PagoServicioRequest;
 import com.proyecto.servicios.models.request.VerificacionCodigoRequest;
+import com.proyecto.servicios.models.response.DesafioResponse;
 import com.proyecto.servicios.models.response.HistorialPagoResponse;
 import com.proyecto.servicios.models.response.gestopago.GestoPagoPagosResponse;
 import com.proyecto.servicios.service.exception.ClienteYaRegistradoException;
-import com.proyecto.servicios.service.exception.CurpDuplicadaException;
-import com.proyecto.servicios.service.exception.RfcDuplicadoException;
+import java.util.List;
+import com.proyecto.servicios.service.exception.DatosDuplicadosException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,8 @@ class ModelosTest {
 
         assertFalse(new CuentaPinRequest("123", "1234", "5678").toString().contains("5678"));
         assertFalse(new LoginRequest("a@b.mx", "secreto").toString().contains("secreto"));
+        assertFalse(new DesafioResponse.Enrolamiento("SECRETOBASE32", "otpauth://totp/x?secret=SECRETOBASE32")
+                .toString().contains("SECRETOBASE32"));
         assertFalse(new VerificacionCodigoRequest("d", "123456", true).toString().contains("123456"));
         assertFalse(new PagoServicioRequest("1", 1, 2, BigDecimal.ONE, null, null, "9876").toString()
                 .contains("9876"));
@@ -113,8 +116,11 @@ class ModelosTest {
     @Test
     void lasExcepcionesDeDuplicadoResponden409() {
         assertEquals(HttpStatus.CONFLICT, new ClienteYaRegistradoException().getStatus());
-        assertEquals("CURP duplicada", new CurpDuplicadaException().getMessage());
-        assertEquals("RFC duplicado", new RfcDuplicadoException().getMessage());
+        assertEquals("El CURP ya está registrado",
+                new DatosDuplicadosException(List.of(DatosDuplicadosException.CURP)).getMessage());
+        assertEquals("Ya están registrados: RFC, teléfono móvil y correo electrónico",
+                new DatosDuplicadosException(List.of(DatosDuplicadosException.RFC, DatosDuplicadosException.TELEFONO,
+                        DatosDuplicadosException.CORREO)).getMessage());
     }
 
     @Test

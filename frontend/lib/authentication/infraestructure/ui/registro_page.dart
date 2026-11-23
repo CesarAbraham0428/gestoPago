@@ -109,6 +109,24 @@ class _RegistroPageState extends State<RegistroPage> {
     'confirmacion',
   ];
 
+  /// Paso "Datos" (CURP, RFC y teléfono): se comprueba aquí que no estén repetidos.
+  static const _pasoDatos = 1;
+
+  /// Campo de la API -> campo del formulario y aviso cuando ya tiene cuenta.
+  static const _repetidoEn = {
+    'curp': ('curp', 'Esta CURP ya está registrada.'),
+    'rfc': ('rfc', 'Este RFC ya está registrado.'),
+    'telefonoMovil': ('telefonoMovil', 'Este teléfono ya está registrado.'),
+    'correoElectronico': (
+      'correo',
+      'Este correo ya está registrado. Inicia sesión o usa otro.',
+    ),
+  };
+
+  /// Valor (normalizado) que el servidor dijo que ya existe, por campo. El aviso
+  /// desaparece solo en cuanto el usuario cambia el valor.
+  final _repetidos = <String, String>{};
+
   final _claves = List.generate(_pasos.length, (_) => GlobalKey<FormState>());
   final _c = {for (final k in _campos) k: TextEditingController()};
   int _paso = 0;
@@ -174,11 +192,33 @@ class _RegistroPageState extends State<RegistroPage> {
     };
   }
 
+  String _normal(String? v) => (v ?? '').trim().toLowerCase();
+
+  String? _avisoRepetido(String nombre, String? valor) {
+    for (final (campo, aviso) in _repetidoEn.values) {
+      if (campo == nombre && _repetidos[nombre] == _normal(valor)) return aviso;
+    }
+    return null;
+  }
+
+  /// Datos únicos que se capturaron en el paso actual y hay que comprobar.
+  Map<String, String> _porComprobar() => switch (_paso) {
+    _pasoDatos => {
+      'curp': _t('curp').toUpperCase(),
+      'rfc': _t('rfc').toUpperCase(),
+      'telefonoMovil': _t('telefonoMovil'),
+    },
+    final p when p == _pasos.length - 1 => {'correoElectronico': _t('correo')},
+    _ => const {},
+  };
+
   Future<void> _siguiente() async {
     if (_enviando || !(_claves[_paso].currentState?.validate() ?? false)) {
       return;
     }
-    if (_paso < _pasos.length - 1) {
+    final comprobar = _porComprobar();
+    final ultimo = _paso == _pasos.length - 1;
+    if (comprobar.isEmpty && !ultimo) {
       setState(() {
         _paso++;
         _error = null;
@@ -190,6 +230,25 @@ class _RegistroPageState extends State<RegistroPage> {
       _error = null;
     });
     try {
+      final repetidos = comprobar.isEmpty
+          ? const <String>[]
+          : await widget.registro.repetidos(comprobar);
+      if (repetidos.isNotEmpty) {
+        // Se marca cada campo repetido y el usuario se queda en este paso.
+        for (final nombre in repetidos) {
+          final campo = _repetidoEn[nombre]?.$1;
+          if (campo != null) _repetidos[campo] = _normal(comprobar[nombre]);
+        }
+        if (mounted) {
+          setState(() => _enviando = false);
+          _claves[_paso].currentState?.validate();
+        }
+        return;
+      }
+      if (!ultimo) {
+        if (mounted) setState(() => _paso++);
+        return;
+      }
       await widget.registro.registrar(_datos());
       if (mounted) setState(() => _creada = true);
     } on Object catch (e) {
@@ -465,6 +524,7 @@ class _RegistroPageState extends State<RegistroPage> {
         validator: ValidadoresRegistro.curp,
         max: 18,
         mayusculas: true,
+        unico: true,
       ),
       _campo(
         'rfc',
@@ -472,6 +532,7 @@ class _RegistroPageState extends State<RegistroPage> {
         validator: ValidadoresRegistro.rfc,
         max: 13,
         mayusculas: true,
+        unico: true,
       ),
     ]),
     _fila([
@@ -482,6 +543,7 @@ class _RegistroPageState extends State<RegistroPage> {
         max: 10,
         teclado: TextInputType.phone,
         soloDigitos: true,
+        unico: true,
         hints: [AutofillHints.telephoneNumberNational],
       ),
       _campo(
@@ -600,6 +662,7 @@ class _RegistroPageState extends State<RegistroPage> {
         'Correo electrónico',
         validator: ValidadoresRegistro.correo,
         max: 100,
+        unico: true,
         teclado: TextInputType.emailAddress,
         hints: [AutofillHints.email],
       ),
@@ -672,6 +735,7 @@ class _RegistroPageState extends State<RegistroPage> {
     TextCapitalization capitalizar = TextCapitalization.none,
     bool soloDigitos = false,
     bool mayusculas = false,
+    bool unico = false,
     List<String> hints = const [],
     String? prefijo,
   }) => TextFormField(
@@ -693,7 +757,11 @@ class _RegistroPageState extends State<RegistroPage> {
         ),
     ],
     decoration: InputDecoration(labelText: etiqueta, prefixText: prefijo),
-    validator: validator,
+    // Los datos únicos se revalidan al editarlos para quitar el aviso de "repetido".
+    autovalidateMode: unico ? AutovalidateMode.onUserInteraction : null,
+    validator: unico
+        ? (v) => validator?.call(v) ?? _avisoRepetido(nombre, v)
+        : validator,
   );
 
   Widget _desplegable(

@@ -8,6 +8,8 @@ import java.util.Optional;
 public interface ClientesRepository extends JpaRepository<Cliente,Integer>, JpaSpecificationExecutor<Cliente> {
     boolean existsByCurp(String curp);
     boolean existsByRfc(String rfc);
+    boolean existsByTelefonoMovil(String telefonoMovil);
+    boolean existsByTelefonoMovilAndIdNot(String telefonoMovil, Integer id);
     @Query("select (count(c) > 0) from Cliente c where lower(c.correoElectronico) = lower(:correo)")
     boolean existsByCorreoElectronicoIgnoreCase(@org.springframework.data.repository.query.Param("correo") String correo);
     @Query("select (count(c) > 0) from Cliente c where lower(c.correoElectronico) = lower(:correo) and c.id <> :id")

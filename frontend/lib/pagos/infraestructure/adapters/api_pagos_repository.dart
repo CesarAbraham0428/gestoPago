@@ -23,7 +23,8 @@ import '../../domain/ports/pagos_repository.dart';
 ///   200 -> datos: {upc,estado,mensaje,monto,comision,referencia,idTx?,numAutorizacion?}
 ///   404 no existe o es de otro usuario
 ///
-/// GET /pagos?pagina=0&tamanio=20 (Bearer)  -> pagos del usuario en cualquier estado
+/// POST /pagos/historial (Bearer)  {"pagina":0,"tamanio":20}  -> pagos del usuario en cualquier estado
+///   400 página fuera de rango (pagina >= 0, tamanio 1-100)
 ///   200 -> datos: {datos:[...],pagina,tamanoPagina,totalElementos,totalPaginas}
 class ApiPagosRepository implements PagosRepository {
   ApiPagosRepository(this._api);
@@ -93,9 +94,9 @@ class ApiPagosRepository implements PagosRepository {
     required int pagina,
     required int tamanio,
   }) async {
-    final respuesta = await _api.get(
-      '/pagos',
-      query: {'pagina': '$pagina', 'tamanio': '$tamanio'},
+    final respuesta = await _api.post(
+      '/pagos/historial',
+      body: {'pagina': pagina, 'tamanio': tamanio},
     );
     final d = respuesta.dataAsMap;
     final lista = d['datos'];

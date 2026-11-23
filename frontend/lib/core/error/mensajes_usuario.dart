@@ -23,16 +23,11 @@ abstract final class MensajesUsuario {
   // Acceso
   static const credencialesIncorrectas = 'Correo o contraseña incorrectos.';
   static const cuentaNoDisponible =
-      'No es posible iniciar sesión con esta cuenta. Comunícate con soporte.';
+      'Tu cuenta está bloqueada y no puede iniciar sesión. Comunícate con soporte para reactivarla.';
   static const codigoIncorrecto =
       'El código no es correcto o ya venció. Escribe el código que muestra ahora tu app de autenticación.';
   static const demasiadosCodigos =
       'Demasiados códigos incorrectos. Vuelve a iniciar sesión para intentarlo de nuevo.';
-
-  // Registro
-  static const cuentaYaExiste =
-      'Ya existe una cuenta con alguno de estos datos (correo, CURP o RFC). '
-      'Inicia sesión o revisa lo que escribiste.';
 
   /// Pistas de que un texto del servidor es técnico y no debe llegar al usuario.
   static final _tecnico = RegExp(

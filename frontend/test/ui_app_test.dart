@@ -76,6 +76,22 @@ void main() {
       await cerrar(tester, deps);
     });
 
+    testWidgets('del login a crear cuenta y de regreso', (tester) async {
+      final deps = await crear();
+      await abrir(tester, deps, construirShellWeb);
+      await tester.ensureVisible(find.text('Crear cuenta'));
+      await tester.tap(find.text('Crear cuenta'));
+      await tester.pumpAndSettle();
+      final volver = find.text('¿Ya tienes cuenta? Inicia sesión');
+      expect(volver, findsOneWidget);
+
+      await tester.ensureVisible(volver);
+      await tester.tap(volver);
+      await tester.pumpAndSettle();
+      expect(find.text('Inicia sesión'), findsOneWidget);
+      await cerrar(tester, deps);
+    });
+
     testWidgets('con sesión, / y /login llevan al catálogo', (tester) async {
       final deps = await crear(sesion: sesionPrueba());
       await abrir(tester, deps, construirShellWeb);
@@ -155,6 +171,15 @@ void main() {
       await tester.tap(find.byTooltip('Volver'));
       await tester.pumpAndSettle();
       expect(find.byType(NavigationBar), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Tu cuenta'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ana Pérez'), findsOneWidget);
+      await tester.tap(find.text('Cerrar sesión'));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Cerrar sesión?'), findsOneWidget);
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
       await cerrar(tester, deps);
     });
   });

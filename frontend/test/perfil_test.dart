@@ -230,16 +230,26 @@ void main() {
 
       await tester.enterText(find.widgetWithText(TextFormField, 'Código postal'), '06000');
       // Datos personales y correo se ven en su lugar pero no se pueden editar.
-      for (final e in ['Primer nombre', 'Fecha de nacimiento', 'Sexo', 'Nacionalidad', 'CURP', 'RFC', 'Correo electrónico']) {
+      for (final e in ['Primer nombre', 'Fecha de nacimiento', 'Sexo', 'Nacionalidad', 'CURP', 'RFC', 'Correo electrónico', 'Teléfono móvil']) {
         final campo = tester.widget<TextFormField>(find.widgetWithText(TextFormField, e));
         expect(campo.enabled, isFalse, reason: e);
       }
       expect(find.text('PELA950412AB1'), findsOneWidget);
+      final alternativo = tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'Teléfono alternativo (opcional)'));
+      expect(alternativo.enabled, isNot(isFalse));
       await tester.tap(find.text('Guardar cambios'));
       await tester.pumpAndSettle();
       expect(repo.cambiosRecibidos.single, {'empresa': 'Nueva'});
       expect(find.text('Tus datos se guardaron.'), findsOneWidget);
       expect(find.text('Nueva'), findsOneWidget);
+    });
+
+    testWidgets('perfil: el teléfono alternativo se muestra con formato', (tester) async {
+      final c = PerfilController(PerfilFalso(perfilPrueba(telefonoAlternativo: '5598765432')));
+      await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 2400));
+      await tester.pumpAndSettle();
+      expect(find.text(formatoTelefono('5598765432')), findsOneWidget);
+      expect(find.text('Sin registrar'), findsNothing);
     });
 
     testWidgets('perfil: error al guardar se muestra y cancelar vuelve', (tester) async {

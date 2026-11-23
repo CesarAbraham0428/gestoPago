@@ -3,8 +3,10 @@ package com.proyecto.servicios.service;
 import com.proyecto.servicios.repositorys.sf.SesionUsuarioRepository;
 import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import com.proyecto.servicios.security.JwtTokenService.TokenEmitido;
+import com.proyecto.servicios.service.NotificadorSesiones.SesionTerminada;
 import java.time.Clock;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,18 +20,25 @@ public class SesionService {
 
     public enum Estado { VALIDA, USUARIO_INACTIVO, REEMPLAZADA, FINALIZADA }
 
+    public static final String MOTIVO_REEMPLAZADA = "Tu sesión se cerró porque iniciaste sesión en otro dispositivo";
+    public static final String MOTIVO_FINALIZADA = "Tu sesión ya no está activa; inicia sesión de nuevo";
+
     private final SesionUsuarioRepository sesiones;
     private final UsuarioRepository usuarios;
+    private final ApplicationEventPublisher eventos;
     private final Clock clock;
 
     @Autowired
-    public SesionService(SesionUsuarioRepository sesiones, UsuarioRepository usuarios) {
-        this(sesiones, usuarios, Clock.systemUTC());
+    public SesionService(SesionUsuarioRepository sesiones, UsuarioRepository usuarios,
+            ApplicationEventPublisher eventos) {
+        this(sesiones, usuarios, eventos, Clock.systemUTC());
     }
 
-    SesionService(SesionUsuarioRepository sesiones, UsuarioRepository usuarios, Clock clock) {
+    SesionService(SesionUsuarioRepository sesiones, UsuarioRepository usuarios, ApplicationEventPublisher eventos,
+            Clock clock) {
         this.sesiones = sesiones;
         this.usuarios = usuarios;
+        this.eventos = eventos;
         this.clock = clock;
     }
 
@@ -48,11 +57,17 @@ public class SesionService {
     /** @return false si ya hay una sesión vigente y {@code reemplazar} es falso. */
     @Transactional
     public boolean abrir(Integer usuarioId, TokenEmitido token, boolean reemplazar) {
-        return sesiones.abrir(usuarioId, token.jti(), clock.instant(), token.expiraEn(), reemplazar) > 0;
+        boolean abierta = sesiones.abrir(usuarioId, token.jti(), clock.instant(), token.expiraEn(), reemplazar) > 0;
+        if (abierta) {
+            // Avisa (tras el commit) al dispositivo cuya sesión acaba de ser reemplazada.
+            eventos.publishEvent(new SesionTerminada(usuarioId, token.jti(), MOTIVO_REEMPLAZADA));
+        }
+        return abierta;
     }
 
     @Transactional
     public void cerrar(Integer usuarioId) {
         sesiones.cerrar(usuarioId);
+        eventos.publishEvent(new SesionTerminada(usuarioId, null, MOTIVO_FINALIZADA));
     }
 }

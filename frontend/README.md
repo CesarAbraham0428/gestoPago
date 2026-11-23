@@ -35,9 +35,10 @@ Screaming architecture (la estructura dice qué hace la app) con puertos y adapt
 
 ```
 lib/
-├── authentication/   Iniciar y cerrar sesión, sesión vigente
+├── authentication/   Registro, iniciar y cerrar sesión, sesión vigente
 ├── productos/        Catálogo y detalle
 ├── pagos/            Compra, resultado, historial
+├── perfil/           Datos del cliente, cuentas bancarias y PIN
 │   ├── domain/
 │   │   ├── entities/        Modelos del negocio (sin Flutter ni HTTP)
 │   │   └── ports/           Puertos de salida: interfaces que el dominio necesita
@@ -62,17 +63,16 @@ lib/
 | HTTPS | La URL base se define al compilar (`API_BASE_URL`). Una compilación de producción con HTTP hacia un host que no sea el propio equipo se niega a arrancar. |
 | Autenticación | Acceso en dos pasos: contraseña (`/auth/login`) y código de 6 dígitos de una app autenticadora (TOTP: Google Authenticator, Microsoft Authenticator, Authy) (`/auth/verificar`); la primera vez la pantalla muestra el QR (`qr_flutter`) y la clave para enlazarla; el servidor valida ambos. El JWT resultante se envía como `Authorization: Bearer`. |
 | Control de acceso | `redirect` del enrutador: sin sesión solo existe `/login`. El servidor valida cada petición. |
-| Sesión única | Si el usuario ya tiene sesión en otro dispositivo (web o móvil), el servidor responde `409`; la app pide confirmar y reenvía el código con `cerrarSesionAnterior: true`. La sesión desplazada recibe `401` y vuelve al login con el motivo. |
+| Sesión única | Si el usuario ya tiene sesión en otro dispositivo (web o móvil), el servidor responde `409`; la app pide confirmar y reenvía el código con `cerrarSesionAnterior: true`. La sesión desplazada vuelve al login con el motivo **al instante**, aunque el usuario no esté navegando: la app mantiene abierto un canal Server-Sent Events (`GET /auth/sesion/eventos`) y el servidor le avisa. Si el canal se corta, se reabre con espera creciente (2 s, 4 s… hasta 64 s) y al volver a la app o pestaña; reabrirlo vuelve a validar la sesión (401 → login). |
 | Expiración de sesión | El token trae `expiraEnMs`; un temporizador cierra la sesión al vencer. Además se cierra tras 15 min sin interacción (`GuardiaInactividad`). Un `401` en cualquier ruta protegida también la cierra. |
 | Cierre de sesión | Llama a `/auth/logout` (el JWT queda revocado en el servidor) y borra el token del dispositivo y los datos en memoria (catálogo, historial). Si no hay red, igual se cierra localmente. |
 | Credenciales | Token en `flutter_secure_storage`; la contraseña y el PIN no se guardan, no se registran y los campos los ocultan. |
 | Validación | Formato de correo, celular, referencia, monto y PIN antes de enviar; el servidor vuelve a validar. |
 | Errores | Se muestra el campo `mensaje` de la API (ya redactado para el usuario); los errores 5xx y de red usan textos genéricos. |
 
-### No implementado
+### Limitaciones
 
-- **Imágenes de productos**: el catálogo no las incluye. Cada servicio se identifica con un monograma estable.
-- **Registro de usuarios**: fuera del alcance de los módulos pedidos (`POST /clientes` requiere CURP, RFC y domicilio).
+- **Imágenes de productos**: el catálogo de GestoPago (`GET /productos`) no incluye imágenes ni URL de imagen. Cada servicio se identifica con un monograma estable (iniciales y color derivados de su nombre).
 
 ## Integración con la API
 
@@ -85,8 +85,19 @@ Contrato general de respuesta: `{ "codigo": 0|1, "mensaje": "...", "datos": ... 
 | Paso 1 | `POST /auth/login` (público) · `{ "correo", "password" }` → `datos: { desafioId, expiraEnMs, enrolamiento }` (`enrolamiento` = `{ secreto, otpauthUri }`, solo mientras la app no está enlazada). 401 credenciales incorrectas · 403 inactivo · 429 demasiados intentos |
 | Paso 2 | `POST /auth/verificar` (público) · `{ "desafioId", "codigo", "cerrarSesionAnterior" }` → `datos: { token, tipo, expiraEnMs, usuario, nombreCompleto }`. 401 código incorrecto/vencido · 409 hay otra sesión activa · 429 demasiados intentos |
 | Cierre | `POST /auth/logout` (Bearer) → 200; revoca la sesión en el servidor |
+| Avisos de sesión | `GET /auth/sesion/eventos` (Bearer, `Accept: text/event-stream`) → flujo SSE: `event: conectado` al abrir, `: latido` cada 25 s y `event: sesion_cerrada` + `data: <motivo>` cuando la sesión se cierra o la reemplaza otro dispositivo (la app cierra la sesión con ese motivo). 401 al conectar → la sesión ya no era válida. Un fallo de red no cierra la sesión: reconecta. En web se lee con `fetch_client` (el cliente XHR por omisión no entrega el flujo por partes) |
 | Validación en la app | Correo con formato válido (máx. 100); contraseña obligatoria (máx. 72); código de exactamente 6 dígitos |
 | Adaptador | `authentication/infraestructure/adapters/api_autenticacion_gateway.dart` |
+
+### Registro
+
+| | |
+|---|---|
+| Disponibilidad | `POST /clientes/disponibilidad` (público) · `{ curp?, rfc?, telefonoMovil?, correoElectronico? }` → `datos: { duplicados: [campos que ya tienen cuenta] }`. Se consulta en cada paso del formulario para avisar por campo |
+| Alta | `POST /clientes` (público) · datos personales, empresa, domicilio, `correoElectronico` y `password` → 201 cliente creado con su cuenta en saldo 0 |
+| Errores | 400 datos inválidos · 409 CURP, RFC, teléfono o correo ya registrados (el mensaje nombra cuáles) · 429 demasiados registros |
+| Validación en la app | CURP, RFC, nombres, teléfono de 10 dígitos, código postal de 5, mayoría de edad y contraseña segura antes de enviar |
+| Adaptador | `authentication/infraestructure/adapters/api_registro_gateway.dart` |
 
 ### Catálogo
 
@@ -152,15 +163,29 @@ Un 401 cierra la sesión.
 
 | | |
 |---|---|
-| Endpoint | `GET /pagos?pagina=0&tamanio=20` (Bearer) — **agregado al backend para este frontend** |
+| Endpoint | `POST /pagos/historial` (Bearer) — **agregado al backend para este frontend** |
+| Cuerpo | `{ "pagina": 0, "tamanio": 20 }` (`pagina` ≥ 0; `tamanio` de 1 a 100). Un campo extra o un valor fuera de rango responde 400 |
 | Respuesta 200 | `datos: { datos: [{ upc, estado, producto, servicio, idProducto, idServicio, monto, comision, total, referencia, telefono, idTx, numAutorizacion, fecha }], pagina, tamanoPagina, totalElementos, totalPaginas }` |
-| Filtro | Solo pagos `APROBADO` del usuario autenticado, del más reciente al más antiguo; `tamanio` máx. 100 |
+| Contenido | Pagos del usuario autenticado en cualquier estado, del más reciente al más antiguo; `tamanio` máx. 100. La app los separa con un filtro (Todos, Aprobados, En proceso, Rechazados) y solo los `APROBADO` se presentan como compras realizadas con su recibo |
 | Adaptador | `ApiPagosRepository.historial` |
+
+### Perfil y cuentas
+
+| | |
+|---|---|
+| Usuario | `GET /usuarios/me` (Bearer) → `datos: { clienteId, correo, ... }` |
+| Datos del cliente | `POST /clientes/consultar` (Bearer) · `{ correo, pagina: 0, tamanio: 5 }` → lista paginada; la app toma el cliente con el `clienteId` de `/usuarios/me` (a un administrador la consulta le devuelve varios) |
+| Editar | `PATCH /clientes` (Bearer) · `{ identificacion: { rfc }, cambios: { solo campos modificados } }` → `datos: ClienteResponse`. CURP, RFC y teléfono móvil son de solo lectura |
+| PIN de pagos | `PUT /cuentas/pin` (Bearer) · `{ numeroCuenta, pinActual?, pinNuevo }` (4–6 dígitos; `pinActual` solo si ya tenía PIN) |
+| Errores | 400 datos inválidos · 403 PIN actual incorrecto · 409 dato repetido · 423 PIN bloqueado |
+| Adaptador | `perfil/infraestructure/adapters/api_perfil_repository.dart` |
 
 ## Cambios en el backend
 
-1. `GET /pagos` (historial): `PagoController`, `PagoService`, `PagoRegistroService`, `PagoRepository` y `HistorialPagoResponse`. El nombre del producto sale del catálogo local.
+1. `POST /pagos/historial` (historial): `PagoController`, `HistorialPagoRequest`, `PagoService`, `PagoRegistroService`, `PagoRepository` y `HistorialPagoResponse`. El nombre del producto sale del catálogo local.
 2. CORS configurable en `SecurityConfiguration` (antes estaba deshabilitado y el navegador bloqueaba a la web).
+3. `POST /clientes/disponibilidad`: avisa por campo de los datos repetidos durante el registro.
+4. `GET /auth/sesion/eventos` (Server-Sent Events): avisa al instante a la app cuando otro dispositivo toma la sesión o se cierra.
 
 ## Pruebas
 
@@ -171,3 +196,7 @@ flutter analyze
 ```bash
 flutter test
 ```
+
+Resultado de SonarQube (frontend y backend): 100 % de cobertura, 0 vulnerabilidades y Quality Gate aprobado. Se repite con `powershell -File scripts/sonar-frontend.ps1` desde la raíz del repositorio.
+
+![Resultados de SonarQube](../docs/img/sonarqube-cobertura.png)

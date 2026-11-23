@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -54,6 +55,16 @@ class _GatewayFalso implements AutenticacionGateway {
   Future<void> cerrarSesion() async {
     cierres++;
     if (falloDeRed) throw const ConexionException();
+  }
+
+  /// Cada conexión al canal de avisos abre uno nuevo; la prueba decide qué llega.
+  final List<StreamController<String>> canales = [];
+
+  @override
+  Stream<String> cierresDeSesion() {
+    final canal = StreamController<String>();
+    canales.add(canal);
+    return canal.stream;
   }
 }
 
@@ -144,6 +155,78 @@ void main() {
     });
   });
 
+  group('Avisos de cierre (Server-Sent Events)', () {
+    late SesionController rapida;
+
+    setUp(() async {
+      rapida = SesionController(
+        gateway: gateway,
+        almacen: almacen,
+        esperaReconexion: const Duration(milliseconds: 10),
+      );
+      await rapida.verificarCodigo(desafio: _desafio, codigo: '123456');
+    });
+
+    tearDown(() => rapida.dispose());
+
+    Future<void> espera(int ms) => Future<void>.delayed(Duration(milliseconds: ms));
+
+    test('al iniciar sesión se abre el canal de avisos', () {
+      expect(gateway.canales, hasLength(1));
+    });
+
+    test('si otro dispositivo toma la sesión, se cierra al instante sin navegar', () async {
+      gateway.canales.single.add('Tu sesión se cerró porque iniciaste sesión en otro dispositivo');
+      await espera(0);
+      expect(rapida.autenticado, isFalse);
+      expect(rapida.aviso, contains('otro dispositivo'));
+      expect(almacen.guardada, isNull);
+    });
+
+    test('un 401 al conectar cierra la sesión', () async {
+      gateway.canales.single.addError(const ApiException(401, 'Tu sesión ya no está activa'));
+      await espera(0);
+      expect(rapida.autenticado, isFalse);
+      expect(rapida.aviso, 'Tu sesión ya no está activa');
+    });
+
+    test('un fallo de red no cierra la sesión: reconecta con espera creciente', () async {
+      gateway.canales.single.addError(const ConexionException());
+      await espera(5);
+      expect(gateway.canales, hasLength(1)); // aún esperando 20 ms
+      await espera(30);
+      expect(gateway.canales, hasLength(2));
+      expect(rapida.autenticado, isTrue);
+    });
+
+    test('si el servidor renueva el canal, se reabre enseguida', () async {
+      await gateway.canales.single.close();
+      await espera(30);
+      expect(gateway.canales, hasLength(2));
+    });
+
+    test('tras muchos fallos la espera deja de crecer', () async {
+      for (var i = 0; i < 7; i++) {
+        gateway.canales.last.addError(const ConexionException());
+        await espera(10 * 33);
+      }
+      expect(gateway.canales, hasLength(8));
+    });
+
+    test('al volver a la app se reabre el canal de inmediato', () {
+      rapida.reconectarAvisos();
+      expect(gateway.canales, hasLength(2));
+    });
+
+    test('sin sesión no se reconecta', () async {
+      await rapida.cerrarSesion();
+      await gateway.canales.single.close();
+      rapida.reconectarAvisos();
+      await espera(30);
+      expect(gateway.canales, hasLength(1));
+    });
+  });
+
   group('Restauración', () {
     test('una sesión vencida guardada no se restaura', () async {
       almacen.guardada = Sesion(
@@ -170,6 +253,24 @@ void main() {
       );
       return ApiAutenticacionGateway(ApiClient(baseUrl: 'http://localhost', client: cliente));
     }
+
+    test('el canal de avisos solo entrega los cierres de sesión', () async {
+      late http.BaseRequest recibida;
+      final cliente = MockClient((r) async {
+        recibida = r;
+        return http.Response(
+          'event: conectado\ndata: ok\n\n: latido\n\n'
+          'event: sesion_cerrada\ndata: Tu sesión se cerró\n\n',
+          200,
+          headers: {'content-type': 'text/event-stream; charset=utf-8'},
+        );
+      });
+      final gateway = ApiAutenticacionGateway(
+        ApiClient(baseUrl: 'http://localhost', client: cliente),
+      );
+      expect(await gateway.cierresDeSesion().toList(), ['Tu sesión se cerró']);
+      expect(recibida.url.path, '/auth/sesion/eventos');
+    });
 
     test('409 al verificar es una sesión activa por confirmar', () async {
       final gateway = conRespuesta(409, {'codigo': 1, 'mensaje': 'Ya tienes una sesión activa'});

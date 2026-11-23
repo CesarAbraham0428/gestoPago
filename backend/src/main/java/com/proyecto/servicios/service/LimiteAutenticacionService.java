@@ -19,21 +19,25 @@ public class LimiteAutenticacionService {
 
     private static final Duration VENTANA_LOGIN = Duration.ofMinutes(15);
     private static final Duration VENTANA_REGISTRO = Duration.ofHours(1);
+    private static final Duration VENTANA_DISPONIBILIDAD = Duration.ofMinutes(15);
     private static final String MENSAJE = "Demasiados intentos; espera unos minutos antes de intentar de nuevo";
 
     private final LimitadorVentanaFija limitador;
     private final int maximoPorCorreo;
     private final int maximoPorIp;
     private final int maximoRegistrosPorIp;
+    private final int maximoDisponibilidadPorIp;
 
     public LimiteAutenticacionService(LimitadorVentanaFija limitador,
             @Value("${gestopago.app.limites.login-por-correo:10}") int maximoPorCorreo,
             @Value("${gestopago.app.limites.login-por-ip:40}") int maximoPorIp,
-            @Value("${gestopago.app.limites.registro-por-ip:10}") int maximoRegistrosPorIp) {
+            @Value("${gestopago.app.limites.registro-por-ip:10}") int maximoRegistrosPorIp,
+            @Value("${gestopago.app.limites.disponibilidad-por-ip:60}") int maximoDisponibilidadPorIp) {
         this.limitador = limitador;
         this.maximoPorCorreo = maximoPorCorreo;
         this.maximoPorIp = maximoPorIp;
         this.maximoRegistrosPorIp = maximoRegistrosPorIp;
+        this.maximoDisponibilidadPorIp = maximoDisponibilidadPorIp;
     }
 
     /** Para /auth/login (por IP y correo) y /auth/verificar (solo por IP, pasando correo null). */
@@ -50,11 +54,17 @@ public class LimiteAutenticacionService {
         rechazarSiExcedido(limitador.registrar("limite:registro:ip:" + ip, maximoRegistrosPorIp, VENTANA_REGISTRO));
     }
 
+    /** Frena el barrido de correos, CURP, RFC o teléfonos para averiguar cuáles ya tienen cuenta. */
+    public void verificarDisponibilidad(String ip) {
+        rechazarSiExcedido(limitador.registrar("limite:disponibilidad:ip:" + ip, maximoDisponibilidadPorIp,
+                VENTANA_DISPONIBILIDAD));
+    }
+
     private static void rechazarSiExcedido(Resultado... resultados) {
         long espera = 0;
         boolean excedido = false;
         for (Resultado resultado : resultados) {
-            if (resultado != null && resultado.excedido()) {
+            if (resultado.excedido()) {
                 excedido = true;
                 espera = Math.max(espera, resultado.reintentarEnSegundos());
             }

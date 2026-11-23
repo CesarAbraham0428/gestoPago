@@ -67,6 +67,15 @@ class _ContenedorFormularioState extends State<_ContenedorFormulario> {
 String _mensajeDe(Object error, String generico) =>
     error is AppException ? error.message : generico;
 
+/// 403: la cuenta está inactiva (bloqueada).
+bool _esCuentaBloqueada(Object error) =>
+    error is ApiException && error.statusCode == 403;
+
+/// Aviso de error del formulario: el de cuenta bloqueada tiene su propio diseño.
+Widget _avisoDeError(String texto, {required bool bloqueada}) => bloqueada
+    ? const AvisoCuentaBloqueada()
+    : AvisoEstado(tono: Tono.rechazo, icono: Icons.error_outline, texto: texto);
+
 /// Espera obligatoria tras un 429 del servidor (demasiados intentos): bloquea
 /// el envío y muestra la cuenta regresiva. Es solo una ayuda de usabilidad; el
 /// límite real lo aplica el servidor, que rechaza igual desde cualquier cliente.
@@ -86,11 +95,8 @@ mixin _EsperaPorLimite<T extends StatefulWidget> on State<T> {
     final espera = error.reintentarEn ?? _esperaPorOmision;
     _segundos = espera.inSeconds < 1 ? 1 : espera.inSeconds;
     _reloj?.cancel();
+    // dispose cancela el temporizador, así que aquí el widget sigue montado.
     _reloj = Timer.periodic(const Duration(seconds: 1), (temporizador) {
-      if (!mounted) {
-        temporizador.cancel();
-        return;
-      }
       setState(() => _segundos--);
       if (_segundos <= 0) temporizador.cancel();
     });
@@ -130,6 +136,7 @@ class _PasoCredencialesState extends State<_PasoCredenciales>
   final _password = TextEditingController();
   bool _ocultar = true;
   bool _enviando = false;
+  bool _bloqueada = false;
   String? _error;
 
   @override
@@ -140,11 +147,13 @@ class _PasoCredencialesState extends State<_PasoCredenciales>
   }
 
   Future<void> _continuar() async {
-    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false))
+    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false)) {
       return;
+    }
     setState(() {
       _enviando = true;
       _error = null;
+      _bloqueada = false;
     });
     try {
       final desafio = await widget.sesion.solicitarCodigo(
@@ -157,12 +166,13 @@ class _PasoCredencialesState extends State<_PasoCredenciales>
     } on Object catch (e) {
       if (mounted) {
         iniciarEsperaSiLimite(e);
-        setState(
-          () => _error = _mensajeDe(
+        setState(() {
+          _bloqueada = _esCuentaBloqueada(e);
+          _error = _mensajeDe(
             e,
             'No fue posible iniciar sesión. Inténtalo de nuevo.',
-          ),
-        );
+          );
+        });
       }
     } finally {
       if (mounted) setState(() => _enviando = false);
@@ -199,13 +209,14 @@ class _PasoCredencialesState extends State<_PasoCredenciales>
                 ),
                 const SizedBox(height: 18),
                 if (_error != null || aviso != null) ...[
-                  AvisoEstado(
-                    tono: _error != null ? Tono.rechazo : Tono.aviso,
-                    icono: _error != null
-                        ? Icons.error_outline
-                        : Icons.info_outline,
-                    texto: (_error ?? aviso)!,
-                  ),
+                  if (_error != null)
+                    _avisoDeError(_error!, bloqueada: _bloqueada)
+                  else
+                    AvisoEstado(
+                      tono: Tono.aviso,
+                      icono: Icons.info_outline,
+                      texto: aviso!,
+                    ),
                   const SizedBox(height: 12),
                 ],
                 TextFormField(
@@ -324,6 +335,7 @@ class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
   final _clave = GlobalKey<FormState>();
   final _codigo = TextEditingController();
   bool _enviando = false;
+  bool _bloqueada = false;
   String? _error;
 
   @override
@@ -333,11 +345,13 @@ class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
   }
 
   Future<void> _verificar({bool cerrarSesionAnterior = false}) async {
-    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false))
+    if (_enviando || enEspera || !(_clave.currentState?.validate() ?? false)) {
       return;
+    }
     setState(() {
       _enviando = true;
       _error = null;
+      _bloqueada = false;
     });
     try {
       await widget.sesion.verificarCodigo(
@@ -353,12 +367,13 @@ class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
     } on Object catch (e) {
       if (mounted) {
         iniciarEsperaSiLimite(e);
-        setState(
-          () => _error = _mensajeDe(
+        setState(() {
+          _bloqueada = _esCuentaBloqueada(e);
+          _error = _mensajeDe(
             e,
             'No fue posible verificar el código. Inténtalo de nuevo.',
-          ),
-        );
+          );
+        });
       }
     } finally {
       if (mounted) setState(() => _enviando = false);
@@ -541,11 +556,7 @@ class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
               ),
               const SizedBox(height: 20),
               if (_error != null) ...[
-                AvisoEstado(
-                  tono: Tono.rechazo,
-                  icono: Icons.error_outline,
-                  texto: _error!,
-                ),
+                _avisoDeError(_error!, bloqueada: _bloqueada),
                 const SizedBox(height: 20),
               ],
               CampoCodigo(

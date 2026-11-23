@@ -35,6 +35,8 @@ URL local predeterminada: `http://localhost:8080`. El registro y los dos pasos d
 | POST | `/auth/login` | Paso 1 del acceso: valida `correo` y `password`. Devuelve un `desafioId`, no un token; la primera vez trae además `enrolamiento` (`secreto` y `otpauthUri` del QR) para enlazar la app autenticadora. |
 | POST | `/auth/verificar` | Paso 2: valida `desafioId` y el `codigo` TOTP de 6 dígitos de la app autenticadora en el servidor y entrega el JWT. `cerrarSesionAnterior: true` confirma terminar la sesión abierta en otro dispositivo (409 si no). |
 | POST | `/auth/logout` | Cierra la sesión del usuario; su JWT deja de ser válido de inmediato. |
+| GET | `/auth/sesion/eventos` | Canal Server-Sent Events (`text/event-stream`) de la sesión del JWT. Envía `conectado` al abrir, un comentario de latido cada 25 s y `sesion_cerrada` (con el motivo en `data`) en cuanto la sesión se cierra o la reemplaza otro dispositivo; después cierra el canal. 401 si la sesión ya no era válida al conectar. |
+| POST | `/clientes/disponibilidad` | Público. Recibe `curp`, `rfc`, `telefonoMovil` y/o `correoElectronico` y devuelve `datos.duplicados` con los que ya pertenecen a otra cuenta. |
 | POST | `/clientes/consultar` | Consultar clientes completos con filtros en un request JSON. |
 | PATCH | `/clientes` | Identificar por RFC/CURP y modificar solo los campos enviados. |
 | POST | `/clientes/desactivar` | Dar de baja lógica mediante RFC o CURP. |
@@ -47,8 +49,9 @@ URL local predeterminada: `http://localhost:8080`. El registro y los dos pasos d
 | PUT | `/cuentas/pin` | Configurar o cambiar el PIN de autorización de pagos de una cuenta. |
 | POST | `/pagos` | Pagar una recarga (`tipoFront 1`) o un servicio con referencia (`tipoFront 2`) con el saldo de la cuenta. |
 | POST | `/pagos/consulta` | Consultar el estado de un pago con su `upc`. |
+| POST | `/pagos/historial` | Historial paginado de pagos del usuario autenticado, del más reciente al más antiguo. Cuerpo `{"pagina":0,"tamanio":20}` (ambos opcionales; `pagina` ≥ 0 y `tamanio` de 1 a 100, si no, 400). |
 
-Los controladores no utilizan `@PathVariable`, `@RequestParam` ni `@ModelAttribute`: todas las entradas y criterios se reciben mediante Request DTO con `@Valid @RequestBody`. Cada recurso tiene un único endpoint de búsqueda con filtros combinables. RFC, CURP y número de cuenta identifican el recurso, pero no conceden acceso: `AutorizacionService` consulta el usuario y el rol reales en la base. Un cliente solo puede acceder a sus propios datos, usuario y cuentas; un administrador activo puede administrar otros clientes. Las listas aplican el permiso antes de paginar y contar. La consulta y contraseña de `/usuarios/me` siempre corresponden al usuario autenticado, incluso para administradores.
+Los controladores no utilizan `@PathVariable`, `@RequestParam` ni `@ModelAttribute`: todas las entradas y criterios se reciben mediante Request DTO con `@Valid @RequestBody`. Los únicos `GET` son los que no reciben datos (`/usuarios/me`, `/productos` y el canal `/auth/sesion/eventos`). Cada recurso tiene un único endpoint de búsqueda con filtros combinables. RFC, CURP y número de cuenta identifican el recurso, pero no conceden acceso: `AutorizacionService` consulta el usuario y el rol reales en la base. Un cliente solo puede acceder a sus propios datos, usuario y cuentas; un administrador activo puede administrar otros clientes. Las listas aplican el permiso antes de paginar y contar. La consulta y contraseña de `/usuarios/me` siempre corresponden al usuario autenticado, incluso para administradores.
 
 **Filtros de clientes:** `rfc`, `curp`, `nombre`, `correo`, `numeroCuenta`, `activo`, `desde`, `hasta`, `pagina` y `tamanio`. Los filtros presentes se combinan con AND; nombre busca una coincidencia parcial en nombres o apellidos. RFC y CURP se comparan completos sin distinguir mayúsculas. Las fechas usan `YYYY-MM-DD`, años de 1 a 9999 y filtran la fecha de registro incluyendo ambos días en `America/Mexico_City`. No se admite filtrar por `id`.
 
@@ -124,8 +127,9 @@ El saldo se obtiene dentro de cada cuenta devuelta por `POST /cuentas/consultar`
 | 2FA | TOTP (RFC 6238: HMAC-SHA1, 6 dígitos, 30 s) con una app autenticadora (Google Authenticator, Microsoft Authenticator, Authy). Tras validar la contraseña se abre un desafío (tabla `desafios_autenticacion`) que vence en 5 minutos y admite 5 intentos. El código se valida siempre en el servidor, con ±1 paso de tolerancia de reloj, y **no se puede reutilizar** (`usuarios.totp_ultimo_paso`). El secreto de cada usuario se guarda **cifrado con AES-256-GCM** (la misma llave `GESTOPAGO_TOKEN_KEY`). La primera vez la API entrega el secreto y la URI del QR (`enrolamiento`) y la app queda enlazada al verificar el primer código. No requiere correo ni variables nuevas. |
 | Sesión única | La tabla `sesiones_usuario` guarda una fila por usuario con el `jti` de su JWT. Cada petición debe traer el JWT de esa sesión; si el usuario entra desde otro dispositivo, la API responde `409` hasta que confirme (`cerrarSesionAnterior`), y el token anterior recibe `401 "…iniciaste sesión en otro dispositivo"`. La sesión se reemplaza de forma atómica (`INSERT … ON CONFLICT`). Solo se cierra la sesión anterior **después** de validar contraseña y código. |
 | Cierre de sesión | `POST /auth/logout` borra la sesión: el JWT queda revocado aunque no haya vencido. Cambiar la contraseña también la cierra. |
+| Aviso inmediato | `NotificadorSesiones` mantiene un canal SSE por sesión (`GET /auth/sesion/eventos`). Cuando la sesión se reemplaza o se cierra, `SesionService` publica un evento y, **después del commit**, el dispositivo afectado recibe `sesion_cerrada` y sale al instante, sin consultas periódicas. Las conexiones viven en la memoria de la instancia: con varias instancias habría que difundir el evento por Redis pub/sub. |
 | Expiración | El JWT dura `APP_JWT_EXPIRATION_MS` (2 h por omisión). Una sesión vencida no bloquea un nuevo acceso. |
-| Fuerza bruta | Límite general por minuto en todas las rutas (por IP y por usuario) y de ráfaga en login/registro; intentos de login por correo (10 / 15 min) y por IP (40 / 15 min), registro por IP (10 / hora) y pagos por usuario, en Redis con respaldo en memoria si cae. Responde 429 con `Retry-After`. Detrás de un proxy usa `FORWARD_HEADERS=native` para ver la IP real. Tabla completa en [docs/DESPLIEGUE-RENDER.md](docs/DESPLIEGUE-RENDER.md#4-qué-protege-la-api). |
+| Fuerza bruta | Límite general por minuto en todas las rutas (por IP y por usuario) y de ráfaga en login/registro; intentos de login por correo (10 / 15 min) y por IP (40 / 15 min), registro por IP (10 / hora) y pagos por usuario, en Redis con respaldo en memoria si cae. Responde 429 con `Retry-After`. Detrás de un proxy usa `FORWARD_HEADERS=native` para ver la IP real. |
 | Enumeración de usuarios | Un correo inexistente tarda lo mismo que uno existente (se compara contra un hash ficticio) y devuelve el mismo error. |
 | Si falla la verificación de sesión | La API rechaza la petición (no autentica "a ciegas"). |
 | Cabeceras y exposición | Swagger apagado por omisión (`SWAGGER_ENABLED`); actuator solo expone `health`; HSTS, `Content-Security-Policy: default-src 'none'`, `Permissions-Policy`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `nosniff` y `Cache-Control: no-store`; CORS sin comodín y cuerpos de petición de hasta 64 KB. |
@@ -353,6 +357,12 @@ Las excepciones de negocio conservan mensajes específicos para correos, RFC y C
 | 503 | Servicio de pagos no disponible por el momento; no se realizó ningún cargo. |
 | 504 | GestoPago no confirmó el pago; queda en revisión con el monto retenido. |
 
+## Modelo de datos
+
+Diagrama entidad-relación de la base: un cliente reside en un domicilio, tiene acceso mediante un usuario y posee cuentas; el catálogo de productos y el token de GestoPago se guardan aparte.
+
+![Diagrama entidad-relación de GestoPago](docs/img/modelo-er.png)
+
 ## Estructura del repositorio
 
 ```
@@ -366,7 +376,7 @@ render.yaml Blueprint de Render: API, web, PostgreSQL y Redis
 
 ## Despliegue
 
-Guía paso a paso para **Render** (API, web y Redis desde `render.yaml`; usa tu PostgreSQL existente): [docs/DESPLIEGUE-RENDER.md](docs/DESPLIEGUE-RENDER.md). Cada servicio solo se redespliega cuando cambian los archivos de su carpeta.
+El despliegue en **Render** se define en `render.yaml` (API, web y Redis; usa tu PostgreSQL existente). Cada servicio solo se redespliega cuando cambian los archivos de su carpeta.
 
 - `CORS_ORIGENES` (API) y `API_BASE_URL` (web) deben ser las URL HTTPS reales de cada servicio; ajústalas si Render asigna un nombre distinto.
 - La API construye `DB_URL` a partir de `DB_HOST`, `DB_PORT` y `DB_NAME` si no se define `DB_URL`; Flyway crea las tablas en la base vacía.
@@ -383,7 +393,7 @@ Guía paso a paso para **Render** (API, web y Redis desde `render.yaml`; usa tu 
    .\gradlew.bat bootRun
    ```
 
-Flyway crea el esquema en una base vacía. Para la instalación mediante SQL manual, consulta [las instrucciones de base de datos](docs/ENTREGA-BASE-DATOS.md) y [el script de creación](backend/scripts/crear-base-datos.sql); con ese script, configura `SPRING_FLYWAY_BASELINE_VERSION=5` en el primer inicio. Las tablas históricas `personas` y `registro` se conservan, pero ya no participan en la API.
+Flyway crea el esquema en una base vacía. Para la instalación mediante SQL manual, usa [el script de creación](backend/scripts/crear-base-datos.sql); con ese script, configura `SPRING_FLYWAY_BASELINE_VERSION=5` en el primer inicio. Las tablas históricas `personas` y `registro` se conservan, pero ya no participan en la API.
 
 ## Pruebas
 
@@ -400,3 +410,21 @@ La suite cubre validación, clientes, cuentas, usuarios, autenticación, JWT, ca
 ```
 
 Estas ejecuciones verifican, respectivamente, las migraciones en una base vacía y la adopción del esquema manual, y corren también las pruebas de integración de pagos (pagos simultáneos sobre una misma cuenta, conciliación tras un timeout y bloqueo del PIN). Crean y eliminan una base temporal, por lo que requieren permiso para crear bases. Sin `TEST_DB_URL`, las pruebas de PostgreSQL se omiten en `gradlew test`.
+
+## Calidad del código (SonarQube)
+
+Backend y frontend se analizan con SonarQube local. Ambos pasan el Quality Gate con 100 % de cobertura, 0 vulnerabilidades, 0 bugs, 0 code smells, 0 hotspots y 0 % de duplicación.
+
+![Resultados de SonarQube del backend y del frontend](docs/img/sonarqube-cobertura.png)
+
+Para repetir los análisis, ejecuta desde la raíz del repositorio (cada script levanta SonarQube con Docker si no está activo):
+
+```powershell
+powershell -File scripts/sonar-analisis.ps1
+```
+
+```powershell
+powershell -File scripts/sonar-frontend.ps1
+```
+
+Reportes: `http://localhost:9001/dashboard?id=gestopago-api` y `http://localhost:9001/dashboard?id=gestopago-frontend`.

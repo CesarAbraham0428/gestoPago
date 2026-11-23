@@ -17,6 +17,9 @@ class ApiResponse {
       data is Map<String, dynamic> ? data as Map<String, dynamic> : const {};
 }
 
+/// Un evento de un flujo Server-Sent Events: su nombre (`event:`) y sus datos (`data:`).
+typedef EventoServidor = ({String nombre, String datos});
+
 /// Cliente HTTP único de las dos aplicaciones. Es el adaptador técnico sobre
 /// el que se apoyan todos los adaptadores de salida (repositorios).
 class ApiClient {
@@ -25,7 +28,9 @@ class ApiClient {
     this.tokenReader,
     this.onUnauthorized,
     http.Client? client,
-  }) : _client = client ?? http.Client();
+    http.Client? clienteEventos,
+  }) : _client = client ?? http.Client(),
+       _clienteEventos = clienteEventos ?? client ?? http.Client();
 
   final String baseUrl;
   final String? Function()? tokenReader;
@@ -34,6 +39,10 @@ class ApiClient {
   /// reemplazado por otro inicio de sesión), con el mensaje del servidor.
   final void Function(String mensaje)? onUnauthorized;
   final http.Client _client;
+
+  /// Cliente para flujos largos (Server-Sent Events). En web debe leer la respuesta
+  /// por partes (`fetch`); el cliente por omisión del navegador espera a que termine.
+  final http.Client _clienteEventos;
 
   Future<ApiResponse> get(
     String path, {
@@ -84,20 +93,10 @@ class ApiClient {
     }
 
     final decoded = _decode(response.bodyBytes);
-    final mensajeServidor = decoded is Map<String, dynamic> && decoded['mensaje'] is String
-        ? decoded['mensaje'] as String
-        : null;
+    final mensajeServidor = _mensajeDe(decoded);
 
     if (response.statusCode >= 400) {
-      final message = MensajesUsuario.desdeServidor(response.statusCode, mensajeServidor);
-      if (response.statusCode == 401 && authenticated) onUnauthorized?.call(message);
-      throw ApiException(
-        response.statusCode,
-        message,
-        reintentarEn: response.statusCode == 429
-            ? esperaIndicada(response.headers['retry-after'])
-            : null,
-      );
+      throw _error(response, mensajeServidor, authenticated: authenticated);
     }
     if (decoded is! Map<String, dynamic>) {
       throw const ConexionException(MensajesUsuario.respuestaInvalida);
@@ -108,6 +107,73 @@ class ApiClient {
       data: decoded['datos'],
     );
   }
+
+  /// Abre un flujo Server-Sent Events autenticado y emite cada evento completo.
+  /// Los comentarios (latidos) se ignoran. Falla con [ApiException] si el servidor
+  /// rechaza la conexión (401 cierra la sesión) o con [ConexionException] si no
+  /// responde; termina cuando el servidor cierra el canal.
+  Stream<EventoServidor> eventos(
+    String path, {
+    Duration timeout = const Duration(seconds: 20),
+  }) async* {
+    final request = http.Request('GET', Uri.parse('$baseUrl$path'))
+      ..headers['Accept'] = 'text/event-stream';
+    final token = tokenReader?.call();
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+
+    final http.StreamedResponse response;
+    try {
+      response = await _clienteEventos.send(request).timeout(timeout);
+    } on TimeoutException {
+      throw const ConexionException(MensajesUsuario.tiempoAgotado);
+    } on Object {
+      throw const ConexionException();
+    }
+    if (response.statusCode >= 400) {
+      final completa = await http.Response.fromStream(response);
+      throw _error(completa, _mensajeDe(_decode(completa.bodyBytes)));
+    }
+
+    String? nombre;
+    final datos = <String>[];
+    final lineas = response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+    await for (final linea in lineas) {
+      if (linea.isEmpty) {
+        if (nombre != null || datos.isNotEmpty) {
+          yield (nombre: nombre ?? 'message', datos: datos.join('\n'));
+        }
+        nombre = null;
+        datos.clear();
+      } else if (linea.startsWith('event:')) {
+        nombre = linea.substring(6).trim();
+      } else if (linea.startsWith('data:')) {
+        datos.add(linea.substring(5).trimLeft());
+      }
+    }
+  }
+
+  ApiException _error(
+    http.Response response,
+    String? mensajeServidor, {
+    bool authenticated = true,
+  }) {
+    final message = MensajesUsuario.desdeServidor(response.statusCode, mensajeServidor);
+    if (response.statusCode == 401 && authenticated) onUnauthorized?.call(message);
+    return ApiException(
+      response.statusCode,
+      message,
+      reintentarEn: response.statusCode == 429
+          ? esperaIndicada(response.headers['retry-after'])
+          : null,
+    );
+  }
+
+  static String? _mensajeDe(Object? decoded) =>
+      decoded is Map<String, dynamic> && decoded['mensaje'] is String
+      ? decoded['mensaje'] as String
+      : null;
 
   /// Segundos de la cabecera `Retry-After` como espera, acotada a una hora para
   /// que un valor absurdo no deje la pantalla bloqueada. Nula si no es válida.

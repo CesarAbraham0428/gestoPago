@@ -265,3 +265,95 @@ class AvisoEstado extends StatelessWidget {
     );
   }
 }
+
+/// Aviso destacado para una cuenta inactiva (el servidor rechaza el acceso con 403): dice
+/// que está bloqueada y qué hacer, con más presencia que un aviso en línea.
+class AvisoCuentaBloqueada extends StatelessWidget {
+  const AvisoCuentaBloqueada({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context).textTheme;
+    return Semantics(
+      liveRegion: true,
+      label: 'Cuenta bloqueada. Comunícate con soporte para reactivarla.',
+      excludeSemantics: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppColors.rechazoFondo, Color(0xFFFDF1EF)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.rechazo.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.rechazo.withValues(alpha: 0.3),
+                  width: 2,
+                ),
+              ),
+              child: const Icon(
+                Icons.lock_outline,
+                color: AppColors.rechazo,
+                size: 26,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Cuenta bloqueada',
+              style: tema.titleMedium?.copyWith(
+                color: AppColors.rechazo,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Tu cuenta está inactiva y no puede iniciar sesión.',
+              style: tema.bodyMedium?.copyWith(color: AppColors.tinta),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.support_agent_outlined,
+                    size: 18,
+                    color: AppColors.rechazo,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Comunícate con soporte para reactivarla',
+                      style: tema.bodySmall?.copyWith(
+                        color: AppColors.rechazo,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -11,11 +11,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.auth0.jwt.JWT;
@@ -40,9 +43,11 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /** Cadena de filtros real (rutas públicas, JWT, CORS y errores JSON) sobre controladores de prueba. */
 @WebMvcTest
@@ -67,6 +72,15 @@ class SecurityConfigurationTest {
         @GetMapping("/protegida")
         String protegida() {
             return "dentro";
+        }
+
+        /** Canal SSE que se cierra enseguida: obliga a un despacho ASYNC por la cadena de seguridad. */
+        @GetMapping("/eventos")
+        SseEmitter eventos() throws java.io.IOException {
+            SseEmitter emisor = new SseEmitter();
+            emisor.send(SseEmitter.event().name("conectado").data("ok"));
+            emisor.complete();
+            return emisor;
         }
 
         @PreAuthorize("hasRole('ADMIN')")
@@ -123,6 +137,23 @@ class SecurityConfigurationTest {
 
         mvc.perform(get("/protegida").header(HttpHeaders.AUTHORIZATION, tokenValido()))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void unCanalSseAutenticadoTerminaSinQueLaSeguridadBloqueeElDespachoAsincrono() throws Exception {
+        when(sesiones.estado(eq(3), eq("jti"))).thenReturn(Estado.VALIDA);
+
+        MvcResult inicio = mvc.perform(get("/eventos").header(HttpHeaders.AUTHORIZATION, tokenValido()))
+                .andExpect(request().asyncStarted()).andReturn();
+
+        mvc.perform(asyncDispatch(inicio))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("event:conectado")));
+    }
+
+    @Test
+    void unCanalSseSinTokenResponde401() throws Exception {
+        mvc.perform(get("/eventos")).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -244,5 +275,7 @@ class SecurityConfigurationTest {
                 () -> SecurityConfiguration.corsConfigurationSource(List.of("*")));
         assertThrows(IllegalStateException.class,
                 () -> SecurityConfiguration.corsConfigurationSource(List.of("https://app.ejemplo.com", "https://*")));
+        assertThrows(IllegalStateException.class,
+                () -> SecurityConfiguration.corsConfigurationSource(List.of(" http://* ")));
     }
 }

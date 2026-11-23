@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.proyecto.servicios.models.response.GenericResponse;
 import com.proyecto.servicios.service.exception.AutenticacionException;
 import com.proyecto.servicios.service.exception.AutenticacionException.Tipo;
+import com.proyecto.servicios.service.exception.NegocioException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -15,6 +16,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.core.MethodParameter;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -114,5 +116,15 @@ class GlobalExceptionHandlerDirectoTest {
 
         assertEquals("Verifique la información capturada e intente nuevamente.",
                 handler.validacion(bind).getBody().getMensaje());
+    }
+
+    @Test
+    void elErrorDeNegocioConEsperaInformaRetryAfter() {
+        ResponseEntity<GenericResponse<Void>> respuesta = handler.negocio(
+                new NegocioException(HttpStatus.TOO_MANY_REQUESTS, "Demasiados intentos", 30L));
+
+        assertEquals(429, respuesta.getStatusCode().value());
+        assertEquals("30", respuesta.getHeaders().getFirst(HttpHeaders.RETRY_AFTER));
+        assertEquals("Demasiados intentos", respuesta.getBody().getMensaje());
     }
 }

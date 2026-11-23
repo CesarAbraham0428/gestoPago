@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 class SesionServiceTest {
 
@@ -20,7 +21,7 @@ class SesionServiceTest {
     private final SesionUsuarioRepository sesiones = mock(SesionUsuarioRepository.class);
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
     private final SesionService service =
-            new SesionService(sesiones, usuarios, Clock.fixed(AHORA, ZoneOffset.UTC));
+            new SesionService(sesiones, usuarios, mock(ApplicationEventPublisher.class), Clock.fixed(AHORA, ZoneOffset.UTC));
 
     @Test
     void elTokenDeLaSesionVigenteEsValidoConUnaSolaConsulta() {

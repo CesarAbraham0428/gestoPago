@@ -76,6 +76,9 @@ class GatewayFalso implements AutenticacionGateway {
 
   @override
   Future<void> cerrarSesion() async => cierres++;
+
+  @override
+  Stream<String> cierresDeSesion() => Stream<String>.multi((_) {});
 }
 
 class AlmacenFalso implements AlmacenSesion {
@@ -225,7 +228,7 @@ class PerfilFalso implements PerfilRepository {
   }
 }
 
-Perfil perfilPrueba({String empresa = 'Acme'}) => Perfil(
+Perfil perfilPrueba({String empresa = 'Acme', String? telefonoAlternativo}) => Perfil(
   primerNombre: 'Ana',
   apellidoPaterno: 'Pérez',
   apellidoMaterno: 'López',
@@ -237,6 +240,7 @@ Perfil perfilPrueba({String empresa = 'Acme'}) => Perfil(
   estadoCivil: 'Union libre',
   correoElectronico: 'ana@example.com',
   telefonoMovil: '5512345678',
+  telefonoAlternativo: telefonoAlternativo,
   ocupacion: 'Ingeniera',
   empresa: empresa,
   ingresoMensual: 25000,

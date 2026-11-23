@@ -21,6 +21,11 @@ import '../../domain/ports/autenticacion_gateway.dart';
 ///
 /// POST /auth/logout (Bearer)
 ///   200 -> la sesión deja de ser válida de inmediato · 401 la sesión ya no estaba activa
+///
+/// GET /auth/sesion/eventos (Bearer, text/event-stream)
+///   200 -> flujo Server-Sent Events: `conectado` al abrir, comentarios de latido
+///          y `sesion_cerrada` (data: motivo) cuando la sesión se cierra o la
+///          reemplaza otro dispositivo · 401 la sesión ya no era válida
 class ApiAutenticacionGateway implements AutenticacionGateway {
   ApiAutenticacionGateway(this._api);
   final ApiClient _api;
@@ -125,4 +130,10 @@ class ApiAutenticacionGateway implements AutenticacionGateway {
   Future<void> cerrarSesion() async {
     await _api.post('/auth/logout', timeout: const Duration(seconds: 8));
   }
+
+  @override
+  Stream<String> cierresDeSesion() => _api
+      .eventos('/auth/sesion/eventos')
+      .where((e) => e.nombre == 'sesion_cerrada')
+      .map((e) => e.datos);
 }
