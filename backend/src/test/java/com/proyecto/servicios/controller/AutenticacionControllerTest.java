@@ -2,6 +2,7 @@ package com.proyecto.servicios.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -84,6 +85,14 @@ class AutenticacionControllerTest {
                 .principal(new UsernamePasswordAuthenticationToken("7", null, List.of())))
                 .andExpect(status().isOk()).andExpect(jsonPath("codigo").value(0));
         verify(service).cerrarSesion(7);
+    }
+
+    @Test
+    void sondaDeSesionRespondeOkConSesionValida() throws Exception {
+        mvc.perform(get("/auth/sesion")
+                .principal(new UsernamePasswordAuthenticationToken("7", null, List.of())))
+                .andExpect(status().isOk()).andExpect(jsonPath("codigo").value(0));
+        verifyNoInteractions(service);
     }
 
     @ParameterizedTest
