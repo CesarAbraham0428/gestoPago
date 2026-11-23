@@ -12,6 +12,7 @@ import com.proyecto.servicios.mapper.ClienteMapper;
 import com.proyecto.servicios.models.request.ClienteActualizacionPorIdentidadRequest;
 import com.proyecto.servicios.models.request.ClienteActualizacionRequest;
 import com.proyecto.servicios.models.request.ClienteConsultaRequest;
+import com.proyecto.servicios.models.request.ClienteDisponibilidadRequest;
 import com.proyecto.servicios.models.request.ClienteIdentificacionRequest;
 import com.proyecto.servicios.models.request.ClienteRequest;
 import com.proyecto.servicios.models.request.DatosCliente;
@@ -26,9 +27,8 @@ import com.proyecto.servicios.service.AutorizacionService;
 import com.proyecto.servicios.service.ClienteService;
 import com.proyecto.servicios.service.exception.ClienteNoEncontradoException;
 import com.proyecto.servicios.service.exception.CorreoDuplicadoException;
-import com.proyecto.servicios.service.exception.CurpDuplicadaException;
+import com.proyecto.servicios.service.exception.DatosDuplicadosException;
 import com.proyecto.servicios.service.exception.NegocioException;
-import com.proyecto.servicios.service.exception.RfcDuplicadoException;
 import com.proyecto.servicios.service.exception.UsuarioNoEncontradoException;
 import com.proyecto.servicios.service.exception.ValidacionException;
 import com.proyecto.servicios.utils.Texto;
@@ -39,6 +39,7 @@ import jakarta.validation.Validator;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -87,6 +88,26 @@ public class ClienteServiceImpl implements ClienteService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<String> datosDuplicados(ClienteDisponibilidadRequest r) {
+        List<String> duplicados = new ArrayList<>();
+        if (r.curp() != null && clientes.existsByCurp(Texto.identidad(r.curp()))) {
+            duplicados.add(DatosDuplicadosException.CURP);
+        }
+        if (r.rfc() != null && clientes.existsByRfc(Texto.identidad(r.rfc()))) {
+            duplicados.add(DatosDuplicadosException.RFC);
+        }
+        if (r.telefonoMovil() != null && clientes.existsByTelefonoMovil(r.telefonoMovil())) {
+            duplicados.add(DatosDuplicadosException.TELEFONO);
+        }
+        if (r.correoElectronico() != null
+                && clientes.existsByCorreoElectronicoIgnoreCase(Texto.correo(r.correoElectronico()))) {
+            duplicados.add(DatosDuplicadosException.CORREO);
+        }
+        return duplicados;
+    }
+
+    @Override
     @Transactional
     public ClienteResponse registrar(ClienteRequest r) {
         PasswordValidator.validar(r.password());
@@ -94,14 +115,10 @@ public class ClienteServiceImpl implements ClienteService {
         String curp = Texto.identidad(r.curp());
         String rfc = Texto.identidad(r.rfc());
         String correo = Texto.correo(r.correoElectronico());
-        if (clientes.existsByCurp(curp)) {
-            throw new CurpDuplicadaException();
-        }
-        if (clientes.existsByRfc(rfc)) {
-            throw new RfcDuplicadoException();
-        }
-        if (clientes.existsByCorreoElectronicoIgnoreCase(correo)) {
-            throw new CorreoDuplicadoException();
+        List<String> duplicados = datosDuplicados(
+                new ClienteDisponibilidadRequest(curp, rfc, r.telefonoMovil(), correo));
+        if (!duplicados.isEmpty()) {
+            throw new DatosDuplicadosException(duplicados);
         }
         Cliente cliente = new Cliente();
         cliente.setCurp(curp);
@@ -209,6 +226,9 @@ public class ClienteServiceImpl implements ClienteService {
         }
         if (clientes.existsByCorreoElectronicoIgnoreCaseAndIdNot(Texto.correo(r.correoElectronico()), id)) {
             throw new CorreoDuplicadoException();
+        }
+        if (clientes.existsByTelefonoMovilAndIdNot(r.telefonoMovil(), id)) {
+            throw new DatosDuplicadosException(List.of(DatosDuplicadosException.TELEFONO));
         }
         copiarDatos(cliente, r);
         Domicilio domicilio = domicilios.findByClienteId(id).orElseThrow(this::domicilioNoEncontrado);

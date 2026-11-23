@@ -64,6 +64,33 @@ class ControladoresRutasTest {
     }
 
     @Test
+    void disponibilidadLimitaPorIpYListaLosCamposRepetidos() throws Exception {
+        ClienteService clientes = mock(ClienteService.class);
+        LimiteAutenticacionService limite = mock(LimiteAutenticacionService.class);
+        when(clientes.datosDuplicados(any())).thenReturn(List.of("rfc", "telefonoMovil"));
+
+        mvc(new ClienteController(clientes, limite))
+                .perform(post("/clientes/disponibilidad").contentType(JSON)
+                        .content("{\"rfc\":\"PERA900101AB1\",\"telefonoMovil\":\"5512345678\"}")
+                        .with(r -> {
+                            r.setRemoteAddr("10.0.0.6");
+                            return r;
+                        }))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("datos.duplicados[0]").value("rfc"))
+                .andExpect(jsonPath("datos.duplicados[1]").value("telefonoMovil"));
+
+        verify(limite).verificarDisponibilidad("10.0.0.6");
+    }
+
+    @Test
+    void disponibilidadRechazaFormatosInvalidos() throws Exception {
+        mvc(new ClienteController(mock(ClienteService.class), mock(LimiteAutenticacionService.class)))
+                .perform(post("/clientes/disponibilidad").contentType(JSON).content("{\"telefonoMovil\":\"12\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void desactivarUsaLaIdentidadAutenticada() throws Exception {
         ClienteService clientes = mock(ClienteService.class);
 

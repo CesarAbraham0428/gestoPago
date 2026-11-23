@@ -32,8 +32,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Slf4j
 public class SecurityConfiguration {
 
-    /** Únicas rutas POST sin sesión: registro y los dos pasos del inicio de sesión. */
-    private static final List<String> POST_PUBLICOS = List.of("/clientes", "/auth/login", "/auth/verificar");
+    /** Únicas rutas POST sin sesión: registro, su comprobación de datos repetidos y los dos pasos del login. */
+    private static final List<String> POST_PUBLICOS =
+            List.of("/clientes", "/clientes/disponibilidad", "/auth/login", "/auth/verificar");
 
     /** La API solo sirve JSON: nada del navegador debe poder cargar recursos de ella. Swagger necesita más. */
     private static final String CSP_API = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";

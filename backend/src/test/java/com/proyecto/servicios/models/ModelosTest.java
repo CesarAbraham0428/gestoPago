@@ -22,8 +22,8 @@ import com.proyecto.servicios.models.response.DesafioResponse;
 import com.proyecto.servicios.models.response.HistorialPagoResponse;
 import com.proyecto.servicios.models.response.gestopago.GestoPagoPagosResponse;
 import com.proyecto.servicios.service.exception.ClienteYaRegistradoException;
-import com.proyecto.servicios.service.exception.CurpDuplicadaException;
-import com.proyecto.servicios.service.exception.RfcDuplicadoException;
+import java.util.List;
+import com.proyecto.servicios.service.exception.DatosDuplicadosException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
@@ -116,8 +116,11 @@ class ModelosTest {
     @Test
     void lasExcepcionesDeDuplicadoResponden409() {
         assertEquals(HttpStatus.CONFLICT, new ClienteYaRegistradoException().getStatus());
-        assertEquals("CURP duplicada", new CurpDuplicadaException().getMessage());
-        assertEquals("RFC duplicado", new RfcDuplicadoException().getMessage());
+        assertEquals("El CURP ya está registrado",
+                new DatosDuplicadosException(List.of(DatosDuplicadosException.CURP)).getMessage());
+        assertEquals("Ya están registrados: RFC, teléfono móvil y correo electrónico",
+                new DatosDuplicadosException(List.of(DatosDuplicadosException.RFC, DatosDuplicadosException.TELEFONO,
+                        DatosDuplicadosException.CORREO)).getMessage());
     }
 
     @Test

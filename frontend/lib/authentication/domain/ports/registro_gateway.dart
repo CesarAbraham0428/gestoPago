@@ -4,4 +4,9 @@
 abstract interface class RegistroGateway {
   /// Registra al cliente con el cuerpo que espera `POST /clientes`.
   Future<void> registrar(Map<String, Object?> datos);
+
+  /// Pregunta cuáles de los datos únicos ya pertenecen a otra cuenta. [datos]
+  /// usa los nombres de la API (`curp`, `rfc`, `telefonoMovil`,
+  /// `correoElectronico`); devuelve los nombres de los repetidos.
+  Future<List<String>> repetidos(Map<String, String> datos);
 }

@@ -21,6 +21,7 @@ import com.proyecto.servicios.entity.sf.Usuario;
 import com.proyecto.servicios.models.request.ClienteActualizacionPorIdentidadRequest;
 import com.proyecto.servicios.models.request.ClienteConsultaRequest;
 import com.proyecto.servicios.models.request.ClienteIdentificacionRequest;
+import com.proyecto.servicios.models.request.ClienteDisponibilidadRequest;
 import com.proyecto.servicios.models.request.ClienteRequest;
 import com.proyecto.servicios.models.request.DomicilioRequest;
 import com.proyecto.servicios.models.response.ClienteResponse;
@@ -31,9 +32,8 @@ import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import com.proyecto.servicios.service.Impl.ClienteServiceImpl;
 import com.proyecto.servicios.service.exception.ClienteNoEncontradoException;
 import com.proyecto.servicios.service.exception.CorreoDuplicadoException;
-import com.proyecto.servicios.service.exception.CurpDuplicadaException;
+import com.proyecto.servicios.service.exception.DatosDuplicadosException;
 import com.proyecto.servicios.service.exception.NegocioException;
-import com.proyecto.servicios.service.exception.RfcDuplicadoException;
 import com.proyecto.servicios.service.exception.UsuarioNoEncontradoException;
 import com.proyecto.servicios.service.exception.ValidacionException;
 import jakarta.persistence.EntityManager;
@@ -143,20 +143,35 @@ class ClienteServiceRegistroTest {
     }
 
     @Test
-    void registrarRechazaDuplicadosEnElOrdenCurpRfcCorreo() {
+    void registrarNombraCadaDatoDuplicado() {
         ClienteRequest request = solicitud(LocalDate.of(1990, 1, 1), PASSWORD);
 
         when(clientes.existsByCurp("PERA900101MDFRZN01")).thenReturn(true);
-        assertThrows(CurpDuplicadaException.class, () -> servicio().registrar(request));
+        assertEquals("El CURP ya está registrado", mensajeDeRegistro(request));
+
+        when(clientes.existsByRfc("PERA900101AB1")).thenReturn(true);
+        assertEquals("Ya están registrados: CURP y RFC", mensajeDeRegistro(request));
 
         when(clientes.existsByCurp(anyString())).thenReturn(false);
-        when(clientes.existsByRfc("PERA900101AB1")).thenReturn(true);
-        assertThrows(RfcDuplicadoException.class, () -> servicio().registrar(request));
-
         when(clientes.existsByRfc(anyString())).thenReturn(false);
+        when(clientes.existsByTelefonoMovil(request.telefonoMovil())).thenReturn(true);
         when(clientes.existsByCorreoElectronicoIgnoreCase("ana@example.com")).thenReturn(true);
-        assertThrows(CorreoDuplicadoException.class, () -> servicio().registrar(request));
+        assertEquals("Ya están registrados: teléfono móvil y correo electrónico", mensajeDeRegistro(request));
         verify(clientes, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void datosDuplicadosSoloConsultaLosCamposEnviados() {
+        when(clientes.existsByRfc("PERA900101AB1")).thenReturn(true);
+
+        assertEquals(List.of(DatosDuplicadosException.RFC), servicio().datosDuplicados(
+                new ClienteDisponibilidadRequest(null, "pera900101ab1", null, null)));
+        assertEquals(List.of(), servicio().datosDuplicados(new ClienteDisponibilidadRequest(null, null, null, null)));
+        verify(clientes, never()).existsByCurp(anyString());
+    }
+
+    private String mensajeDeRegistro(ClienteRequest request) {
+        return assertThrows(DatosDuplicadosException.class, () -> servicio().registrar(request)).getMessage();
     }
 
     @Test
@@ -295,6 +310,18 @@ class ClienteServiceRegistroTest {
                 () -> servicio().actualizarParcial(parche("{\"empresa\":\"Nueva\"}"), 9));
 
         assertEquals(HttpStatus.CONFLICT, error.getStatus());
+    }
+
+    @Test
+    void elParcheRechazaUnTelefonoYaUsadoPorOtroCliente() throws Exception {
+        Cliente cliente = clienteActivo(true);
+        when(clientes.findByRfcIgnoreCase("PERA900101AB1")).thenReturn(Optional.of(cliente));
+        when(clientes.bloquearPorId(7)).thenReturn(Optional.of(cliente));
+        when(domicilios.findByClienteId(7)).thenReturn(Optional.of(domicilio(cliente)));
+        when(clientes.existsByTelefonoMovilAndIdNot("5500000000", 7)).thenReturn(true);
+
+        assertEquals("El teléfono móvil ya está registrado", assertThrows(DatosDuplicadosException.class,
+                () -> servicio().actualizarParcial(parche("{\"telefonoMovil\":\"5500000000\"}"), 9)).getMessage());
     }
 
     @Test

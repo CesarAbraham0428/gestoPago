@@ -274,7 +274,8 @@ class PagosPostgresTest {
     private String registrarOtroClienteYIniciarSesion() throws Exception {
         mvc.perform(post("/clientes").contentType("application/json").content(CLIENTE
             .replace("PERA900101MDFRZN01", "PERA900102MDFRZN02").replace("PERA900101AB1", "PERA900102AB2")
-            .replace("ana1@example.com", "ana2@example.com"))).andExpect(status().isCreated());
+            .replace("ana1@example.com", "ana2@example.com")
+            .replace("\"telefonoMovil\":\"5512345678\"", "\"telefonoMovil\":\"5512345679\""))).andExpect(status().isCreated());
         return iniciarSesion("ana2@example.com");
     }
 

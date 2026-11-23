@@ -24,7 +24,7 @@ class LimiteAutenticacionServiceTest {
     private static final Resultado EXCEDIDO = new Resultado(true, 120);
 
     private final LimitadorVentanaFija limitador = mock(LimitadorVentanaFija.class);
-    private final LimiteAutenticacionService servicio = new LimiteAutenticacionService(limitador, 10, 40, 7);
+    private final LimiteAutenticacionService servicio = new LimiteAutenticacionService(limitador, 10, 40, 7, 30);
 
     @BeforeEach
     void sinExceso() {
@@ -83,5 +83,14 @@ class LimiteAutenticacionServiceTest {
 
         when(limitador.registrar(anyString(), anyInt(), any())).thenReturn(EXCEDIDO);
         assertThrows(NegocioException.class, () -> servicio.verificarRegistro("1.2.3.4"));
+    }
+
+    @Test
+    void laDisponibilidadSeLimitaPorIp() {
+        assertDoesNotThrow(() -> servicio.verificarDisponibilidad("1.2.3.4"));
+        verify(limitador).registrar("limite:disponibilidad:ip:1.2.3.4", 30, Duration.ofMinutes(15));
+
+        when(limitador.registrar(anyString(), anyInt(), any())).thenReturn(EXCEDIDO);
+        assertThrows(NegocioException.class, () -> servicio.verificarDisponibilidad("1.2.3.4"));
     }
 }
