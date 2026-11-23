@@ -54,7 +54,7 @@ public class LimiteAutenticacionService {
         long espera = 0;
         boolean excedido = false;
         for (Resultado resultado : resultados) {
-            if (resultado != null && resultado.excedido()) {
+            if (resultado.excedido()) {
                 excedido = true;
                 espera = Math.max(espera, resultado.reintentarEnSegundos());
             }

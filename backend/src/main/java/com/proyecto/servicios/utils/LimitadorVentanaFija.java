@@ -108,8 +108,10 @@ public class LimitadorVentanaFija {
 
     private void avisarRespaldo(DataAccessException e) {
         long ahora = reloj.getAsLong();
-        long anterior = ultimoAviso.get();
-        if (ahora - anterior >= AVISO_CADA_MS && ultimoAviso.compareAndSet(anterior, ahora)) {
+        // Atómico: solo el hilo que mueve la marca de tiempo escribe el aviso.
+        long anterior = ultimoAviso.getAndAccumulate(ahora,
+                (previo, nuevo) -> nuevo - previo >= AVISO_CADA_MS ? nuevo : previo);
+        if (ahora - anterior >= AVISO_CADA_MS) {
             log.warn("Redis no disponible; los límites de solicitudes se cuentan en memoria de esta instancia ({})",
                     e.getClass().getSimpleName());
         }

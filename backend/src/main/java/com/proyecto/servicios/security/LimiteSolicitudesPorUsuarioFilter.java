@@ -34,7 +34,7 @@ class LimiteSolicitudesPorUsuarioFilter extends LimiteSolicitudesFilter {
 
     @Override
     String origen(HttpServletRequest request) {
-        Authentication autenticacion = SecurityContextHolder.getContext().getAuthentication();
-        return "usuario " + (autenticacion == null ? "?" : autenticacion.getName());
+        // Solo se llama tras exceder el límite, y eso solo ocurre con un usuario autenticado (ver contar).
+        return "usuario " + SecurityContextHolder.getContext().getAuthentication().getName();
     }
 }
