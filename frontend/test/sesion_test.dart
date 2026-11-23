@@ -55,6 +55,19 @@ class _GatewayFalso implements AutenticacionGateway {
     cierres++;
     if (falloDeRed) throw const ConexionException();
   }
+
+  /// Simula que otro dispositivo cerró esta sesión en el servidor.
+  bool sesionCerradaEnServidor = false;
+  int verificaciones = 0;
+
+  @override
+  Future<void> verificarSesion() async {
+    verificaciones++;
+    if (falloDeRed) throw const ConexionException();
+    if (sesionCerradaEnServidor) {
+      throw const ApiException(401, 'Tu sesión se cerró desde otro dispositivo');
+    }
+  }
 }
 
 class _AlmacenFalso implements AlmacenSesion {
@@ -144,6 +157,40 @@ void main() {
     });
   });
 
+  group('Sondeo de sesión', () {
+    test('si otro dispositivo la cerró, se cierra aquí sin navegar', () async {
+      await sesion.verificarCodigo(desafio: _desafio, codigo: '123456');
+      gateway.sesionCerradaEnServidor = true;
+      await sesion.verificarSesion();
+      expect(sesion.autenticado, isFalse);
+      expect(sesion.aviso, contains('otro dispositivo'));
+      expect(almacen.guardada, isNull);
+    });
+
+    test('un fallo de red no cierra la sesión', () async {
+      await sesion.verificarCodigo(desafio: _desafio, codigo: '123456');
+      gateway.falloDeRed = true;
+      await sesion.verificarSesion();
+      expect(sesion.autenticado, isTrue);
+    });
+
+    test('se verifica sola cada intervalo y deja de hacerlo al cerrar', () async {
+      final rapida = SesionController(
+        gateway: gateway,
+        almacen: almacen,
+        intervaloVerificacion: const Duration(milliseconds: 20),
+      );
+      addTearDown(rapida.dispose);
+      await rapida.verificarCodigo(desafio: _desafio, codigo: '123456');
+      gateway.sesionCerradaEnServidor = true;
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(rapida.autenticado, isFalse);
+      final hechas = gateway.verificaciones;
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(gateway.verificaciones, hechas);
+    });
+  });
+
   group('Restauración', () {
     test('una sesión vencida guardada no se restaura', () async {
       almacen.guardada = Sesion(
@@ -170,6 +217,14 @@ void main() {
       );
       return ApiAutenticacionGateway(ApiClient(baseUrl: 'http://localhost', client: cliente));
     }
+
+    test('el sondeo de sesión acepta 200 y propaga el 401', () async {
+      await conRespuesta(200, {'codigo': 0, 'mensaje': 'Sesión activa'}).verificarSesion();
+      await expectLater(
+        conRespuesta(401, {'codigo': 1, 'mensaje': 'Sesión cerrada'}).verificarSesion(),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'estado', 401)),
+      );
+    });
 
     test('409 al verificar es una sesión activa por confirmar', () async {
       final gateway = conRespuesta(409, {'codigo': 1, 'mensaje': 'Ya tienes una sesión activa'});

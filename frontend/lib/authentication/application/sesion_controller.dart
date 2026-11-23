@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/error/app_exception.dart';
 import '../domain/entities/desafio_verificacion.dart';
 import '../domain/entities/sesion.dart';
 import '../domain/ports/almacen_sesion.dart';
@@ -14,13 +15,23 @@ import '../domain/ports/autenticacion_gateway.dart';
 /// El servidor guarda una sola sesión por usuario: cerrar sesión la invalida allí
 /// además de borrar el token de este dispositivo.
 class SesionController extends ChangeNotifier {
-  SesionController({required this._gateway, required this._almacen});
+  SesionController({
+    required this._gateway,
+    required this._almacen,
+    this.intervaloVerificacion = const Duration(seconds: 10),
+  });
 
   final AutenticacionGateway _gateway;
   final AlmacenSesion _almacen;
 
+  /// Cada cuánto se pregunta al servidor si la sesión sigue vigente, para que un
+  /// cierre desde otro dispositivo saque al usuario aunque no esté navegando.
+  final Duration intervaloVerificacion;
+
   Sesion? _sesion;
   Timer? _temporizador;
+  Timer? _sondeo;
+  bool _verificando = false;
   bool _restaurada = false;
   bool _cerrando = false;
   String? _aviso;
@@ -105,8 +116,29 @@ class SesionController extends ChangeNotifier {
     unawaited(_cerrar(mensaje));
   }
 
+  /// Pregunta al servidor si la sesión sigue activa; si respondió 401 la cierra
+  /// aquí. Un fallo de red no cierra nada: se reintenta en el siguiente sondeo.
+  Future<void> verificarSesion() async {
+    if (_sesion == null || _cerrando || _verificando) return;
+    _verificando = true;
+    try {
+      await _gateway.verificarSesion();
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) sesionInvalidada(e.message);
+    } on Object {
+      // Sin conexión no se sabe; se vuelve a intentar.
+    } finally {
+      _verificando = false;
+    }
+  }
+
   void _activar(Sesion sesion) {
     _sesion = sesion;
+    _sondeo?.cancel();
+    _sondeo = Timer.periodic(
+      intervaloVerificacion,
+      (_) => unawaited(verificarSesion()),
+    );
     _temporizador?.cancel();
     _temporizador = Timer(sesion.tiempoRestante, () {
       unawaited(
@@ -117,6 +149,7 @@ class SesionController extends ChangeNotifier {
 
   Future<void> _cerrar(String? aviso) async {
     _temporizador?.cancel();
+    _sondeo?.cancel();
     _sesion = null;
     _aviso = aviso;
     notifyListeners();
@@ -130,6 +163,7 @@ class SesionController extends ChangeNotifier {
   @override
   void dispose() {
     _temporizador?.cancel();
+    _sondeo?.cancel();
     super.dispose();
   }
 }

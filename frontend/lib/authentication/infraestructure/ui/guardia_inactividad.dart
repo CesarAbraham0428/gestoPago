@@ -6,7 +6,8 @@ import 'package:flutter/services.dart';
 import '../../application/sesion_controller.dart';
 
 /// Cierra la sesión tras un rato sin interacción (toques, desplazamiento o
-/// teclado). Protege un equipo desatendido con la sesión abierta.
+/// teclado). Protege un equipo desatendido con la sesión abierta. Al volver a
+/// la app (o a la pestaña) verifica de inmediato que la sesión siga activa.
 class GuardiaInactividad extends StatefulWidget {
   const GuardiaInactividad({
     super.key,
@@ -25,10 +26,12 @@ class GuardiaInactividad extends StatefulWidget {
 
 class _GuardiaInactividadState extends State<GuardiaInactividad> {
   Timer? _temporizador;
+  late final AppLifecycleListener _ciclo;
 
   @override
   void initState() {
     super.initState();
+    _ciclo = AppLifecycleListener(onResume: widget.sesion.verificarSesion);
     widget.sesion.addListener(_reiniciar);
     HardwareKeyboard.instance.addHandler(_alTeclear);
     _reiniciar();
@@ -36,6 +39,7 @@ class _GuardiaInactividadState extends State<GuardiaInactividad> {
 
   @override
   void dispose() {
+    _ciclo.dispose();
     widget.sesion.removeListener(_reiniciar);
     HardwareKeyboard.instance.removeHandler(_alTeclear);
     _temporizador?.cancel();

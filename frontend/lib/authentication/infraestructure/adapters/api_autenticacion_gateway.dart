@@ -21,6 +21,9 @@ import '../../domain/ports/autenticacion_gateway.dart';
 ///
 /// POST /auth/logout (Bearer)
 ///   200 -> la sesión deja de ser válida de inmediato · 401 la sesión ya no estaba activa
+///
+/// GET /auth/sesion (Bearer)
+///   200 -> la sesión sigue activa · 401 cerrada, vencida o reemplazada
 class ApiAutenticacionGateway implements AutenticacionGateway {
   ApiAutenticacionGateway(this._api);
   final ApiClient _api;
@@ -124,5 +127,10 @@ class ApiAutenticacionGateway implements AutenticacionGateway {
   @override
   Future<void> cerrarSesion() async {
     await _api.post('/auth/logout', timeout: const Duration(seconds: 8));
+  }
+
+  @override
+  Future<void> verificarSesion() async {
+    await _api.get('/auth/sesion', timeout: const Duration(seconds: 8));
   }
 }

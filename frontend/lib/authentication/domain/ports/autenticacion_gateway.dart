@@ -20,4 +20,8 @@ abstract interface class AutenticacionGateway {
 
   /// Invalida en el servidor la sesión actual.
   Future<void> cerrarSesion();
+
+  /// Consulta si la sesión actual sigue vigente en el servidor. Lanza
+  /// `ApiException` 401 si se cerró o la reemplazó otro dispositivo.
+  Future<void> verificarSesion();
 }

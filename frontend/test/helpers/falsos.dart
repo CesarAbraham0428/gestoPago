@@ -76,6 +76,9 @@ class GatewayFalso implements AutenticacionGateway {
 
   @override
   Future<void> cerrarSesion() async => cierres++;
+
+  @override
+  Future<void> verificarSesion() async {}
 }
 
 class AlmacenFalso implements AlmacenSesion {

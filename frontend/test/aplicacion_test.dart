@@ -55,6 +55,9 @@ class _Gateway implements AutenticacionGateway {
     cierres++;
     if (fallaCierre) throw const ConexionException();
   }
+
+  @override
+  Future<void> verificarSesion() async {}
 }
 
 class _Almacen implements AlmacenSesion {
