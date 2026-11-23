@@ -33,6 +33,11 @@ class DireccionClienteTest {
     }
 
     @Test
+    void unaIpv6InvalidaSeDevuelveSinResolverla() {
+        assertEquals("::g", DireccionCliente.normalizar("::g"));
+    }
+
+    @Test
     void sinDireccionSeUsaUnValorConstante() {
         assertEquals("desconocida", DireccionCliente.normalizar(null));
         assertEquals("desconocida", DireccionCliente.normalizar("  "));

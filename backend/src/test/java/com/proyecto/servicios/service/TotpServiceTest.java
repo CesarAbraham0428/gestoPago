@@ -3,13 +3,19 @@ package com.proyecto.servicios.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.OptionalLong;
+import javax.crypto.Mac;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 
 class TotpServiceTest {
 
@@ -83,5 +89,22 @@ class TotpServiceTest {
         assertTrue(uri.contains("issuer=GestoPago"));
         assertTrue(uri.contains("digits=6") && uri.contains("period=30") && uri.contains("algorithm=SHA1"));
         assertFalse(uri.contains(" "));
+    }
+
+    @Test
+    void sinRelojRegistradoUsaElDelSistema() {
+        TotpService totp = new TotpService(new DefaultListableBeanFactory().getBeanProvider(Clock.class));
+
+        assertTrue(Math.abs(totp.pasoActual() - Instant.now().getEpochSecond() / 30) <= 1);
+    }
+
+    @Test
+    void siLaPlataformaNoOfreceHmacSeFallaSinRevelarDetalles() {
+        try (MockedStatic<Mac> mac = Mockito.mockStatic(Mac.class)) {
+            mac.when(() -> Mac.getInstance("HmacSHA1")).thenThrow(new NoSuchAlgorithmException("sin HMAC"));
+
+            IllegalStateException error = assertThrows(IllegalStateException.class, () -> en(0).codigo(SECRETO_RFC, 1));
+            assertEquals("No se pudo calcular el código TOTP", error.getMessage());
+        }
     }
 }

@@ -18,6 +18,7 @@ import com.proyecto.servicios.models.request.DomicilioRequest;
 import com.proyecto.servicios.models.request.LoginRequest;
 import com.proyecto.servicios.models.request.PagoServicioRequest;
 import com.proyecto.servicios.models.request.VerificacionCodigoRequest;
+import com.proyecto.servicios.models.response.DesafioResponse;
 import com.proyecto.servicios.models.response.HistorialPagoResponse;
 import com.proyecto.servicios.models.response.gestopago.GestoPagoPagosResponse;
 import com.proyecto.servicios.service.exception.ClienteYaRegistradoException;
@@ -51,6 +52,8 @@ class ModelosTest {
 
         assertFalse(new CuentaPinRequest("123", "1234", "5678").toString().contains("5678"));
         assertFalse(new LoginRequest("a@b.mx", "secreto").toString().contains("secreto"));
+        assertFalse(new DesafioResponse.Enrolamiento("SECRETOBASE32", "otpauth://totp/x?secret=SECRETOBASE32")
+                .toString().contains("SECRETOBASE32"));
         assertFalse(new VerificacionCodigoRequest("d", "123456", true).toString().contains("123456"));
         assertFalse(new PagoServicioRequest("1", 1, 2, BigDecimal.ONE, null, null, "9876").toString()
                 .contains("9876"));

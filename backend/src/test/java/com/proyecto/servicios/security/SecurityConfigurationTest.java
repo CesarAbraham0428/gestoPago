@@ -244,5 +244,7 @@ class SecurityConfigurationTest {
                 () -> SecurityConfiguration.corsConfigurationSource(List.of("*")));
         assertThrows(IllegalStateException.class,
                 () -> SecurityConfiguration.corsConfigurationSource(List.of("https://app.ejemplo.com", "https://*")));
+        assertThrows(IllegalStateException.class,
+                () -> SecurityConfiguration.corsConfigurationSource(List.of(" http://* ")));
     }
 }
