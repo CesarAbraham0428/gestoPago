@@ -350,6 +350,23 @@ void main() {
       expect(find.text('Paso 2 de 5'), findsOneWidget);
     });
 
+    testWidgets('el ojito muestra la contraseña y "hecho" en la confirmación envía', (tester) async {
+      await abrir(tester);
+      await paso1(tester);
+      await paso2(tester);
+      await paso3(tester);
+      await paso4(tester);
+
+      await tester.tap(find.byTooltip('Mostrar contraseña'));
+      await tester.pump();
+      expect(find.byTooltip('Ocultar contraseña'), findsOneWidget);
+
+      await tester.showKeyboard(campo('confirmacion'));
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(registro.enviados, hasLength(1));
+    });
+
     testWidgets('las contraseñas distintas bloquean el envío', (tester) async {
       await abrir(tester);
       await paso1(tester);

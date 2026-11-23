@@ -33,6 +33,10 @@ void main() {
       expect(editar('123456', '1234567').text, '123456');
     });
 
+    test('insertar en medio conserva el prefijo y lo insertado', () {
+      expect(editar('123456', '12399956').text, '123999');
+    });
+
     test('el cursor queda al final', () {
       expect(editar('', '123').selection, const TextSelection.collapsed(offset: 3));
     });
@@ -64,5 +68,22 @@ void main() {
     for (final digito in '123456'.split('')) {
       expect(find.text(digito), findsOneWidget);
     }
+  });
+
+  testWidgets('al cambiar de controlador escucha al nuevo', (tester) async {
+    final primero = TextEditingController();
+    final segundo = TextEditingController();
+    addTearDown(primero.dispose);
+    addTearDown(segundo.dispose);
+    Widget campo(TextEditingController c) =>
+        MaterialApp(home: Scaffold(body: CampoCodigo(controller: c)));
+
+    await tester.pumpWidget(campo(primero));
+    await tester.pumpWidget(campo(segundo));
+    segundo.text = '42';
+    await tester.pump();
+
+    expect(find.text('4'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
   });
 }

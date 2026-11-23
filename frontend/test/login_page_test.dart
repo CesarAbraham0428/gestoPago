@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:frontend/core/ui/campo_codigo.dart';
@@ -162,5 +163,18 @@ void main() {
     expect(find.byType(QrImageView), findsOneWidget);
     expect(find.text('ABCD EFGH IJKL MNOP QRST UVWX YZ23 4567'), findsOneWidget);
     expect(find.byKey(CampoCodigo.claveCampo), findsOneWidget);
+
+    String? copiado;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (llamada) async {
+      if (llamada.method == 'Clipboard.setData') {
+        copiado = (llamada.arguments as Map)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+    await tester.tap(find.byTooltip('Copiar clave'));
+    await tester.pump();
+    expect(copiado, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567');
+    expect(find.text('Clave copiada'), findsOneWidget);
   });
 }

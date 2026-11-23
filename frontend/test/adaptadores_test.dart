@@ -7,6 +7,7 @@ import 'package:frontend/authentication/domain/entities/sesion.dart';
 import 'package:frontend/authentication/infraestructure/adapters/almacen_sesion_seguro.dart';
 import 'package:frontend/authentication/infraestructure/adapters/api_autenticacion_gateway.dart';
 import 'package:frontend/core/error/app_exception.dart';
+import 'package:frontend/core/error/mensajes_usuario.dart';
 import 'package:frontend/core/network/api_client.dart';
 import 'package:frontend/pagos/domain/entities/solicitud_compra.dart';
 import 'package:frontend/pagos/infraestructure/adapters/api_cuentas_repository.dart';
@@ -162,6 +163,14 @@ void main() {
       await expectLater(
         verificar(_Servidor(null, 401)),
         throwsA(isA<ApiException>()),
+      );
+      await expectLater(
+        verificar(_Servidor(null, 403)),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 403)
+              .having((e) => e.message, 'message', MensajesUsuario.cuentaNoDisponible),
+        ),
       );
       for (final datos in <Object?>[
         null,

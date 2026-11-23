@@ -6,6 +6,9 @@ import 'package:frontend/authentication/application/sesion_controller.dart';
 import 'package:frontend/authentication/infraestructure/ui/guardia_inactividad.dart';
 import 'package:frontend/core/theme/app_colors.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/ui/fondo_acceso.dart';
+import 'package:frontend/core/ui/ilustracion.dart';
+import 'package:frontend/core/ui/tarjeta_debito.dart';
 import 'package:frontend/core/ui/widgets_estado.dart';
 import 'package:frontend/pagos/domain/entities/comprobante.dart';
 import 'package:frontend/pagos/domain/entities/solicitud_compra.dart';
@@ -368,5 +371,29 @@ void main() {
       expect(find.text('ACCION'), findsNothing);
       expect(find.text('Este producto no se puede pagar'), findsOneWidget);
     });
+  });
+
+  testWidgets('los dibujos decorativos solo se repintan si cambian sus colores', (tester) async {
+    await montar(
+      tester,
+      FondoAcceso(
+        child: ListView(
+          children: const [
+            Ilustracion(icono: Icons.star, color: AppColors.azul, fondo: AppColors.turquesaTenue),
+            TarjetaDebito(numeroCuenta: '123456789012345678', saldo: 10),
+          ],
+        ),
+      ),
+    );
+    final pintores = {
+      for (final p in tester.widgetList<CustomPaint>(find.byType(CustomPaint)).map((w) => w.painter).nonNulls)
+        p.runtimeType.toString(): p,
+    };
+
+    for (final nombre in ['_FondoDecorado', '_Fondo', '_LineasChip']) {
+      final pintor = pintores[nombre];
+      expect(pintor, isNotNull, reason: nombre);
+      expect(pintor!.shouldRepaint(pintor), isFalse, reason: nombre);
+    }
   });
 }

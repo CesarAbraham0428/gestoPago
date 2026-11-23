@@ -242,6 +242,14 @@ void main() {
       expect(find.text('Nueva'), findsOneWidget);
     });
 
+    testWidgets('perfil: el teléfono alternativo se muestra con formato', (tester) async {
+      final c = PerfilController(PerfilFalso(perfilPrueba(telefonoAlternativo: '5598765432')));
+      await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 2400));
+      await tester.pumpAndSettle();
+      expect(find.text(formatoTelefono('5598765432')), findsOneWidget);
+      expect(find.text('Sin registrar'), findsNothing);
+    });
+
     testWidgets('perfil: error al guardar se muestra y cancelar vuelve', (tester) async {
       final repo = PerfilFalso()..errorActualizar = const ApiException(409, 'Correo en uso');
       final c = PerfilController(repo);

@@ -271,6 +271,8 @@ void main() {
       expect(find.text('Compras bloqueadas'), findsOneWidget);
       expect(find.text('Realizar compra'), findsNothing);
       expect(find.textContaining('Podrás volver a comprar a las'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1)); // la cuenta regresiva avanza
+      expect(find.text('Compras bloqueadas'), findsOneWidget);
     });
 
     testWidgets('el bloqueo termina solo y vuelve a permitir comprar', (tester) async {
@@ -325,6 +327,43 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Compras bloqueadas'), findsOneWidget);
       expect(find.text('Realizar compra'), findsNothing);
+    });
+
+    testWidgets('si el bloqueo del resultado vence, se puede corregir y reintentar', (tester) async {
+      final pagos = PagosFalso()
+        ..alPagar = (_) async => throw const ApiException(
+          422,
+          'PIN incorrecto; se bloqueó por 15 minutos por intentos fallidos',
+        );
+      var consultas = 0;
+      await abrir(
+        tester,
+        recarga,
+        pagos: pagos,
+        cuentas: () async {
+          consultas++;
+          if (consultas == 1) return [_cuenta1];
+          return [
+            Cuenta(
+              id: 1,
+              numeroCuenta: _cuenta1.numeroCuenta,
+              saldo: 1000,
+              activa: true,
+              pinBloqueadoHasta: DateTime.now().add(const Duration(milliseconds: 300)),
+            ),
+          ];
+        },
+      );
+      await tester.pumpAndSettle();
+      await ponerCelular(tester);
+      await revisar(tester);
+      await pagarConPin(tester);
+      expect(find.text('PIN bloqueado temporalmente'), findsOneWidget);
+
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 400)));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(find.text('Corregir y reintentar'), findsOneWidget);
     });
 
     testWidgets('error de comunicación incierto y no incierto', (tester) async {

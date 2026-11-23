@@ -430,7 +430,7 @@ void main() {
         expect(find.text('Consultando el pago'), findsOneWidget);
         await tester.tap(find.byTooltip('Limpiar búsqueda'));
         await tester.pump();
-        espera.complete(EstadoPago(upc: upc, estado: 'APROBADO', mensaje: 'tardío'));
+        espera.complete(const EstadoPago(upc: upc, estado: 'APROBADO', mensaje: 'tardío'));
         await tester.pumpAndSettle();
         expect(find.text('tardío'), findsNothing);
       });
