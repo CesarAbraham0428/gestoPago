@@ -1,0 +1,35 @@
+# SonarQube local para analisis estatico (seguridad, duplicados, mantenibilidad)
+# y cobertura (JaCoCo). Uso: scripts/sonar-analisis.ps1  (o ver README del script)
+name: gestopago-sonar
+
+services:
+  sonarqube:
+    image: sonarqube:community
+    container_name: gestopago-sonarqube
+    ports:
+      - "${SONAR_PORT:-9001}:9000"
+    environment:
+      # Base H2 embebida: suficiente para uso local/desarrollo.
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - sonar_extensions:/opt/sonarqube/extensions
+      # Plugin de comunidad para analizar Dart/Flutter (frontend/). No se sube a git: descarga
+      # sonar-flutter-plugin-0.5.2.jar (insideapp-oss/sonar-flutter, releases) en tools/sonar-plugins/.
+      - ./tools/sonar-plugins/sonar-flutter-plugin-0.5.2.jar:/opt/sonarqube/extensions/plugins/sonar-flutter-plugin-0.5.2.jar:ro
+      - sonar_logs:/opt/sonarqube/logs
+    ulimits:
+      nofile:
+        soft: 131072
+        hard: 131072
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 60s
+
+volumes:
+  sonar_data:
+  sonar_extensions:
+  sonar_logs:

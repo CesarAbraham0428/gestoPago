@@ -27,12 +27,14 @@ El catálogo se consulta en el orden Redis → PostgreSQL → GestoPago. Los dat
 
 ## Endpoints de la API
 
-URL local predeterminada: `http://localhost:8080`. El registro y el login son públicos; los demás endpoints de esta tabla requieren JWT.
+URL local predeterminada: `http://localhost:8080`. El registro y los dos pasos del acceso son públicos; los demás endpoints de esta tabla requieren JWT.
 
 | Método | Ruta | Función |
 | --- | --- | --- |
 | POST | `/clientes` | Registrar cliente, domicilio, cuenta y usuario. |
-| POST | `/auth/login` | Iniciar sesión con `correo` y `password`. |
+| POST | `/auth/login` | Paso 1 del acceso: valida `correo` y `password`. Devuelve un `desafioId`, no un token; la primera vez trae además `enrolamiento` (`secreto` y `otpauthUri` del QR) para enlazar la app autenticadora. |
+| POST | `/auth/verificar` | Paso 2: valida `desafioId` y el `codigo` TOTP de 6 dígitos de la app autenticadora en el servidor y entrega el JWT. `cerrarSesionAnterior: true` confirma terminar la sesión abierta en otro dispositivo (409 si no). |
+| POST | `/auth/logout` | Cierra la sesión del usuario; su JWT deja de ser válido de inmediato. |
 | POST | `/clientes/consultar` | Consultar clientes completos con filtros en un request JSON. |
 | PATCH | `/clientes` | Identificar por RFC/CURP y modificar solo los campos enviados. |
 | POST | `/clientes/desactivar` | Dar de baja lógica mediante RFC o CURP. |
@@ -114,6 +116,42 @@ La actualización parcial usa un request que separa identificación y cambios:
 Envíalo a `PATCH /clientes`. Los campos omitidos conservan su valor; `null` explícito limpia un campo opcional y se rechaza para los obligatorios. RFC, CURP, rol, estado, contraseña y cuentas no se pueden cambiar por este endpoint. La actualización conserva el bloqueo del cliente y valida el resultado completo antes de modificar entidades.
 
 El saldo se obtiene dentro de cada cuenta devuelta por `POST /cuentas/consultar`; puedes filtrar por `numeroCuenta`. Para cambiar su estado, envía `{"numeroCuenta":"000000000000000001","activa":false}` a `PATCH /cuentas/estado`. Un cliente no puede consultar, activar ni desactivar cuentas ajenas.
+
+## Acceso, doble factor y sesión única
+
+| Control | Cómo funciona |
+| --- | --- |
+| 2FA | TOTP (RFC 6238: HMAC-SHA1, 6 dígitos, 30 s) con una app autenticadora (Google Authenticator, Microsoft Authenticator, Authy). Tras validar la contraseña se abre un desafío (tabla `desafios_autenticacion`) que vence en 5 minutos y admite 5 intentos. El código se valida siempre en el servidor, con ±1 paso de tolerancia de reloj, y **no se puede reutilizar** (`usuarios.totp_ultimo_paso`). El secreto de cada usuario se guarda **cifrado con AES-256-GCM** (la misma llave `GESTOPAGO_TOKEN_KEY`). La primera vez la API entrega el secreto y la URI del QR (`enrolamiento`) y la app queda enlazada al verificar el primer código. No requiere correo ni variables nuevas. |
+| Sesión única | La tabla `sesiones_usuario` guarda una fila por usuario con el `jti` de su JWT. Cada petición debe traer el JWT de esa sesión; si el usuario entra desde otro dispositivo, la API responde `409` hasta que confirme (`cerrarSesionAnterior`), y el token anterior recibe `401 "…iniciaste sesión en otro dispositivo"`. La sesión se reemplaza de forma atómica (`INSERT … ON CONFLICT`). Solo se cierra la sesión anterior **después** de validar contraseña y código. |
+| Cierre de sesión | `POST /auth/logout` borra la sesión: el JWT queda revocado aunque no haya vencido. Cambiar la contraseña también la cierra. |
+| Expiración | El JWT dura `APP_JWT_EXPIRATION_MS` (2 h por omisión). Una sesión vencida no bloquea un nuevo acceso. |
+| Fuerza bruta | Límite general por minuto en todas las rutas (por IP y por usuario) y de ráfaga en login/registro; intentos de login por correo (10 / 15 min) y por IP (40 / 15 min), registro por IP (10 / hora) y pagos por usuario, en Redis con respaldo en memoria si cae. Responde 429 con `Retry-After`. Detrás de un proxy usa `FORWARD_HEADERS=native` para ver la IP real. Tabla completa en [docs/DESPLIEGUE-RENDER.md](docs/DESPLIEGUE-RENDER.md#4-qué-protege-la-api). |
+| Enumeración de usuarios | Un correo inexistente tarda lo mismo que uno existente (se compara contra un hash ficticio) y devuelve el mismo error. |
+| Si falla la verificación de sesión | La API rechaza la petición (no autentica "a ciegas"). |
+| Cabeceras y exposición | Swagger apagado por omisión (`SWAGGER_ENABLED`); actuator solo expone `health`; HSTS, `Content-Security-Policy: default-src 'none'`, `Permissions-Policy`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `nosniff` y `Cache-Control: no-store`; CORS sin comodín y cuerpos de petición de hasta 64 KB. |
+
+**App autenticadora (2FA).** Cada usuario enlaza su app la primera vez que inicia sesión: escanea el QR (web) o escribe la clave (celular) y confirma con el primer código. Después, cada acceso pide el código que muestra la app. Puntos a tener en cuenta:
+
+- El reloj del servidor debe estar sincronizado (NTP): el TOTP depende de la hora.
+- Mientras una cuenta no tiene la app enlazada, cualquiera que inicie sesión con su contraseña ve el mismo secreto y puede enlazar su propia app; seguirá generando códigos válidos aunque el dueño enlace la suya después. Todas las cuentas existentes están en ese estado hasta su próximo acceso. Si pasa, reinicia el enlace con el SQL de abajo.
+- `GESTOPAGO_TOKEN_KEY` también cifra estos secretos: si se cambia, nadie podrá iniciar sesión hasta reiniciar el enlace de todos (SQL de abajo sin `WHERE`).
+- Si un usuario pierde su teléfono no hay recuperación automática. Un administrador puede reiniciar su enlace (tendrá que enlazar de nuevo en su siguiente acceso): `UPDATE usuarios SET totp_secreto = NULL, totp_confirmado = false, totp_ultimo_paso = 0 WHERE correo = '…';`
+- Las variables `MAIL_*`, `GMAIL_*` y `APP_2FA_CONSOLA` ya no se usan; se pueden borrar de `backend/.env` y del despliegue.
+
+Ejemplo de acceso completo:
+
+```json
+POST /auth/login      {"correo":"ana@example.com","password":"Segura123!"}
+200 -> {"codigo":0,"mensaje":"Ingresa el código de tu app autenticadora",
+        "datos":{"desafioId":"…43 caracteres…","expiraEnMs":300000,
+                 "enrolamiento":{"secreto":"JBSWY3DP…","otpauthUri":"otpauth://totp/GestoPago:ana%40example.com?secret=…&issuer=GestoPago"}}}
+        (`enrolamiento` solo viene mientras la cuenta no tiene la app enlazada; después es null)
+
+POST /auth/verificar  {"desafioId":"…","codigo":"123456","cerrarSesionAnterior":false}
+200 -> {"codigo":0,"mensaje":"Sesión iniciada","datos":{"token":"…","tipo":"Bearer","expiraEnMs":7200000,"usuario":"ana@example.com","nombreCompleto":"…"}}
+409 -> ya existe una sesión activa: repetir con "cerrarSesionAnterior": true (el código sigue siendo válido)
+401 -> código incorrecto, vencido o con demasiados intentos · 429 demasiados intentos
+```
 
 ## Pagos con GestoPago
 
@@ -315,29 +353,50 @@ Las excepciones de negocio conservan mensajes específicos para correos, RFC y C
 | 503 | Servicio de pagos no disponible por el momento; no se realizó ningún cargo. |
 | 504 | GestoPago no confirmó el pago; queda en revisión con el monto retenido. |
 
+## Estructura del repositorio
+
+```
+backend/    API Spring Boot (Gradle, Dockerfile, migraciones Flyway, .env.example)
+frontend/   App Flutter (web y móvil, Dockerfile + nginx para la versión web)
+docs/       Documentación
+scripts/    Análisis SonarQube (ambos proyectos)
+tools/      Scanner y plugins de SonarQube (local)
+render.yaml Blueprint de Render: API, web, PostgreSQL y Redis
+```
+
+## Despliegue
+
+Guía paso a paso para **Render** (API, web y Redis desde `render.yaml`; usa tu PostgreSQL existente): [docs/DESPLIEGUE-RENDER.md](docs/DESPLIEGUE-RENDER.md). Cada servicio solo se redespliega cuando cambian los archivos de su carpeta.
+
+- `CORS_ORIGENES` (API) y `API_BASE_URL` (web) deben ser las URL HTTPS reales de cada servicio; ajústalas si Render asigna un nombre distinto.
+- La API construye `DB_URL` a partir de `DB_HOST`, `DB_PORT` y `DB_NAME` si no se define `DB_URL`; Flyway crea las tablas en la base vacía.
+- Imágenes en local: `docker build -t gestopago-api backend` y `docker build -t gestopago-web --build-arg API_BASE_URL=https://tu-api frontend`.
+
 ## Ejecución local
 
 1. Instala Java 17 e inicia PostgreSQL y Redis.
-2. Copia `.env.example` a `.env` y configura las credenciales de PostgreSQL, GestoPago y `APP_JWT_SECRET` con un valor aleatorio de al menos 32 bytes. No compartas este archivo.
-3. Ejecuta desde la raíz del proyecto:
+2. Copia `backend/.env.example` a `backend/.env` y configura las credenciales de PostgreSQL, GestoPago, `APP_JWT_SECRET` (valor aleatorio de al menos 32 bytes) y `GESTOPAGO_TOKEN_KEY` (también cifra los secretos del 2FA). Para el segundo factor solo necesitas una app autenticadora en tu teléfono. No compartas este archivo.
+3. Ejecuta desde la carpeta `backend/`:
 
    ```powershell
+   cd backend
    .\gradlew.bat bootRun
    ```
 
-Flyway crea el esquema en una base vacía. Para la instalación mediante SQL manual, consulta [las instrucciones de base de datos](docs/ENTREGA-BASE-DATOS.md) y [el script de creación](scripts/crear-base-datos.sql); con ese script, configura `SPRING_FLYWAY_BASELINE_VERSION=5` en el primer inicio. Las tablas históricas `personas` y `registro` se conservan, pero ya no participan en la API.
+Flyway crea el esquema en una base vacía. Para la instalación mediante SQL manual, consulta [las instrucciones de base de datos](docs/ENTREGA-BASE-DATOS.md) y [el script de creación](backend/scripts/crear-base-datos.sql); con ese script, configura `SPRING_FLYWAY_BASELINE_VERSION=5` en el primer inicio. Las tablas históricas `personas` y `registro` se conservan, pero ya no participan en la API.
 
 ## Pruebas
 
 ```powershell
+cd backend
 .\gradlew.bat test
 ```
 
-La suite cubre validación, clientes, cuentas, usuarios, autenticación, JWT, catálogo y pagos. Para verificar también PostgreSQL, instala sus herramientas cliente en `PATH` y ejecuta:
+La suite cubre validación, clientes, cuentas, usuarios, autenticación, JWT, catálogo y pagos. Para verificar también PostgreSQL, instala sus herramientas cliente en `PATH` y ejecuta desde la raíz del repositorio:
 
 ```powershell
-.\scripts\test-postgres.ps1
-.\scripts\test-postgres.ps1 -EsquemaManual
+.\backend\scripts\test-postgres.ps1
+.\backend\scripts\test-postgres.ps1 -EsquemaManual
 ```
 
 Estas ejecuciones verifican, respectivamente, las migraciones en una base vacía y la adopción del esquema manual, y corren también las pruebas de integración de pagos (pagos simultáneos sobre una misma cuenta, conciliación tras un timeout y bloqueo del PIN). Crean y eliminan una base temporal, por lo que requieren permiso para crear bases. Sin `TEST_DB_URL`, las pruebas de PostgreSQL se omiten en `gradlew test`.

@@ -1,0 +1,91 @@
+# Blueprint de Render: API (Spring Boot) + web (Flutter/nginx) + Redis. Guía en docs/DESPLIEGUE-RENDER.md.
+# Uso: Render Dashboard > New > Blueprint > selecciona este repositorio.
+# Los valores marcados con `sync: false` los pide Render al crear el Blueprint (no se guardan en git).
+#
+# - El nombre de cada servicio define su URL (https://<nombre>.onrender.com). Si Render la cambia porque el
+#   nombre ya existe, actualiza CORS_ORIGENES (api) y API_BASE_URL (web).
+# - Plan gratuito: los servicios web se duermen tras 15 min sin tráfico (la primera petición tarda ~1 min).
+# - Flyway crea las tablas al arrancar la API contra una base vacía.
+
+# La base de datos NO se define aquí: Render solo permite una PostgreSQL gratuita por cuenta y tú ya tienes la
+# tuya. Cópiala en las variables DB_URL / DB_USERNAME / DB_PASSWORD de la API (ver más abajo).
+
+services:
+  # Redis (caché del catálogo y límite de solicitudes de pago). Solo accesible desde la red privada.
+  - type: keyvalue
+    name: gestopago-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+  # --- API --------------------------------------------------------------------------------
+  - type: web
+    name: gestopago-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    # Solo se redespliega cuando cambia el backend.
+    buildFilter:
+      paths:
+        - backend/**
+    # /actuator/health es público y solo responde {"status":"UP"} (sin detalles).
+    healthCheckPath: /actuator/health
+    envVars:
+      # Datos de tu PostgreSQL de Render (Dashboard > tu base > Connections). Si la API y la base están en la
+      # misma región usa el host INTERNO (sin dominio, p. ej. dpg-xxxx-a): es más rápido y no necesita SSL.
+      #   DB_URL = jdbc:postgresql://<host>:5432/<base>      (con el host externo, agrega ?sslmode=require)
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: REDIS_HOST
+        fromService: { type: keyvalue, name: gestopago-redis, property: host }
+      - key: REDIS_PORT
+        fromService: { type: keyvalue, name: gestopago-redis, property: port }
+
+      # Secretos generados por Render (base64 de 256 bits).
+      - key: APP_JWT_SECRET
+        generateValue: true
+      # Cifra el token de GestoPago y los secretos 2FA de los usuarios: no la regeneres.
+      - key: GESTOPAGO_TOKEN_KEY
+        generateValue: true
+
+      # Credenciales que entrega GestoPago.
+      - key: GESTOPAGO_AUTH_ID_DISTRIBUIDOR
+        sync: false
+      - key: GESTOPAGO_AUTH_CODIGO_DISPOSITIVO
+        sync: false
+      - key: GESTOPAGO_AUTH_PASSWORD
+        sync: false
+      - key: GESTOPAGO_PAGOS_SECRET_KEY
+        sync: false
+      - key: GESTOPAGO_PAGOS_IV
+        sync: false
+
+      # Origen autorizado por CORS: la URL HTTPS del frontend.
+      - key: CORS_ORIGENES
+        value: https://gestopago-web.onrender.com
+      # Detrás del proxy de Render, para que los límites por IP vean la IP real del cliente.
+      - key: FORWARD_HEADERS
+        value: native
+      - key: SWAGGER_ENABLED
+        value: "false"
+
+  # --- Frontend (Flutter web + nginx) -----------------------------------------------------
+  - type: web
+    name: gestopago-web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    buildFilter:
+      paths:
+        - frontend/**
+    healthCheckPath: /
+    envVars:
+      # Se compila dentro de la app y se agrega al CSP (connect-src) de nginx. Debe ser HTTPS.
+      - key: API_BASE_URL
+        value: https://gestopago-api.onrender.com

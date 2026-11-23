@@ -1,0 +1,13 @@
+# Fuera de la imagen: salidas de compilación, cachés y reportes locales.
+.dart_tool
+.flutter-plugins-dependencies
+build
+coverage
+reports
+.scannerwork
+.idea
+*.iml
+android
+windows
+Dockerfile
+.dockerignore
