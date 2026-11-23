@@ -17,7 +17,7 @@ class ValidadoresCredenciales {
   /// Código de un solo uso del segundo factor: exactamente 6 dígitos.
   static String? codigo(String? valor) {
     final texto = (valor ?? '').trim();
-    if (texto.isEmpty) return 'Escribe el código que enviamos a tu correo.';
+    if (texto.isEmpty) return 'Escribe el código que muestra tu app de autenticación.';
     if (!RegExp(r'^\d{6}$').hasMatch(texto))
       return 'El código tiene 6 dígitos.';
     return null;

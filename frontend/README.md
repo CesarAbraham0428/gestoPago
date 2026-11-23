@@ -60,7 +60,7 @@ lib/
 | Requisito | Cómo se cumple |
 |---|---|
 | HTTPS | La URL base se define al compilar (`API_BASE_URL`). Una compilación de producción con HTTP hacia un host que no sea el propio equipo se niega a arrancar. |
-| Autenticación | Acceso en dos pasos: contraseña (`/auth/login`) y código de 6 dígitos enviado al correo (`/auth/verificar`); el servidor valida ambos. El JWT resultante se envía como `Authorization: Bearer`. |
+| Autenticación | Acceso en dos pasos: contraseña (`/auth/login`) y código de 6 dígitos de una app autenticadora (TOTP: Google Authenticator, Microsoft Authenticator, Authy) (`/auth/verificar`); la primera vez la pantalla muestra el QR (`qr_flutter`) y la clave para enlazarla; el servidor valida ambos. El JWT resultante se envía como `Authorization: Bearer`. |
 | Control de acceso | `redirect` del enrutador: sin sesión solo existe `/login`. El servidor valida cada petición. |
 | Sesión única | Si el usuario ya tiene sesión en otro dispositivo (web o móvil), el servidor responde `409`; la app pide confirmar y reenvía el código con `cerrarSesionAnterior: true`. La sesión desplazada recibe `401` y vuelve al login con el motivo. |
 | Expiración de sesión | El token trae `expiraEnMs`; un temporizador cierra la sesión al vencer. Además se cierra tras 15 min sin interacción (`GuardiaInactividad`). Un `401` en cualquier ruta protegida también la cierra. |
@@ -82,7 +82,7 @@ Contrato general de respuesta: `{ "codigo": 0|1, "mensaje": "...", "datos": ... 
 
 | | |
 |---|---|
-| Paso 1 | `POST /auth/login` (público) · `{ "correo", "password" }` → `datos: { desafioId, expiraEnMs, correoEnmascarado }`. 401 credenciales incorrectas · 403 inactivo · 429 demasiados intentos · 503 no se pudo enviar el correo |
+| Paso 1 | `POST /auth/login` (público) · `{ "correo", "password" }` → `datos: { desafioId, expiraEnMs, enrolamiento }` (`enrolamiento` = `{ secreto, otpauthUri }`, solo mientras la app no está enlazada). 401 credenciales incorrectas · 403 inactivo · 429 demasiados intentos |
 | Paso 2 | `POST /auth/verificar` (público) · `{ "desafioId", "codigo", "cerrarSesionAnterior" }` → `datos: { token, tipo, expiraEnMs, usuario, nombreCompleto }`. 401 código incorrecto/vencido · 409 hay otra sesión activa · 429 demasiados intentos |
 | Cierre | `POST /auth/logout` (Bearer) → 200; revoca la sesión en el servidor |
 | Validación en la app | Correo con formato válido (máx. 100); contraseña obligatoria (máx. 72); código de exactamente 6 dígitos |

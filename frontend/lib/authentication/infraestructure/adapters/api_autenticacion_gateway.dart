@@ -8,9 +8,10 @@ import '../../domain/ports/autenticacion_gateway.dart';
 /// Adaptador HTTP del puerto [AutenticacionGateway]. Acceso en dos pasos.
 ///
 /// POST /auth/login   {"correo","password"}
-///   200 -> datos: {desafioId, expiraEnMs, correoEnmascarado}  (código enviado por correo)
+///   200 -> datos: {desafioId, expiraEnMs, enrolamiento}  (el código lo da la app de autenticación;
+///          `enrolamiento` = {secreto, otpauthUri} solo mientras la cuenta no tiene la app enlazada)
 ///   400 datos inválidos · 401 credenciales incorrectas · 403 usuario inactivo
-///   429 demasiados intentos o código pedido hace poco · 503 no se pudo enviar el correo
+///   429 demasiados intentos
 ///
 /// POST /auth/verificar   {"desafioId","codigo":"6 dígitos","cerrarSesionAnterior":bool}
 ///   200 -> datos: {token, tipo, expiraEnMs, usuario, nombreCompleto}
@@ -57,9 +58,22 @@ class ApiAutenticacionGateway implements AutenticacionGateway {
     return DesafioVerificacion(
       desafioId: id,
       correo: correo,
-      correoEnmascarado: (datos['correoEnmascarado'] as String?) ?? correo,
       vigencia: Duration(milliseconds: vigenciaMs.toInt()),
+      enrolamiento: _enrolamientoDe(datos['enrolamiento']),
     );
+  }
+
+  static EnrolamientoTotp? _enrolamientoDe(Object? crudo) {
+    if (crudo == null) return null;
+    final secreto = crudo is Map ? crudo['secreto'] : null;
+    final uri = crudo is Map ? crudo['otpauthUri'] : null;
+    if (secreto is! String ||
+        secreto.isEmpty ||
+        uri is! String ||
+        uri.isEmpty) {
+      throw const ConexionException(MensajesUsuario.respuestaInvalida);
+    }
+    return EnrolamientoTotp(secreto: secreto, otpauthUri: uri);
   }
 
   @override

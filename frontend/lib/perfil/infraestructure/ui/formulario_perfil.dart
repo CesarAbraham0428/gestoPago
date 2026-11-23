@@ -8,7 +8,7 @@ import '../../domain/entities/perfil.dart';
 
 /// Formulario de edición del perfil. Nombre, fecha de nacimiento, sexo,
 /// nacionalidad, CURP, RFC y correo se muestran en su lugar pero de solo
-/// lectura (el correo es el usuario de acceso y destino del código 2FA).
+/// lectura (el correo es el usuario de acceso).
 /// Entrega a [alGuardar] solo los campos editables; el caso de uso calcula
 /// qué cambió. [alGuardar] devuelve el mensaje de error, o null si se guardó.
 class FormularioPerfil extends StatefulWidget {

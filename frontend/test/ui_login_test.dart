@@ -85,7 +85,7 @@ void main() {
     await tester.tap(campo('Contraseña'));
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
-    expect(find.text('Revisa tu correo'), findsOneWidget);
+    expect(find.text('Código de tu app'), findsOneWidget);
   });
 
   testWidgets('código incorrecto, error inesperado, teclado y volver', (tester) async {

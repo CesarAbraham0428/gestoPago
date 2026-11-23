@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/error/app_exception.dart';
 import '../../../core/theme/app_colors.dart';
@@ -39,7 +40,7 @@ class _ContenedorFormulario extends StatefulWidget {
 }
 
 class _ContenedorFormularioState extends State<_ContenedorFormulario> {
-  /// Hay desafío cuando el servidor ya envió el código: toca el segundo paso.
+  /// Hay desafío cuando la contraseña ya fue validada: toca el código de la app.
   DesafioVerificacion? _desafio;
 
   @override
@@ -368,23 +369,123 @@ class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
   Future<void> _confirmarCierreDeOtraSesion() async {
     final cerrar = await showDialog<bool>(
       context: context,
-      builder: (dialogo) => AlertDialog(
-        title: const Text('Ya tienes una sesión abierta'),
-        content: const Text(
-          'Tu cuenta está abierta en otro dispositivo o navegador. '
-          'Solo puede haber una sesión a la vez: si continúas, la otra se cerrará.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogo).pop(false),
-            child: const Text('Cancelar'),
+      barrierColor: Colors.black.withValues(alpha: 0.72), // el fondo se atenúa para que solo se vea la alerta
+      builder: (dialogo) {
+        final tema = Theme.of(dialogo).textTheme;
+        return Dialog(
+          clipBehavior: Clip.antiAlias,
+          insetPadding: const EdgeInsets.all(20),
+          backgroundColor: AppColors.superficie,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: AppColors.coral, width: 2),
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogo).pop(true),
-            child: const Text('Cerrar la otra sesión y continuar'),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 22),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.coral, AppColors.rechazo],
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        // Entrada con rebote una sola vez (sin bucle: no bloquea las pruebas).
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.4, end: 1),
+                          duration: const Duration(milliseconds: 700),
+                          curve: Curves.elasticOut,
+                          builder: (_, escala, hijo) =>
+                              Transform.scale(scale: escala, child: hijo),
+                          child: Container(
+                            width: 76,
+                            height: 76,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.warning_amber_rounded,
+                              size: 46,
+                              color: AppColors.rechazo,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Ya tienes una sesión abierta',
+                          textAlign: TextAlign.center,
+                          style: tema.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.coralTenue,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.devices_other,
+                                color: AppColors.rechazo,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Tu cuenta está abierta en otro dispositivo o navegador. '
+                                  'Solo puede haber una sesión a la vez: si continúas, la otra se cerrará.',
+                                  style: tema.bodyMedium?.copyWith(
+                                    color: AppColors.tinta,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.rechazo,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () => Navigator.of(dialogo).pop(true),
+                          child: const Text('Cerrar la otra sesión y continuar'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogo).pop(false),
+                          child: const Text('Cancelar'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
     if (cerrar == true && mounted) await _verificar(cerrarSesionAnterior: true);
   }
@@ -392,6 +493,7 @@ class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context).textTheme;
+    final enrolamiento = widget.desafio.enrolamiento;
     return Form(
       key: _clave,
       child: Column(
@@ -403,61 +505,37 @@ class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
             children: [
               const Center(
                 child: Ilustracion(
-                  icono: Icons.mark_email_unread_outlined,
+                  icono: Icons.phonelink_lock_outlined,
                   color: AppColors.marca,
                   fondo: AppColors.marcaTenue,
-                  tamano: 104,
+                  tamano: 96,
                 ),
               ),
               const SizedBox(height: 12),
               Text(
-                'Revisa tu correo',
+                enrolamiento == null
+                    ? 'Código de tu app'
+                    : 'Enlaza tu app de autenticación',
                 style: tema.headlineSmall,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
-              Text(
-                'Enviamos un código de 6 dígitos a',
-                style: tema.bodyMedium?.copyWith(color: AppColors.tintaSuave),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
+              if (enrolamiento == null)
+                Text(
+                  'Abre tu app de autenticación (Google Authenticator, '
+                  'Microsoft Authenticator o Authy) y escribe el código de '
+                  '6 dígitos de GestoPago.',
+                  style: tema.bodyMedium?.copyWith(
+                    color: AppColors.tintaSuave,
                   ),
-                  decoration: BoxDecoration(
-                    color: AppColors.marcaTenue,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.mail_outline,
-                        size: 18,
-                        color: AppColors.marca,
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          widget.desafio.correoEnmascarado,
-                          overflow: TextOverflow.ellipsis,
-                          style: tema.titleSmall?.copyWith(
-                            color: AppColors.marcaOscura,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                  textAlign: TextAlign.center,
+                )
+              else
+                _EnlaceDeApp(enrolamiento: enrolamiento),
               const SizedBox(height: 10),
               Text(
-                'Vence en ${widget.desafio.vigencia.inMinutes} minutos y solo sirve una vez.',
+                'Tienes ${widget.desafio.vigencia.inMinutes} minutos para '
+                'terminar este paso.',
                 style: tema.bodySmall?.copyWith(color: AppColors.tintaSuave),
                 textAlign: TextAlign.center,
               ),
@@ -493,6 +571,92 @@ class _PasoCodigoState extends State<_PasoCodigo> with _EsperaPorLimite {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Instrucciones, código QR y clave manual para enlazar la app de autenticación.
+/// En el celular el QR no se puede escanear con la misma pantalla: ahí sirve la clave.
+class _EnlaceDeApp extends StatelessWidget {
+  const _EnlaceDeApp({required this.enrolamiento});
+
+  final EnrolamientoTotp enrolamiento;
+
+  /// "ABCD EFGH IJKL…": la clave en bloques de 4 es más fácil de copiar a mano.
+  String get _claveEnBloques => RegExp(
+    r'.{1,4}',
+  ).allMatches(enrolamiento.secreto).map((m) => m[0]).join(' ');
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '1. Instala Google Authenticator, Microsoft Authenticator o Authy.\n'
+          '2. Escanea este código QR, o escribe la clave de abajo si estás en '
+          'el mismo celular.\n'
+          '3. Escribe el código de 6 dígitos que aparece en la app.',
+          style: tema.bodyMedium?.copyWith(color: AppColors.tintaSuave),
+        ),
+        const SizedBox(height: 14),
+        Center(
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.linea),
+            ),
+            child: Semantics(
+              label: 'Código QR para enlazar tu app de autenticación',
+              child: QrImageView(
+                data: enrolamiento.otpauthUri,
+                size: 168,
+                backgroundColor: Colors.white,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+          decoration: BoxDecoration(
+            color: AppColors.marcaTenue,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: SelectableText(
+                  _claveEnBloques,
+                  key: const ValueKey('clave-totp'),
+                  style: tema.titleSmall?.copyWith(
+                    color: AppColors.marcaOscura,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Copiar clave',
+                icon: const Icon(Icons.copy_rounded, size: 20),
+                color: AppColors.marca,
+                onPressed: () async {
+                  final aviso = ScaffoldMessenger.of(context);
+                  await Clipboard.setData(
+                    ClipboardData(text: enrolamiento.secreto),
+                  );
+                  aviso.showSnackBar(
+                    const SnackBar(content: Text('Clave copiada')),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

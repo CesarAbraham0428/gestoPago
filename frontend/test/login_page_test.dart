@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:frontend/core/ui/campo_codigo.dart';
 import 'package:frontend/authentication/application/sesion_controller.dart';
 import 'package:frontend/authentication/domain/entities/desafio_verificacion.dart';
@@ -11,6 +12,9 @@ import 'package:frontend/core/error/app_exception.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 
 class _Gateway implements AutenticacionGateway {
+  _Gateway({this.enrolamiento});
+
+  final EnrolamientoTotp? enrolamiento;
   final List<bool> reemplazos = [];
 
   @override
@@ -20,8 +24,8 @@ class _Gateway implements AutenticacionGateway {
   }) async => DesafioVerificacion(
     desafioId: 'abc',
     correo: correo,
-    correoEnmascarado: 'a***@example.com',
     vigencia: const Duration(minutes: 5),
+    enrolamiento: enrolamiento,
   );
 
   /// Hay otra sesión abierta: solo entra si el usuario confirma cerrarla.
@@ -76,8 +80,9 @@ void main() {
     await tester.enterText(find.widgetWithText(TextFormField, 'Contraseña'), 'Segura123!');
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
-    expect(find.text('Revisa tu correo'), findsOneWidget);
-    expect(find.textContaining('a***@example.com'), findsOneWidget);
+    expect(find.text('Código de tu app'), findsOneWidget);
+    expect(find.textContaining('app de autenticación'), findsOneWidget);
+    expect(find.byType(QrImageView), findsNothing); // la app ya estaba enlazada
     expect(sesion.autenticado, isFalse);
 
     // Un código mal escrito no llega al servidor.
@@ -128,6 +133,34 @@ void main() {
 
     expect(sesion.autenticado, isFalse);
     expect(gateway.reemplazos, [false]);
-    expect(find.text('Revisa tu correo'), findsOneWidget);
+    expect(find.text('Código de tu app'), findsOneWidget);
+  });
+
+  testWidgets('la primera vez muestra el QR y la clave en bloques para enlazar la app', (tester) async {
+    final gateway = _Gateway(
+      enrolamiento: const EnrolamientoTotp(
+        secreto: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567',
+        otpauthUri: 'otpauth://totp/GestoPago:ana?secret=ABCDEFGHIJKLMNOPQRSTUVWXYZ234567',
+      ),
+    );
+    final sesion = SesionController(gateway: gateway, almacen: _Almacen());
+    addTearDown(sesion.dispose);
+
+    tester.view.physicalSize = const Size(500, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(theme: AppTheme.light(), home: LoginPage(sesion: sesion)),
+    );
+    await tester.enterText(find.widgetWithText(TextFormField, 'Correo electrónico'), 'ana@example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Contraseña'), 'Segura123!');
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enlaza tu app de autenticación'), findsOneWidget);
+    expect(find.byType(QrImageView), findsOneWidget);
+    expect(find.text('ABCD EFGH IJKL MNOP QRST UVWX YZ23 4567'), findsOneWidget);
+    expect(find.byKey(CampoCodigo.claveCampo), findsOneWidget);
   });
 }

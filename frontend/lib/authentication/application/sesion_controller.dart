@@ -51,7 +51,7 @@ class SesionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Paso 1: valida usuario y contraseña; el servidor envía el código por correo.
+  /// Paso 1: valida usuario y contraseña; el servidor abre el desafío del segundo factor.
   /// Lanza una `AppException` con un mensaje apto para el usuario si falla.
   Future<DesafioVerificacion> solicitarCodigo({
     required String correo,

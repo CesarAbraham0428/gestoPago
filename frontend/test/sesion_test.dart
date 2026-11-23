@@ -17,7 +17,6 @@ import 'package:http/testing.dart';
 const _desafio = DesafioVerificacion(
   desafioId: 'abc',
   correo: 'ana@example.com',
-  correoEnmascarado: 'a***@example.com',
   vigencia: Duration(minutes: 5),
 );
 
@@ -216,7 +215,7 @@ void main() {
       final gateway = conRespuesta(200, {
         'codigo': 0,
         'mensaje': 'ok',
-        'datos': {'desafioId': 'xyz', 'expiraEnMs': 300000, 'correoEnmascarado': 'a***@x.com'},
+        'datos': {'desafioId': 'xyz', 'expiraEnMs': 300000},
       });
       final desafio = await gateway.iniciarSesion(correo: 'ana@x.com', password: 'Segura123!');
       expect(desafio.desafioId, 'xyz');

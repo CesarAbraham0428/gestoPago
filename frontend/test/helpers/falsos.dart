@@ -38,7 +38,6 @@ Future<void> montar(
 const desafioPrueba = DesafioVerificacion(
   desafioId: 'd1',
   correo: 'ana@example.com',
-  correoEnmascarado: 'a***@example.com',
   vigencia: Duration(minutes: 5),
 );
 

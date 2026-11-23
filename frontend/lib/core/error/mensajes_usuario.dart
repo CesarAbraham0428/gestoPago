@@ -17,16 +17,17 @@ abstract final class MensajesUsuario {
   static const noEncontrado = 'No encontramos lo que buscas.';
   static const demasiadosIntentos =
       'Hiciste demasiados intentos. Espera un momento e inténtalo de nuevo.';
-  static const generico = 'No pudimos completar la operación. Inténtalo de nuevo.';
+  static const generico =
+      'No pudimos completar la operación. Inténtalo de nuevo.';
 
   // Acceso
   static const credencialesIncorrectas = 'Correo o contraseña incorrectos.';
   static const cuentaNoDisponible =
       'No es posible iniciar sesión con esta cuenta. Comunícate con soporte.';
   static const codigoIncorrecto =
-      'El código no es correcto o ya venció. Revísalo e inténtalo de nuevo.';
+      'El código no es correcto o ya venció. Escribe el código que muestra ahora tu app de autenticación.';
   static const demasiadosCodigos =
-      'Demasiados códigos incorrectos. Vuelve a iniciar sesión para recibir uno nuevo.';
+      'Demasiados códigos incorrectos. Vuelve a iniciar sesión para intentarlo de nuevo.';
 
   // Registro
   static const cuentaYaExiste =
@@ -59,7 +60,9 @@ abstract final class MensajesUsuario {
   static String desdeServidor(int estado, String? mensaje) {
     final texto = mensaje?.trim() ?? '';
     final pagoConTexto = estado == 502 || estado == 504;
-    if (texto.isEmpty || _tecnico.hasMatch(texto) || (estado >= 500 && !pagoConTexto)) {
+    if (texto.isEmpty ||
+        _tecnico.hasMatch(texto) ||
+        (estado >= 500 && !pagoConTexto)) {
       return porEstado(estado);
     }
     return _conPunto(texto);

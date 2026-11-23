@@ -18,7 +18,6 @@ import 'package:frontend/productos/domain/ports/catalogo_repository.dart';
 const _desafio = DesafioVerificacion(
   desafioId: 'd',
   correo: 'ana@example.com',
-  correoEnmascarado: 'a***@example.com',
   vigencia: Duration(minutes: 5),
 );
 

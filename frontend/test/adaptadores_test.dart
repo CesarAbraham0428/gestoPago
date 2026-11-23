@@ -19,7 +19,6 @@ import 'package:http/testing.dart';
 const _desafio = DesafioVerificacion(
   desafioId: 'd1',
   correo: 'ana@example.com',
-  correoEnmascarado: 'a***@example.com',
   vigencia: Duration(minutes: 5),
 );
 
@@ -67,26 +66,42 @@ SolicitudCompra _solicitud({String? telefono, String? referencia}) =>
 void main() {
   group('ApiAutenticacionGateway', () {
     test('iniciarSesion devuelve el desafío', () async {
-      final s = _Servidor({
-        'desafioId': 'x',
-        'expiraEnMs': 60000,
-        'correoEnmascarado': 'a***@e.com',
-      });
+      final s = _Servidor({'desafioId': 'x', 'expiraEnMs': 60000});
       final d = await ApiAutenticacionGateway(
         s.api,
       ).iniciarSesion(correo: 'ana@e.com', password: 'pw');
       expect(d.desafioId, 'x');
+      expect(d.correo, 'ana@e.com');
       expect(d.vigencia, const Duration(minutes: 1));
-      expect(d.correoEnmascarado, 'a***@e.com');
+      expect(d.enrolamiento, isNull);
       expect(s.ultima!.headers.containsKey('Authorization'), isFalse);
     });
 
-    test('iniciarSesion sin correo enmascarado usa el correo', () async {
-      final s = _Servidor({'desafioId': 'x', 'expiraEnMs': 1000});
+    test('iniciarSesion con la app sin enlazar trae el secreto y la URI del QR', () async {
+      final s = _Servidor({
+        'desafioId': 'x',
+        'expiraEnMs': 1000,
+        'enrolamiento': {'secreto': 'ABCD', 'otpauthUri': 'otpauth://totp/GestoPago:a'},
+      });
       final d = await ApiAutenticacionGateway(
         s.api,
       ).iniciarSesion(correo: 'ana@e.com', password: 'pw');
-      expect(d.correoEnmascarado, 'ana@e.com');
+      expect(d.enrolamiento!.secreto, 'ABCD');
+      expect(d.enrolamiento!.otpauthUri, 'otpauth://totp/GestoPago:a');
+    });
+
+    test('un enrolamiento incompleto es una respuesta inválida', () async {
+      for (final enrolamiento in <Object?>[
+        'texto',
+        {'secreto': 'ABCD'},
+        {'secreto': '', 'otpauthUri': 'otpauth://x'},
+      ]) {
+        final s = _Servidor({'desafioId': 'x', 'expiraEnMs': 1000, 'enrolamiento': enrolamiento});
+        expect(
+          ApiAutenticacionGateway(s.api).iniciarSesion(correo: 'a@e.com', password: 'pw'),
+          throwsA(isA<ConexionException>()),
+        );
+      }
     });
 
     test('iniciarSesion con respuesta inválida', () async {
