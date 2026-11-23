@@ -230,11 +230,13 @@ void main() {
 
       await tester.enterText(find.widgetWithText(TextFormField, 'Código postal'), '06000');
       // Datos personales y correo se ven en su lugar pero no se pueden editar.
-      for (final e in ['Primer nombre', 'Fecha de nacimiento', 'Sexo', 'Nacionalidad', 'CURP', 'RFC', 'Correo electrónico']) {
+      for (final e in ['Primer nombre', 'Fecha de nacimiento', 'Sexo', 'Nacionalidad', 'CURP', 'RFC', 'Correo electrónico', 'Teléfono móvil']) {
         final campo = tester.widget<TextFormField>(find.widgetWithText(TextFormField, e));
         expect(campo.enabled, isFalse, reason: e);
       }
       expect(find.text('PELA950412AB1'), findsOneWidget);
+      final alternativo = tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'Teléfono alternativo (opcional)'));
+      expect(alternativo.enabled, isNot(isFalse));
       await tester.tap(find.text('Guardar cambios'));
       await tester.pumpAndSettle();
       expect(repo.cambiosRecibidos.single, {'empresa': 'Nueva'});
