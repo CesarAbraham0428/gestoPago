@@ -94,7 +94,7 @@ Contrato general de respuesta: `{ "codigo": 0|1, "mensaje": "...", "datos": ... 
 | | |
 |---|---|
 | Disponibilidad | `POST /clientes/disponibilidad` (público) · `{ curp?, rfc?, telefonoMovil?, correoElectronico? }` → `datos: { duplicados: [campos que ya tienen cuenta] }`. Se consulta en cada paso del formulario para avisar por campo |
-| Alta | `POST /clientes` (público) · datos personales, empresa, domicilio, `correoElectronico` y `password` → 201 cliente creado con su cuenta en saldo 0 |
+| Alta | `POST /clientes` (público) · datos personales, `correoElectronico` y `password` (obligatorios) más empresa y domicilio (opcionales: el formulario permite omitir esos pasos y se completan después en «Editar perfil») → 201 cliente creado con su cuenta en saldo 0 |
 | Errores | 400 datos inválidos · 409 CURP, RFC, teléfono o correo ya registrados (el mensaje nombra cuáles) · 429 demasiados registros |
 | Validación en la app | CURP, RFC, nombres, teléfono de 10 dígitos, código postal de 5, mayoría de edad y contraseña segura antes de enviar |
 | Adaptador | `authentication/infraestructure/adapters/api_registro_gateway.dart` |

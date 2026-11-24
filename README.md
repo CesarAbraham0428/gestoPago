@@ -4,7 +4,7 @@ API REST para registrar y administrar clientes, domicilios, cuentas bancarias y 
 
 ## Solución implementada
 
-El registro valida los datos y guarda **cliente, domicilio, cuenta bancaria y usuario en una sola transacción**. Si una operación falla, se revierte el registro completo. La cuenta se asocia al cliente, recibe un número único de 18 dígitos generado mediante una secuencia y comienza **ACTIVA**, con saldo de **0.00** definido por el sistema. El usuario también inicia activo y utiliza el correo del cliente para acceder.
+El registro valida los datos y guarda **cliente, domicilio (si se proporciona), cuenta bancaria y usuario en una sola transacción**. Si una operación falla, se revierte el registro completo. La cuenta se asocia al cliente, recibe un número único de 18 dígitos generado mediante una secuencia y comienza **ACTIVA**, con saldo de **0.00** definido por el sistema. El usuario también inicia activo y utiliza el correo del cliente para acceder.
 
 La aplicación separa controladores REST, servicios de negocio y repositorios JPA. PostgreSQL almacena las tablas `clientes` (datos personales, de contacto y laborales), `domicilios` (dirección), `cuentas` (número, saldo y estado) y `usuarios` (correo y hash de contraseña). Flyway administra el esquema; las restricciones y los triggers refuerzan la unicidad, la integridad y la baja lógica.
 
@@ -16,11 +16,11 @@ El catálogo se consulta en el orden Redis → PostgreSQL → GestoPago. Los dat
 
 - **Edad:** el cliente debe tener al menos 18 años; la fecha de nacimiento es obligatoria y no puede ser futura.
 - **Identidad:** CURP y RFC son obligatorios, únicos e inmodificables. Se valida su formato mediante expresiones regulares: CURP de 18 caracteres y RFC de 12 o 13.
-- **Nombres:** primer nombre y ambos apellidos son obligatorios; segundo nombre es opcional. Cada valor proporcionado admite solo letras y espacios, con longitud de 2 a 50 caracteres.
+- **Nombres:** primer nombre y ambos apellidos son obligatorios; segundo nombre es opcional. Cada valor proporcionado admite solo letras y espacios; los nombres de pila (primer y segundo) llevan de 3 a 50 caracteres y los apellidos de 2 a 50.
 - **Contacto:** correo obligatorio, válido, único y de máximo 100 caracteres. El correo del usuario también es único y se sincroniza cuando cambia el del cliente. El teléfono móvil es obligatorio y debe tener exactamente 10 dígitos; el alternativo, si se proporciona, cumple la misma longitud.
-- **Domicilio e ingresos:** domicilio obligatorio, código postal de exactamente 5 dígitos e ingreso mensual mayor que cero.
+- **Domicilio y empleo (opcionales):** el registro puede omitir `domicilio`, `ocupacion`, `empresa` e `ingresoMensual`; se agregan después con `PATCH /clientes`. Si se envía el domicilio debe venir completo: `calle` y `colonia` de 3 a 100 caracteres, código postal de exactamente 5 dígitos. El ingreso mensual, si se captura, es mayor que cero. Un cliente sin domicilio se devuelve con `domicilio: null`.
 - **Cuentas:** número de cuenta único e inmodificable; saldo inicial no negativo, fijado actualmente en cero. Solo los clientes activos pueden tener cuentas activas.
-- **Usuarios:** cada cliente tiene un único usuario asociado. La contraseña requiere al menos 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial; se admite un máximo de 72 bytes UTF-8 y 72 caracteres por el uso de BCrypt.
+- **Usuarios:** cada cliente tiene un único usuario asociado. La contraseña nueva (registro y cambio) requiere de 8 a 12 caracteres, con una mayúscula, una minúscula, un número y un carácter especial. El inicio de sesión no impone el máximo de 12, para que las contraseñas anteriores sigan funcionando.
 - **Actualización:** se pueden modificar datos personales, de contacto, domicilio e información laboral de clientes activos. CURP, RFC y número de cuenta no se pueden modificar.
 - **Baja lógica:** desactivar un cliente conserva sus datos y desactiva automáticamente sus cuentas y su usuario. Las cuentas solo se activan o desactivan; no se eliminan físicamente. No se puede reactivar una cuenta si su cliente está inactivo.
 - **Acceso:** solo los usuarios autenticados pueden consumir los endpoints protegidos. Se rechaza el login con credenciales incorrectas o con usuario o cliente inactivo.
