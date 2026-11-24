@@ -19,12 +19,10 @@ class PasswordValidatorTest {
     void aceptaPasswordConTodosLosRequisitos(String password) {
         assertDoesNotThrow(() -> PasswordValidator.validar(password));
     }
-    @Test void aceptaExactamente72BytesYRechazaUnByteMas() {
-        assertDoesNotThrow(() -> PasswordValidator.validar("Aa1!" + "a".repeat(68)));
-        assertThrows(PasswordInvalidaException.class, () -> PasswordValidator.validar("Aa1!" + "a".repeat(69)));
-    }
-    @Test void limitaBytesUtf8AunqueLaCantidadDeCaracteresSeaMenor() {
-        assertDoesNotThrow(() -> PasswordValidator.validar("Aa1!" + "ñ".repeat(34)));
-        assertThrows(PasswordInvalidaException.class, () -> PasswordValidator.validar("Aa1!" + "ñ".repeat(35)));
+    @Test void aceptaDe8A12CaracteresYRechazaUnoMas() {
+        assertDoesNotThrow(() -> PasswordValidator.validar("Aa1!" + "a".repeat(4)));
+        assertDoesNotThrow(() -> PasswordValidator.validar("Aa1!" + "a".repeat(8)));
+        assertThrows(PasswordInvalidaException.class, () -> PasswordValidator.validar("Aa1!" + "a".repeat(9)));
+        assertThrows(PasswordInvalidaException.class, () -> PasswordValidator.validar("Aa1!" + "a".repeat(3)));
     }
 }

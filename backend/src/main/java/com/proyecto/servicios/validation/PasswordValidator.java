@@ -1,7 +1,6 @@
 package com.proyecto.servicios.validation;
 
 import com.proyecto.servicios.service.exception.PasswordInvalidaException;
-import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 
 public final class PasswordValidator {
@@ -19,8 +18,7 @@ public final class PasswordValidator {
     }
 
     public static boolean esValida(String password) {
-        return password != null && password.length() >= 8 && password.length() <= 72
-                && password.getBytes(StandardCharsets.UTF_8).length <= 72
+        return password != null && password.length() >= 8 && password.length() <= 12
                 && MAYUSCULA.matcher(password).find()
                 && MINUSCULA.matcher(password).find()
                 && NUMERO.matcher(password).find()

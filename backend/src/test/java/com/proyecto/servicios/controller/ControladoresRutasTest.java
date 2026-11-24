@@ -38,7 +38,7 @@ class ControladoresRutasTest {
              "empresa":"Empresa","ingresoMensual":12000,
              "domicilio":{"calle":"Reforma","numeroExterior":"10","colonia":"Centro","municipio":"Cuauhtemoc",
                           "estado":"CDMX","codigoPostal":"06000","pais":"Mexico"},
-             "password":"Segura#Clave2026"}""";
+             "password":"Segura#2026"}""";
     private final UsernamePasswordAuthenticationToken usuario =
             new UsernamePasswordAuthenticationToken("7", null, List.of());
 

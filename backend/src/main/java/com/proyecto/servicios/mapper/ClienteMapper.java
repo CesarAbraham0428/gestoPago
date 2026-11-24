@@ -46,6 +46,9 @@ public final class ClienteMapper {
     }
 
     public static DomicilioResponse domicilio(Domicilio domicilio) {
+        if (domicilio == null) {
+            return null;
+        }
         return new DomicilioResponse(
             domicilio.getId(), domicilio.getCalle(), domicilio.getNumeroExterior(),
             domicilio.getNumeroInterior(), domicilio.getColonia(), domicilio.getMunicipio(),

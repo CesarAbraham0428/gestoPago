@@ -8,8 +8,8 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.proyecto.servicios.validation.FormatosCliente;
 
 public record ClienteRequest(
-    @NotBlank @com.proyecto.servicios.validation.NombreValido String primerNombre,
-    @com.proyecto.servicios.validation.NombreValido String segundoNombre,
+    @NotBlank @com.proyecto.servicios.validation.NombreValido(min=3) String primerNombre,
+    @com.proyecto.servicios.validation.NombreValido(min=3) String segundoNombre,
     @NotBlank @com.proyecto.servicios.validation.NombreValido String apellidoPaterno,
     @NotBlank @com.proyecto.servicios.validation.NombreValido String apellidoMaterno,
     @NotNull @Past LocalDate fechaNacimiento,
@@ -17,14 +17,14 @@ public record ClienteRequest(
     @NotBlank @Pattern(regexp=FormatosCliente.RFC) String rfc,
     @NotNull Sexo sexo,
     @NotBlank @Size(max=100) String nacionalidad,
-    @NotNull EstadoCivil estadoCivil,
+    EstadoCivil estadoCivil,
     @NotBlank @Email @Size(max=100) String correoElectronico,
     @NotBlank @Pattern(regexp="[0-9]{10}") String telefonoMovil,
     @Pattern(regexp="[0-9]{10}") String telefonoAlternativo,
-    @NotBlank @Size(max=250) String ocupacion,
-    @NotBlank @Size(max=250) String empresa,
-    @NotNull @DecimalMin(value="0",inclusive=false) @Digits(integer=16,fraction=2) BigDecimal ingresoMensual,
-    @NotNull @Valid DomicilioRequest domicilio,
+    @Size(max=50) @Pattern(regexp=FormatosCliente.CON_TEXTO) String ocupacion,
+    @Size(max=50) @Pattern(regexp=FormatosCliente.CON_TEXTO) String empresa,
+    @DecimalMin(value="0",inclusive=false) @Digits(integer=16,fraction=2) BigDecimal ingresoMensual,
+    @Valid DomicilioRequest domicilio,
     @NotBlank @com.proyecto.servicios.validation.PasswordSegura String password
 ) implements DatosCliente {
     @JsonAnySetter

@@ -43,7 +43,8 @@ class ValidadoresTest {
     @Test
     void laPasswordSeguraAceptaNuloYRechazaLasDebiles() {
         assertTrue(password.isValid(null, null));
-        assertTrue(password.isValid("Nueva#Segura2026", null));
+        assertTrue(password.isValid("Nueva#2026", null));
+        assertFalse(password.isValid("Nueva#Segura2026", null));
         assertFalse(password.isValid("123", null));
     }
 

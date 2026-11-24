@@ -104,6 +104,41 @@ class ClientesPostgresTest {
         assertEquals(1, jdbc.queryForObject("select count(*) from usuarios where cliente_id=?", Integer.class, id));
         assertTrue(numero(c).matches("[0-9]{18}"));
     }
+    @Test void registroSinOcupacionNiDomicilioSeCompletaDespuesPorPatch() throws Exception {
+        ObjectNode body = registro("1");
+        body.remove("estadoCivil"); body.remove("ocupacion"); body.remove("empresa"); body.remove("ingresoMensual"); body.remove("domicilio");
+        JsonNode c = crear(body); String token = bearer("1"); int id = c.get("id").asInt();
+        assertAll(
+            () -> assertTrue(c.get("domicilio").isNull()),
+            () -> assertTrue(c.get("ocupacion").isNull()),
+            () -> assertTrue(c.get("estadoCivil").isNull()),
+            () -> assertEquals(0, jdbc.queryForObject("select count(*) from domicilios where cliente_id=?", Integer.class, id)),
+            () -> assertEquals(1, jdbc.queryForObject("select count(*) from cuentas where cliente_id=?", Integer.class, id)));
+
+        // Se consulta sin domicilio y luego se agrega desde "Editar perfil" (PATCH).
+        mvc.perform(post("/clientes/consultar").header("Authorization", token)
+            .contentType("application/json").content(identificacion(c).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.datos[0].domicilio").doesNotExist());
+        JsonNode cambios = mapper.readTree("""
+                {"ocupacion":"Contadora","empresa":"Acme","ingresoMensual":9000,
+                 "domicilio":{"calle":"Reforma","numeroExterior":"10","colonia":"Centro","municipio":"Cuauhtemoc",
+                 "estado":"CDMX","codigoPostal":"06000","pais":"Mexico"}}
+                """);
+        mvc.perform(patch("/clientes").header("Authorization", token).contentType("application/json")
+            .content(actualizacion(c, cambios).toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("datos.domicilio.calle").value("Reforma"))
+            .andExpect(jsonPath("datos.ocupacion").value("Contadora"));
+        assertEquals(1, jdbc.queryForObject("select count(*) from domicilios where cliente_id=?", Integer.class, id));
+
+        // Un domicilio incompleto se rechaza y no crea nada.
+        ObjectNode otro = registro("2");
+        otro.remove("domicilio");
+        JsonNode c2 = crear(otro); String token2 = bearer("2");
+        mvc.perform(patch("/clientes").header("Authorization", token2).contentType("application/json")
+            .content(actualizacion(c2, mapper.readTree("{\"domicilio\":{\"calle\":\"Reforma\"}}")).toString()))
+            .andExpect(status().isBadRequest());
+        assertEquals(0, jdbc.queryForObject("select count(*) from domicilios where cliente_id=?", Integer.class, c2.get("id").asInt()));
+    }
     @Test void dosClientesRecibenNumerosDeCuentaDistintos() throws Exception {
         JsonNode primero = crear(registro("1"));
         JsonNode segundo = crear(registro("2"));

@@ -11,7 +11,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = PasswordSeguraValidator.class)
 public @interface PasswordSegura {
-    String message() default "debe tener de 8 a 72 caracteres, mayúscula, minúscula, número y carácter especial; máximo 72 bytes UTF-8";
+    String message() default "debe tener de 8 a 12 caracteres, mayúscula, minúscula, número y carácter especial";
     Class<?>[] groups() default {};
     Class<? extends Payload>[] payload() default {};
 }

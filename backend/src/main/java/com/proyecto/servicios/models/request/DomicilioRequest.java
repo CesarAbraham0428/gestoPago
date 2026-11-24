@@ -3,10 +3,10 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.proyecto.servicios.validation.FormatosCliente;
 import jakarta.validation.constraints.*;
 public record DomicilioRequest(
-    @NotBlank @Size(max=1000) String calle,
+    @NotBlank @Size(min=3,max=100) String calle,
     @NotBlank @Size(max=50) String numeroExterior,
     @Size(max=50) @Pattern(regexp=FormatosCliente.CON_TEXTO) String numeroInterior,
-    @NotBlank @Size(max=1000) String colonia,
+    @NotBlank @Size(min=3,max=100) String colonia,
     @NotBlank @Size(max=250) String municipio,
     @NotBlank @Size(max=250) String estado,
     @NotBlank @Pattern(regexp="[0-9]{5}") String codigoPostal,

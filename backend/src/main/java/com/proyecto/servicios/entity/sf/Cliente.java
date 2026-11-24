@@ -21,13 +21,13 @@ public class Cliente extends Auditado {
     @Column(nullable=false, columnDefinition="sexo_enum") private Sexo sexo;
     @Column(nullable=false, length=100) private String nacionalidad = "Mexicana";
     @Convert(converter=EstadoCivilConverter.class) @org.hibernate.annotations.ColumnTransformer(write="?::estado_civil_enum")
-    @Column(name="estado_civil", nullable=false, columnDefinition="estado_civil_enum") private EstadoCivil estadoCivil;
+    @Column(name="estado_civil", columnDefinition="estado_civil_enum") private EstadoCivil estadoCivil;
     @Column(name="correo_electronico", nullable=false, length=100) private String correoElectronico;
     @Column(name="telefono_movil", nullable=false, length=10) private String telefonoMovil;
     @Column(name="telefono_alternativo", length=10) private String telefonoAlternativo;
-    @Column(nullable=false, length=250) private String ocupacion;
-    @Column(nullable=false, length=250) private String empresa;
-    @Column(name="ingreso_mensual", nullable=false, precision=18, scale=2) private BigDecimal ingresoMensual;
+    @Column(length=250) private String ocupacion;
+    @Column(length=250) private String empresa;
+    @Column(name="ingreso_mensual", precision=18, scale=2) private BigDecimal ingresoMensual;
     @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable=false, columnDefinition="rol_enum") private Rol rol = Rol.Cliente;
     @Column(nullable=false) private boolean activo = true;

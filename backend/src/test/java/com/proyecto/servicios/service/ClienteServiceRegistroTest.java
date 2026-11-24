@@ -2,6 +2,7 @@ package com.proyecto.servicios.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,7 +58,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 /** Registro, baja y rutas de error de ClienteServiceImpl (las consultas y el PATCH feliz tienen sus clases). */
 class ClienteServiceRegistroTest {
 
-    private static final String PASSWORD = "Segura#Clave2026";
+    private static final String PASSWORD = "Segura#2026";
     private static ValidatorFactory factory;
 
     private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
@@ -129,6 +130,30 @@ class ClienteServiceRegistroTest {
         verify(em).flush();
         assertEquals("ana@example.com", respuesta.correoElectronico());
         assertEquals(1, respuesta.cuentas().size());
+    }
+
+    @Test
+    void registrarSinOcupacionNiDomicilioSoloCreaClienteCuentaYUsuario() {
+        when(cuentas.siguienteNumero()).thenReturn("000000000000000001");
+        when(encoder.encode(PASSWORD)).thenReturn("hash");
+        ClienteRequest base = solicitud(LocalDate.of(1990, 1, 1), PASSWORD);
+        ClienteRequest sinOpcionales = new ClienteRequest(base.primerNombre(), base.segundoNombre(),
+                base.apellidoPaterno(), base.apellidoMaterno(), base.fechaNacimiento(), base.curp(), base.rfc(),
+                base.sexo(), base.nacionalidad(), base.estadoCivil(), base.correoElectronico(),
+                base.telefonoMovil(), base.telefonoAlternativo(), null, null, null, null, PASSWORD);
+
+        ClienteResponse respuesta = servicio().registrar(sinOpcionales);
+
+        ArgumentCaptor<Cliente> cliente = ArgumentCaptor.forClass(Cliente.class);
+        verify(clientes).saveAndFlush(cliente.capture());
+        assertNull(cliente.getValue().getOcupacion());
+        assertNull(cliente.getValue().getEmpresa());
+        assertNull(cliente.getValue().getIngresoMensual());
+        verify(domicilios, never()).save(any());
+        verify(cuentas).save(any(Cuenta.class));
+        verify(usuarios).save(any(Usuario.class));
+        assertNull(respuesta.domicilio());
+        assertNull(respuesta.ocupacion());
     }
 
     @Test

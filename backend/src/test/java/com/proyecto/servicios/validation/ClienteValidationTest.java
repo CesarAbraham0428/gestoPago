@@ -84,9 +84,48 @@ class ClienteValidationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints={2, 50})
+    @ValueSource(ints={3, 50})
     void aceptaLosLimitesInclusivosDeLongitudDelNombre(int longitud) throws Exception {
         var request = mapper.treeToValue(registro().put("primerNombre", "A".repeat(longitud)), ClienteRequest.class);
         assertTrue(validator.validate(request).isEmpty());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"primerNombre,Al", "segundoNombre,Jo", "password,Segura#Clave2026", "password,Seg#1ab"})
+    void rechazaNombresDe2CaracteresYPasswordsFueraDe8A12(String campo, String valor) throws Exception {
+        ObjectNode body = registro().put(campo, valor);
+        assertTrue(validator.validate(mapper.treeToValue(body, ClienteRequest.class)).stream()
+            .anyMatch(v -> v.getPropertyPath().toString().equals(campo)));
+    }
+
+    @Test void losApellidosSiguenAceptando2Caracteres() throws Exception {
+        var request = mapper.treeToValue(registro().put("apellidoPaterno", "Li"), ClienteRequest.class);
+        assertTrue(validator.validate(request).isEmpty());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"calle,Ab", "colonia,Ab"})
+    void calleYColoniaPidenAlMenos3Caracteres(String campo, String valor) throws Exception {
+        ObjectNode body = registro();
+        ((ObjectNode) body.get("domicilio")).put(campo, valor);
+        assertTrue(validator.validate(mapper.treeToValue(body, ClienteRequest.class)).stream()
+            .anyMatch(v -> v.getPropertyPath().toString().equals("domicilio." + campo)));
+        ((ObjectNode) body.get("domicilio")).put(campo, "A".repeat(101));
+        assertFalse(validator.validate(mapper.treeToValue(body, ClienteRequest.class)).isEmpty());
+        ((ObjectNode) body.get("domicilio")).put(campo, "A".repeat(100));
+        assertTrue(validator.validate(mapper.treeToValue(body, ClienteRequest.class)).isEmpty());
+    }
+
+    @Test void ocupacionEmpresaIngresoYDomicilioSonOpcionales() throws Exception {
+        ObjectNode body = registro();
+        body.remove("estadoCivil"); body.remove("ocupacion"); body.remove("empresa"); body.remove("ingresoMensual"); body.remove("domicilio");
+        assertTrue(validator.validate(mapper.treeToValue(body, ClienteRequest.class)).isEmpty());
+    }
+
+    @Test void siSeCapturaElDomicilioDebeVenirCompleto() throws Exception {
+        ObjectNode body = registro();
+        ((ObjectNode) body.get("domicilio")).remove("municipio");
+        assertTrue(validator.validate(mapper.treeToValue(body, ClienteRequest.class)).stream()
+            .anyMatch(v -> v.getPropertyPath().toString().equals("domicilio.municipio")));
     }
 }

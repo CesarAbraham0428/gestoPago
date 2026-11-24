@@ -180,6 +180,38 @@ class ClientePatchTest {
         verifyNoInteractions(domicilios, cuentas, usuarios, em, autorizacion);
         assertEquals("Empresa", cliente.getEmpresa());
     }
+    @Test void agregaElDomicilioYLaOcupacionAUnClienteQueNoLosTenia() throws Exception {
+        cliente.setOcupacion(null); cliente.setEmpresa(null); cliente.setIngresoMensual(null);
+        when(clientes.findByRfcIgnoreCase("PERA900101AB1")).thenReturn(Optional.of(cliente));
+        when(clientes.bloquearPorId(7)).thenReturn(Optional.of(cliente));
+        when(domicilios.findByClienteId(7)).thenReturn(Optional.empty(), Optional.empty(), Optional.of(domicilio));
+        when(domicilios.save(any(Domicilio.class))).thenAnswer(i -> i.getArgument(0));
+        prepararRespuesta();
+
+        var response = actualizar(mapper.readTree("""
+            {"ocupacion":"Contadora","empresa":"Acme","ingresoMensual":9000,
+             "domicilio":{"calle":"Reforma","numeroExterior":"10","numeroInterior":null,"colonia":"Centro",
+             "municipio":"Cuauhtemoc","estado":"CDMX","codigoPostal":"06000","pais":"Mexico"}}
+            """));
+
+        var nuevo = org.mockito.ArgumentCaptor.forClass(Domicilio.class);
+        verify(domicilios).save(nuevo.capture());
+        assertAll(
+            () -> assertEquals("Reforma", nuevo.getValue().getCalle()),
+            () -> assertSame(cliente, nuevo.getValue().getCliente()),
+            () -> assertEquals("Contadora", response.ocupacion()),
+            () -> assertEquals("Acme", response.empresa()),
+            () -> assertEquals("Reforma", response.domicilio().calle()));
+    }
+    @Test void unDomicilioIncompletoNoSeCreaAlActualizar() throws Exception {
+        when(clientes.findByRfcIgnoreCase("PERA900101AB1")).thenReturn(Optional.of(cliente));
+        when(clientes.bloquearPorId(7)).thenReturn(Optional.of(cliente));
+        when(domicilios.findByClienteId(7)).thenReturn(Optional.empty());
+
+        assertThrows(ConstraintViolationException.class,
+            () -> actualizar(mapper.readTree("{\"domicilio\":{\"calle\":\"Reforma\"}}")));
+        verify(domicilios, never()).save(any());
+    }
     private ClienteResponse actualizar(JsonNode cambios) {
         var request = new ClienteActualizacionPorIdentidadRequest(
             new ClienteIdentificacionRequest("PERA900101AB1", null), cambios);

@@ -32,7 +32,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 class UsuarioServiceUnitTest {
 
-    private static final String PASSWORD_NUEVA = "Nueva#Segura2026";
+    private static final String PASSWORD_NUEVA = "Nueva#2026";
 
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
     private final ClientesRepository clientes = mock(ClientesRepository.class);

@@ -61,7 +61,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ClienteServiceImpl implements ClienteService {
 
     private static final ZoneId ZONA = ZoneId.of("America/Mexico_City");
-    private static final String DOMICILIO_NO_ENCONTRADO = "Domicilio no encontrado";
 
     private final ClientesRepository clientes;
     private final DomicilioRepository domicilios;
@@ -126,10 +125,10 @@ public class ClienteServiceImpl implements ClienteService {
         copiarDatos(cliente, r);
         clientes.saveAndFlush(cliente);
 
-        Domicilio domicilio = new Domicilio();
-        domicilio.setCliente(cliente);
-        aplicarDomicilio(domicilio, r.domicilio());
-        domicilios.save(domicilio);
+        Domicilio domicilio = null;
+        if (r.domicilio() != null) {
+            domicilio = nuevoDomicilio(cliente, r.domicilio());
+        }
 
         Cuenta cuenta = new Cuenta();
         cuenta.setCliente(cliente);
@@ -145,7 +144,9 @@ public class ClienteServiceImpl implements ClienteService {
 
         em.flush();
         em.refresh(cliente);
-        em.refresh(domicilio);
+        if (domicilio != null) {
+            em.refresh(domicilio);
+        }
         em.refresh(cuenta);
         em.refresh(usuario);
         return ClienteMapper.cliente(cliente, domicilio, usuario, List.of(cuenta));
@@ -171,9 +172,6 @@ public class ClienteServiceImpl implements ClienteService {
                 .collect(Collectors.groupingBy(c -> c.getCliente().getId()));
         return ListaGenericResponse.desde(pagina.map(cliente -> {
             Domicilio domicilio = domiciliosPorCliente.get(cliente.getId());
-            if (domicilio == null) {
-                throw domicilioNoEncontrado();
-            }
             Usuario usuario = usuariosPorCliente.get(cliente.getId());
             if (usuario == null) {
                 throw new UsuarioNoEncontradoException();
@@ -193,7 +191,7 @@ public class ClienteServiceImpl implements ClienteService {
         autorizacion.autorizarCliente(identificado.getId(), usuarioAutenticadoId);
         Integer id = identificado.getId();
         Cliente cliente = bloquear(id);
-        Domicilio domicilio = domicilios.findByClienteId(id).orElseThrow(this::domicilioNoEncontrado);
+        Domicilio domicilio = domicilios.findByClienteId(id).orElse(null);
         ObjectNode combinado = mapper.valueToTree(actualActualizacion(cliente, domicilio));
         CambiosParciales.combinar(combinado, cambios);
         try {
@@ -231,8 +229,14 @@ public class ClienteServiceImpl implements ClienteService {
             throw new DatosDuplicadosException(List.of(DatosDuplicadosException.TELEFONO));
         }
         copiarDatos(cliente, r);
-        Domicilio domicilio = domicilios.findByClienteId(id).orElseThrow(this::domicilioNoEncontrado);
-        aplicarDomicilio(domicilio, r.domicilio());
+        if (r.domicilio() != null) {
+            Domicilio domicilio = domicilios.findByClienteId(id).orElse(null);
+            if (domicilio == null) {
+                nuevoDomicilio(cliente, r.domicilio());
+            } else {
+                aplicarDomicilio(domicilio, r.domicilio());
+            }
+        }
         // El trigger sincroniza el correo del usuario. Vaciar el contexto evita datos obsoletos.
         em.flush();
         em.clear();
@@ -246,8 +250,9 @@ public class ClienteServiceImpl implements ClienteService {
                 c.getFechaNacimiento(), c.getSexo(), c.getNacionalidad(), c.getEstadoCivil(),
                 c.getCorreoElectronico(), c.getTelefonoMovil(), c.getTelefonoAlternativo(),
                 c.getOcupacion(), c.getEmpresa(), c.getIngresoMensual(),
-                new DomicilioRequest(d.getCalle(), d.getNumeroExterior(), d.getNumeroInterior(), d.getColonia(),
-                        d.getMunicipio(), d.getEstado(), d.getCodigoPostal(), d.getPais()));
+                d == null ? null
+                        : new DomicilioRequest(d.getCalle(), d.getNumeroExterior(), d.getNumeroInterior(),
+                                d.getColonia(), d.getMunicipio(), d.getEstado(), d.getCodigoPostal(), d.getPais()));
     }
 
     private Cliente buscar(Integer id) {
@@ -285,7 +290,7 @@ public class ClienteServiceImpl implements ClienteService {
     }
 
     private ClienteResponse respuesta(Cliente c) {
-        Domicilio d = domicilios.findByClienteId(c.getId()).orElseThrow(this::domicilioNoEncontrado);
+        Domicilio d = domicilios.findByClienteId(c.getId()).orElse(null);
         Usuario u = usuarios.findByClienteId(c.getId()).orElseThrow(UsuarioNoEncontradoException::new);
         return ClienteMapper.cliente(c, d, u, cuentas.findByClienteIdOrderByIdAsc(c.getId()));
     }
@@ -303,9 +308,16 @@ public class ClienteServiceImpl implements ClienteService {
         c.setCorreoElectronico(Texto.correo(r.correoElectronico()));
         c.setTelefonoMovil(r.telefonoMovil());
         c.setTelefonoAlternativo(r.telefonoAlternativo());
-        c.setOcupacion(r.ocupacion().trim());
-        c.setEmpresa(r.empresa().trim());
+        c.setOcupacion(Texto.opcional(r.ocupacion()));
+        c.setEmpresa(Texto.opcional(r.empresa()));
         c.setIngresoMensual(r.ingresoMensual());
+    }
+
+    private Domicilio nuevoDomicilio(Cliente cliente, DomicilioRequest r) {
+        Domicilio domicilio = new Domicilio();
+        domicilio.setCliente(cliente);
+        aplicarDomicilio(domicilio, r);
+        return domicilios.save(domicilio);
     }
 
     private void aplicarDomicilio(Domicilio d, DomicilioRequest r) {
@@ -323,9 +335,5 @@ public class ClienteServiceImpl implements ClienteService {
         if (fecha == null || fecha.isAfter(LocalDate.now(ZONA).minusYears(18))) {
             throw new ValidacionException("El cliente debe tener al menos 18 años y la fecha no puede ser futura");
         }
-    }
-
-    private NegocioException domicilioNoEncontrado() {
-        return new NegocioException(HttpStatus.NOT_FOUND, DOMICILIO_NO_ENCONTRADO);
     }
 }
