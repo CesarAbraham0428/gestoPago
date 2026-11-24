@@ -17,6 +17,7 @@ typedef _Paso = ({
   IconData icono,
   Color color,
   Color tenue,
+  bool opcional,
 });
 
 const List<_Paso> _pasos = [
@@ -27,6 +28,7 @@ const List<_Paso> _pasos = [
     icono: Icons.person_outline,
     color: AppColors.turquesa,
     tenue: AppColors.turquesaTenue,
+    opcional: false,
   ),
   (
     titulo: 'Tu identidad',
@@ -35,22 +37,25 @@ const List<_Paso> _pasos = [
     icono: Icons.badge_outlined,
     color: AppColors.indigo,
     tenue: AppColors.indigoTenue,
+    opcional: false,
   ),
   (
     titulo: 'Tu empresa',
-    subtitulo: 'Dónde trabajas y cuánto ingresas al mes.',
+    subtitulo: 'Opcional: dónde trabajas y cuánto ingresas.',
     etiqueta: 'Empresa',
     icono: Icons.business_center_outlined,
     color: AppColors.azul,
     tenue: AppColors.azulTenue,
+    opcional: true,
   ),
   (
     titulo: 'Tu domicilio',
-    subtitulo: 'Dónde vives actualmente.',
+    subtitulo: 'Opcional: dónde vives actualmente.',
     etiqueta: 'Domicilio',
     icono: Icons.home_outlined,
     color: AppColors.coral,
     tenue: AppColors.coralTenue,
+    opcional: true,
   ),
   (
     titulo: 'Acceso a tu cuenta',
@@ -59,11 +64,13 @@ const List<_Paso> _pasos = [
     icono: Icons.lock_outline,
     color: AppColors.ciruela,
     tenue: AppColors.ciruelaTenue,
+    opcional: false,
   ),
 ];
 
 /// Pantalla para crear una cuenta (adaptador de entrada), en cinco pasos:
-/// nombre, identidad, empresa, domicilio y acceso. Cada paso cabe en pantalla. El servidor crea además la
+/// nombre, identidad, empresa, domicilio y acceso. Empresa y domicilio son opcionales (se pueden omitir y
+/// completar después en "Editar perfil"). Cada paso cabe en pantalla. El servidor crea además la
 /// cuenta bancaria del usuario, ligada a él y con saldo cero.
 class RegistroPage extends StatefulWidget {
   const RegistroPage({
@@ -112,6 +119,20 @@ class _RegistroPageState extends State<RegistroPage> {
   /// Paso "Datos" (CURP, RFC y teléfono): se comprueba aquí que no estén repetidos.
   static const _pasoDatos = 1;
 
+  /// Pasos opcionales y los campos que se vacían al omitirlos.
+  static const _pasoEmpresa = 2;
+  static const _pasoDomicilio = 3;
+  static const _camposEmpresa = ['empresa', 'ocupacion', 'ingresoMensual'];
+  static const _camposDomicilio = [
+    'calle',
+    'numeroExterior',
+    'numeroInterior',
+    'colonia',
+    'municipio',
+    'estado',
+    'codigoPostal',
+  ];
+
   /// Campo de la API -> campo del formulario y aviso cuando ya tiene cuenta.
   static const _repetidoEn = {
     'curp': ('curp', 'Esta CURP ya está registrada.'),
@@ -134,6 +155,7 @@ class _RegistroPageState extends State<RegistroPage> {
   String? _sexo;
   String? _estadoCivil;
   bool _ocultar = true;
+  bool _ocultarConfirmacion = true;
   bool _enviando = false;
   bool _creada = false;
   double _altoMinimo = 0;
@@ -175,19 +197,24 @@ class _RegistroPageState extends State<RegistroPage> {
       'correoElectronico': _t('correo'),
       'telefonoMovil': _t('telefonoMovil'),
       'telefonoAlternativo': _opcional('telefonoAlternativo'),
-      'ocupacion': _t('ocupacion'),
-      'empresa': _t('empresa'),
-      'ingresoMensual': parseMonto(_t('ingresoMensual')),
-      'domicilio': {
-        'calle': _t('calle'),
-        'numeroExterior': _t('numeroExterior'),
-        'numeroInterior': _opcional('numeroInterior'),
-        'colonia': _t('colonia'),
-        'municipio': _t('municipio'),
-        'estado': _t('estado'),
-        'codigoPostal': _t('codigoPostal'),
-        'pais': _t('pais'),
-      },
+      // Empresa y domicilio se pueden omitir: vacíos viajan como null.
+      'ocupacion': _opcional('ocupacion'),
+      'empresa': _opcional('empresa'),
+      'ingresoMensual': _opcional('ingresoMensual') == null
+          ? null
+          : parseMonto(_t('ingresoMensual')),
+      'domicilio': _opcional('calle') == null
+          ? null
+          : {
+              'calle': _t('calle'),
+              'numeroExterior': _t('numeroExterior'),
+              'numeroInterior': _opcional('numeroInterior'),
+              'colonia': _t('colonia'),
+              'municipio': _t('municipio'),
+              'estado': _t('estado'),
+              'codigoPostal': _t('codigoPostal'),
+              'pais': _t('pais'),
+            },
       'password': _c['password']!.text,
     };
   }
@@ -262,6 +289,20 @@ class _RegistroPageState extends State<RegistroPage> {
     } finally {
       if (mounted) setState(() => _enviando = false);
     }
+  }
+
+  /// Salta un paso opcional: se vacían sus campos para que no viaje nada de él.
+  void _omitir() {
+    final campos = _paso == _pasoEmpresa ? _camposEmpresa : _camposDomicilio;
+    for (final k in campos) {
+      _c[k]!.clear();
+    }
+    if (_paso == _pasoDomicilio) _c['pais']!.text = 'México';
+    _claves[_paso].currentState?.reset();
+    setState(() {
+      _paso++;
+      _error = null;
+    });
   }
 
   void _atras() => setState(() {
@@ -438,6 +479,13 @@ class _RegistroPageState extends State<RegistroPage> {
                         : Text(ultimo ? 'Crear mi cuenta' : 'Continuar'),
                   ),
                 ),
+                if (p.opcional) ...[
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: _enviando ? null : _omitir,
+                    child: const Text('Omitir'),
+                  ),
+                ],
               ],
             ),
           ],
@@ -453,7 +501,7 @@ class _RegistroPageState extends State<RegistroPage> {
       _campo(
         'primerNombre',
         'Primer nombre',
-        validator: ValidadoresRegistro.nombre,
+        validator: (v) => ValidadoresRegistro.nombre(v, min: 3),
         max: 50,
         capitalizar: TextCapitalization.words,
         hints: [AutofillHints.givenName],
@@ -461,7 +509,8 @@ class _RegistroPageState extends State<RegistroPage> {
       _campo(
         'segundoNombre',
         'Segundo nombre (opcional)',
-        validator: (v) => ValidadoresRegistro.nombre(v, opcional: true),
+        validator: (v) =>
+            ValidadoresRegistro.nombre(v, opcional: true, min: 3),
         max: 50,
         capitalizar: TextCapitalization.words,
       ),
@@ -509,6 +558,7 @@ class _RegistroPageState extends State<RegistroPage> {
         _estadoCivil,
         estadosCiviles,
         (v) => setState(() => _estadoCivil = v),
+        opcional: true,
       ),
       _campo(
         'nacionalidad',
@@ -561,8 +611,8 @@ class _RegistroPageState extends State<RegistroPage> {
     _campo(
       'empresa',
       'Empresa donde trabajas',
-      validator: ValidadoresRegistro.requerido,
-      max: 250,
+      validator: (v) => ValidadoresRegistro.requerido(v, max: 50),
+      max: 50,
       capitalizar: TextCapitalization.words,
       hints: [AutofillHints.organizationName],
     ),
@@ -570,8 +620,8 @@ class _RegistroPageState extends State<RegistroPage> {
       _campo(
         'ocupacion',
         'Ocupación o puesto',
-        validator: ValidadoresRegistro.requerido,
-        max: 250,
+        validator: (v) => ValidadoresRegistro.requerido(v, max: 50),
+        max: 50,
         capitalizar: TextCapitalization.sentences,
         hints: [AutofillHints.jobTitle],
       ),
@@ -594,8 +644,8 @@ class _RegistroPageState extends State<RegistroPage> {
         _campo(
           'calle',
           'Calle',
-          validator: ValidadoresRegistro.requerido,
-          max: 1000,
+          validator: (v) => ValidadoresRegistro.requerido(v, min: 3, max: 100),
+          max: 100,
           capitalizar: TextCapitalization.words,
           hints: [AutofillHints.streetAddressLine1],
         ),
@@ -614,8 +664,8 @@ class _RegistroPageState extends State<RegistroPage> {
         _campo(
           'colonia',
           'Colonia',
-          validator: ValidadoresRegistro.requerido,
-          max: 1000,
+          validator: (v) => ValidadoresRegistro.requerido(v, min: 3, max: 100),
+          max: 100,
           capitalizar: TextCapitalization.words,
         ),
         _campo(
@@ -674,7 +724,10 @@ class _RegistroPageState extends State<RegistroPage> {
           autofillHints: const [AutofillHints.newPassword],
           enableSuggestions: false,
           autocorrect: false,
-          inputFormatters: [LengthLimitingTextInputFormatter(72)],
+          inputFormatters: [LengthLimitingTextInputFormatter(12)],
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          // Reconstruye la página para que la confirmación se revalide con la nueva contraseña.
+          onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             labelText: 'Contraseña',
             suffixIcon: IconButton(
@@ -693,12 +746,28 @@ class _RegistroPageState extends State<RegistroPage> {
         TextFormField(
           key: const ValueKey('reg-confirmacion'),
           controller: _c['confirmacion'],
-          obscureText: _ocultar,
+          obscureText: _ocultarConfirmacion,
           autofillHints: const [AutofillHints.newPassword],
           enableSuggestions: false,
           autocorrect: false,
-          inputFormatters: [LengthLimitingTextInputFormatter(72)],
-          decoration: const InputDecoration(labelText: 'Confirmar contraseña'),
+          inputFormatters: [LengthLimitingTextInputFormatter(12)],
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          decoration: InputDecoration(
+            labelText: 'Confirmar contraseña',
+            suffixIcon: IconButton(
+              tooltip: _ocultarConfirmacion
+                  ? 'Mostrar confirmación'
+                  : 'Ocultar confirmación',
+              icon: Icon(
+                _ocultarConfirmacion
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                size: 20,
+              ),
+              onPressed: () =>
+                  setState(() => _ocultarConfirmacion = !_ocultarConfirmacion),
+            ),
+          ),
           validator: (v) =>
               ValidadoresRegistro.confirmacion(v, _c['password']!.text),
           onFieldSubmitted: (_) => _siguiente(),
@@ -757,8 +826,9 @@ class _RegistroPageState extends State<RegistroPage> {
         ),
     ],
     decoration: InputDecoration(labelText: etiqueta, prefixText: prefijo),
-    // Los datos únicos se revalidan al editarlos para quitar el aviso de "repetido".
-    autovalidateMode: unico ? AutovalidateMode.onUserInteraction : null,
+    // Se valida mientras se escribe (sin esperar a "Continuar"); los datos únicos además
+    // se revalidan al editarlos para quitar el aviso de "repetido".
+    autovalidateMode: AutovalidateMode.onUserInteraction,
     validator: unico
         ? (v) => validator?.call(v) ?? _avisoRepetido(nombre, v)
         : validator,
@@ -768,17 +838,20 @@ class _RegistroPageState extends State<RegistroPage> {
     String etiqueta,
     String? valor,
     List<String> opciones,
-    ValueChanged<String?> alCambiar,
-  ) => DropdownButtonFormField<String>(
+    ValueChanged<String?> alCambiar, {
+    bool opcional = false,
+  }) => DropdownButtonFormField<String>(
     key: ValueKey('reg-$etiqueta'),
     initialValue: valor,
     isExpanded: true,
-    decoration: InputDecoration(labelText: etiqueta),
+    decoration: InputDecoration(
+      labelText: opcional ? '$etiqueta (opcional)' : etiqueta,
+    ),
     items: [
       for (final o in opciones) DropdownMenuItem(value: o, child: Text(o)),
     ],
     onChanged: _enviando ? null : alCambiar,
-    validator: (v) => v == null ? 'Selecciona una opción.' : null,
+    validator: (v) => v == null && !opcional ? 'Selecciona una opción.' : null,
   );
 
   /// Campos lado a lado (con [flex] como pesos) cuando el ancho llega a

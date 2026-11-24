@@ -57,14 +57,14 @@ class Perfil {
     required this.rfc,
     required this.sexo,
     required this.nacionalidad,
-    required this.estadoCivil,
+    this.estadoCivil,
     required this.correoElectronico,
     required this.telefonoMovil,
     this.telefonoAlternativo,
-    required this.ocupacion,
-    required this.empresa,
-    required this.ingresoMensual,
-    required this.domicilio,
+    this.ocupacion,
+    this.empresa,
+    this.ingresoMensual,
+    this.domicilio,
     this.cuentas = const [],
   });
 
@@ -77,14 +77,15 @@ class Perfil {
   final String rfc;
   final String sexo;
   final String nacionalidad;
-  final String estadoCivil;
+  final String? estadoCivil;
   final String correoElectronico;
   final String telefonoMovil;
   final String? telefonoAlternativo;
-  final String ocupacion;
-  final String empresa;
-  final double ingresoMensual;
-  final Domicilio domicilio;
+  // Empleo y domicilio son opcionales en el registro: se capturan después en "Editar perfil".
+  final String? ocupacion;
+  final String? empresa;
+  final double? ingresoMensual;
+  final Domicilio? domicilio;
   final List<Cuenta> cuentas;
 
   String get nombreCompleto => [
@@ -110,7 +111,7 @@ class Perfil {
     'ocupacion': ocupacion,
     'empresa': empresa,
     'ingresoMensual': ingresoMensual,
-    'domicilio': domicilio.aMapa(),
+    'domicilio': domicilio?.aMapa(),
   };
 }
 

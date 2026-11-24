@@ -32,7 +32,7 @@ class FormularioPerfil extends StatefulWidget {
 class _FormularioPerfilState extends State<FormularioPerfil> {
   final _form = GlobalKey<FormState>();
   late final Map<String, TextEditingController> _c;
-  late String _estadoCivil;
+  String? _estadoCivil;
   String? _error;
 
   @override
@@ -42,17 +42,17 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
     final d = p.domicilio;
     _c = {
       'telefonoAlternativo': p.telefonoAlternativo ?? '',
-      'ocupacion': p.ocupacion,
-      'empresa': p.empresa,
-      'ingresoMensual': p.ingresoMensual.toStringAsFixed(2),
-      'calle': d.calle,
-      'numeroExterior': d.numeroExterior,
-      'numeroInterior': d.numeroInterior ?? '',
-      'colonia': d.colonia,
-      'municipio': d.municipio,
-      'estado': d.estado,
-      'codigoPostal': d.codigoPostal,
-      'pais': d.pais,
+      'ocupacion': p.ocupacion ?? '',
+      'empresa': p.empresa ?? '',
+      'ingresoMensual': p.ingresoMensual?.toStringAsFixed(2) ?? '',
+      'calle': d?.calle ?? '',
+      'numeroExterior': d?.numeroExterior ?? '',
+      'numeroInterior': d?.numeroInterior ?? '',
+      'colonia': d?.colonia ?? '',
+      'municipio': d?.municipio ?? '',
+      'estado': d?.estado ?? '',
+      'codigoPostal': d?.codigoPostal ?? '',
+      'pais': d?.pais ?? 'México',
     }.map((k, v) => MapEntry(k, TextEditingController(text: v)));
     _estadoCivil = p.estadoCivil;
   }
@@ -73,10 +73,15 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
     // No es editable, pero la API recibe el perfil completo.
     'telefonoMovil': widget.perfil.telefonoMovil,
     'telefonoAlternativo': _opcional('telefonoAlternativo'),
-    'ocupacion': _t('ocupacion'),
-    'empresa': _t('empresa'),
-    'ingresoMensual': parseMonto(_t('ingresoMensual')),
-    'domicilio': {
+    // Empleo y domicilio son opcionales: vacíos viajan como null.
+    'ocupacion': _opcional('ocupacion'),
+    'empresa': _opcional('empresa'),
+    'ingresoMensual': _opcional('ingresoMensual') == null
+        ? null
+        : parseMonto(_t('ingresoMensual')),
+    'domicilio': _domicilioOmitido
+        ? null
+        : {
       'calle': _t('calle'),
       'numeroExterior': _t('numeroExterior'),
       'numeroInterior': _opcional('numeroInterior'),
@@ -87,6 +92,21 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
       'pais': _t('pais'),
     },
   };
+
+  static const _domicilioCampos = [
+    'calle',
+    'numeroExterior',
+    'numeroInterior',
+    'colonia',
+    'municipio',
+    'estado',
+    'codigoPostal',
+  ];
+
+  /// Sin domicilio previo y sin capturar nada (el país viene sugerido): se deja vacío.
+  bool get _domicilioOmitido =>
+      widget.perfil.domicilio == null &&
+      _domicilioCampos.every((k) => _t(k).isEmpty);
 
   Future<void> _guardar() async {
     setState(() => _error = null);
@@ -119,12 +139,22 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
     return RegExp('^\\d{$n}\$').hasMatch(t) ? null : 'Debe tener $n dígitos.';
   };
 
+  /// Campo de domicilio: obligatorio, salvo que el domicilio se esté omitiendo.
+  String? Function(String?) _dom({int min = 1, int max = 250}) => (v) {
+    if (_domicilioOmitido) return null;
+    final t = v?.trim() ?? '';
+    if (t.isEmpty) return 'Este campo es obligatorio.';
+    if (t.length < min) return 'Mínimo $min caracteres.';
+    return t.length > max ? 'Máximo $max caracteres.' : null;
+  };
+
   Widget _campo(
     String clave,
     String etiqueta, {
     String? Function(String?)? validar = _requerido,
     TextInputType? teclado,
     int? digitos,
+    int? max,
   }) {
     return TextFormField(
       controller: _c[clave],
@@ -133,7 +163,9 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
       keyboardType: digitos != null ? TextInputType.number : teclado,
       inputFormatters: digitos != null
           ? [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(digitos)]
-          : null,
+          : max != null
+              ? [LengthLimitingTextInputFormatter(max)]
+              : null,
       enabled: !widget.guardando,
     );
   }
@@ -149,7 +181,8 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
           Text('Editar perfil', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 4),
           Text(
-            'Solo puedes cambiar tu estado civil, teléfono alternativo, empleo y domicilio.',
+            'Solo puedes cambiar tu estado civil, teléfono alternativo, empleo y domicilio. '
+            'Empleo y domicilio son opcionales: agrégalos cuando quieras.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.tintaSuave),
           ),
           const SizedBox(height: 20),
@@ -162,11 +195,11 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
             _fijo('Sexo', p.sexo),
             DropdownButtonFormField<String>(
               initialValue: _estadoCivil,
-              decoration: const InputDecoration(labelText: 'Estado civil'),
+              decoration: const InputDecoration(labelText: 'Estado civil (opcional)'),
               items: [
                 for (final e in estadosCiviles) DropdownMenuItem(value: e, child: Text(e)),
               ],
-              onChanged: widget.guardando ? null : (v) => setState(() => _estadoCivil = v!),
+              onChanged: widget.guardando ? null : (v) => setState(() => _estadoCivil = v),
             ),
             _fijo('Nacionalidad', p.nacionalidad),
             _fijo('CURP', p.curp),
@@ -183,27 +216,33 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
             ),
           ]),
           _Grupo(titulo: 'Empleo', campos: [
-            _campo('ocupacion', 'Ocupación'),
-            _campo('empresa', 'Empresa'),
+            _campo('ocupacion', 'Ocupación (opcional)', validar: null, max: 50),
+            _campo('empresa', 'Empresa (opcional)', validar: null, max: 50),
             _campo(
               'ingresoMensual',
-              'Ingreso mensual',
+              'Ingreso mensual (opcional)',
               teclado: const TextInputType.numberWithOptions(decimal: true),
               validar: (v) {
-                final m = parseMonto(v ?? '');
+                if ((v ?? '').trim().isEmpty) return null;
+                final m = parseMonto(v!);
                 return m == null || m <= 0 ? 'Escribe un monto mayor a cero.' : null;
               },
             ),
           ]),
           _Grupo(titulo: 'Domicilio', campos: [
-            _campo('calle', 'Calle'),
-            _campo('numeroExterior', 'Número exterior'),
+            _campo('calle', 'Calle', validar: _dom(min: 3, max: 100), max: 100),
+            _campo('numeroExterior', 'Número exterior', validar: _dom(max: 50)),
             _campo('numeroInterior', 'Número interior (opcional)', validar: null),
-            _campo('colonia', 'Colonia'),
-            _campo('codigoPostal', 'Código postal', digitos: 5, validar: _digitos(5)),
-            _campo('municipio', 'Municipio o alcaldía'),
-            _campo('estado', 'Estado'),
-            _campo('pais', 'País'),
+            _campo('colonia', 'Colonia', validar: _dom(min: 3, max: 100), max: 100),
+            _campo(
+              'codigoPostal',
+              'Código postal',
+              digitos: 5,
+              validar: (v) => _domicilioOmitido ? null : _digitos(5)(v),
+            ),
+            _campo('municipio', 'Municipio o alcaldía', validar: _dom()),
+            _campo('estado', 'Estado', validar: _dom()),
+            _campo('pais', 'País', validar: _dom(max: 100)),
           ]),
           if (_error != null) ...[
             AvisoEstado(tono: Tono.rechazo, icono: Icons.error_outline, texto: _error!),

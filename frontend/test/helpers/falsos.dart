@@ -224,7 +224,7 @@ class PerfilFalso implements PerfilRepository {
   }) async {
     cambiosRecibidos.add(cambios);
     if (errorActualizar != null) throw errorActualizar!; // ignore: only_throw_errors
-    return perfil = perfilPrueba(empresa: cambios['empresa'] as String? ?? perfil.empresa);
+    return perfil = perfilPrueba(empresa: cambios['empresa'] as String? ?? perfil.empresa ?? 'Acme');
   }
 }
 

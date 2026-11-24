@@ -90,7 +90,9 @@ Perfil perfilDesdeJson(Map<String, dynamic> j) {
   final dom = j['domicilio'];
   final fecha = DateTime.tryParse(j['fechaNacimiento']?.toString() ?? '');
   final ingreso = j['ingresoMensual'];
-  if (dom is! Map<String, dynamic> || fecha == null || ingreso is! num) {
+  if (fecha == null ||
+      (dom != null && dom is! Map<String, dynamic>) ||
+      (ingreso != null && ingreso is! num)) {
     throw ApiPerfilRepository._invalida();
   }
   final cuentas = j['cuentas'];
@@ -104,23 +106,25 @@ Perfil perfilDesdeJson(Map<String, dynamic> j) {
     rfc: texto(j, 'rfc'),
     sexo: texto(j, 'sexo'),
     nacionalidad: texto(j, 'nacionalidad'),
-    estadoCivil: texto(j, 'estadoCivil'),
+    estadoCivil: opcional(j, 'estadoCivil'),
     correoElectronico: texto(j, 'correoElectronico'),
     telefonoMovil: texto(j, 'telefonoMovil'),
     telefonoAlternativo: opcional(j, 'telefonoAlternativo'),
-    ocupacion: texto(j, 'ocupacion'),
-    empresa: texto(j, 'empresa'),
-    ingresoMensual: ingreso.toDouble(),
-    domicilio: Domicilio(
-      calle: texto(dom, 'calle'),
-      numeroExterior: texto(dom, 'numeroExterior'),
-      numeroInterior: opcional(dom, 'numeroInterior'),
-      colonia: texto(dom, 'colonia'),
-      municipio: texto(dom, 'municipio'),
-      estado: texto(dom, 'estado'),
-      codigoPostal: texto(dom, 'codigoPostal'),
-      pais: texto(dom, 'pais'),
-    ),
+    ocupacion: opcional(j, 'ocupacion'),
+    empresa: opcional(j, 'empresa'),
+    ingresoMensual: (ingreso as num?)?.toDouble(),
+    domicilio: dom is Map<String, dynamic>
+        ? Domicilio(
+            calle: texto(dom, 'calle'),
+            numeroExterior: texto(dom, 'numeroExterior'),
+            numeroInterior: opcional(dom, 'numeroInterior'),
+            colonia: texto(dom, 'colonia'),
+            municipio: texto(dom, 'municipio'),
+            estado: texto(dom, 'estado'),
+            codigoPostal: texto(dom, 'codigoPostal'),
+            pais: texto(dom, 'pais'),
+          )
+        : null,
     cuentas: cuentas is List
         ? cuentas
               .whereType<Map<String, dynamic>>()

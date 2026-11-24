@@ -75,6 +75,8 @@ class _Lienzo extends StatelessWidget {
   }
 }
 
+const _sinRegistrar = 'Sin registrar';
+
 /// "Mi perfil": datos personales, contacto, empleo y domicilio, con edición.
 class PerfilPage extends StatefulWidget {
   const PerfilPage({super.key, required this.controller});
@@ -135,7 +137,7 @@ class _PerfilPageState extends State<PerfilPage> {
                 'Nombre completo': p.nombreCompleto,
                 'Fecha de nacimiento': formatoFecha(p.fechaNacimiento),
                 'Sexo': p.sexo,
-                'Estado civil': p.estadoCivil,
+                'Estado civil': p.estadoCivil ?? _sinRegistrar,
                 'Nacionalidad': p.nacionalidad,
                 'CURP': p.curp,
                 'RFC': p.rfc,
@@ -150,7 +152,7 @@ class _PerfilPageState extends State<PerfilPage> {
                 'Correo electrónico': p.correoElectronico,
                 'Teléfono móvil': formatoTelefono(p.telefonoMovil),
                 'Teléfono alternativo': p.telefonoAlternativo == null
-                    ? 'Sin registrar'
+                    ? _sinRegistrar
                     : formatoTelefono(p.telefonoAlternativo!),
               },
             ),
@@ -160,9 +162,11 @@ class _PerfilPageState extends State<PerfilPage> {
               color: AppColors.azul,
               fondo: AppColors.azulTenue,
               datos: {
-                'Ocupación': p.ocupacion,
-                'Empresa': p.empresa,
-                'Ingreso mensual': formatoMoneda(p.ingresoMensual),
+                'Ocupación': p.ocupacion ?? _sinRegistrar,
+                'Empresa': p.empresa ?? _sinRegistrar,
+                'Ingreso mensual': p.ingresoMensual == null
+                    ? _sinRegistrar
+                    : formatoMoneda(p.ingresoMensual!),
               },
             ),
             _Seccion(
@@ -171,12 +175,12 @@ class _PerfilPageState extends State<PerfilPage> {
               color: AppColors.ciruela,
               fondo: AppColors.ciruelaTenue,
               datos: {
-                'Calle y número': d.lineaCalle,
-                'Colonia': d.colonia,
-                'Código postal': d.codigoPostal,
-                'Municipio': d.municipio,
-                'Estado': d.estado,
-                'País': d.pais,
+                'Calle y número': d?.lineaCalle ?? _sinRegistrar,
+                'Colonia': d?.colonia ?? _sinRegistrar,
+                'Código postal': d?.codigoPostal ?? _sinRegistrar,
+                'Municipio': d?.municipio ?? _sinRegistrar,
+                'Estado': d?.estado ?? _sinRegistrar,
+                'País': d?.pais ?? _sinRegistrar,
               },
             ),
           ],

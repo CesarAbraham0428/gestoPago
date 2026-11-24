@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import '../../core/format/formatters.dart';
 
 /// Validaciones previas al envío del registro. Replican las reglas de
@@ -20,19 +18,21 @@ class ValidadoresRegistro {
     r'^[A-ZÑ&]{3,4}[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])[A-Z0-9]{3}$',
   );
 
-  static String? requerido(String? v, {int max = 250}) {
+  static String? requerido(String? v, {int min = 1, int max = 250}) {
     final t = v?.trim() ?? '';
     if (t.isEmpty) return _obligatorio;
+    if (t.length < min) return 'Mínimo $min caracteres.';
     return t.length > max ? 'Máximo $max caracteres.' : null;
   }
 
-  /// Nombre o apellido: solo letras y espacios, de 2 a 50 caracteres.
-  static String? nombre(String? v, {bool opcional = false}) {
+  /// Nombre o apellido: solo letras y espacios, de [min] a 50 caracteres.
+  /// Los nombres de pila piden 3; los apellidos, 2.
+  static String? nombre(String? v, {bool opcional = false, int min = 2}) {
     final t = v?.trim() ?? '';
     if (t.isEmpty) return opcional ? null : _obligatorio;
-    return t.length >= 2 && t.length <= 50 && _letras.hasMatch(t)
+    return t.length >= min && t.length <= 50 && _letras.hasMatch(t)
         ? null
-        : 'Solo letras, de 2 a 50 caracteres.';
+        : 'Solo letras, de $min a 50 caracteres.';
   }
 
   static String? curp(String? v) {
@@ -93,9 +93,9 @@ class ValidadoresRegistro {
         : null;
   }
 
-  static String? ingreso(String? v) {
+  static String? ingreso(String? v, {bool opcional = false}) {
     final t = v?.trim() ?? '';
-    if (t.isEmpty) return _obligatorio;
+    if (t.isEmpty) return opcional ? null : _obligatorio;
     final monto = parseMonto(t);
     return monto == null || monto <= 0
         ? 'Escribe un monto mayor a 0 (máximo 2 decimales).'
@@ -104,10 +104,7 @@ class ValidadoresRegistro {
 
   /// Cada requisito de la contraseña con su cumplimiento, para mostrarlos en vivo.
   static List<(String, bool)> requisitosPassword(String p) => [
-    (
-      '8 a 72 caracteres',
-      p.length >= 8 && p.length <= 72 && utf8.encode(p).length <= 72,
-    ),
+    ('8 a 12 caracteres', p.length >= 8 && p.length <= 12),
     ('Mayúscula', RegExp('[A-Z]').hasMatch(p)),
     ('Minúscula', RegExp('[a-z]').hasMatch(p)),
     ('Número', RegExp('[0-9]').hasMatch(p)),

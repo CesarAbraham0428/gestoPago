@@ -47,6 +47,26 @@ void main() {
   setUpAll(() => initializeDateFormatting('es_MX'));
 
   group('ValidadoresRegistro', () {
+    test('nombre de pila: mínimo 3 letras; apellidos: mínimo 2', () {
+      expect(ValidadoresRegistro.nombre('Al', min: 3), isNotNull);
+      expect(ValidadoresRegistro.nombre('Ana', min: 3), isNull);
+      expect(ValidadoresRegistro.nombre('Jo', opcional: true, min: 3), isNotNull);
+      expect(ValidadoresRegistro.nombre('', opcional: true, min: 3), isNull);
+      expect(ValidadoresRegistro.nombre('Li'), isNull);
+    });
+
+    test('requerido con mínimo y máximo (calle y colonia: 3 a 100)', () {
+      expect(ValidadoresRegistro.requerido('Ab', min: 3, max: 100), isNotNull);
+      expect(ValidadoresRegistro.requerido('Abc', min: 3, max: 100), isNull);
+      expect(ValidadoresRegistro.requerido('x' * 100, min: 3, max: 100), isNull);
+      expect(ValidadoresRegistro.requerido('x' * 101, min: 3, max: 100), isNotNull);
+    });
+
+    test('ingreso opcional acepta vacío pero no un monto inválido', () {
+      expect(ValidadoresRegistro.ingreso('', opcional: true), isNull);
+      expect(ValidadoresRegistro.ingreso('0', opcional: true), isNotNull);
+    });
+
     test('nombre: letras, 2 a 50, opcional vacío', () {
       expect(ValidadoresRegistro.nombre('María José'), isNull);
       expect(ValidadoresRegistro.nombre(''), isNotNull);
@@ -137,6 +157,8 @@ void main() {
 
     test('contraseña: pide los cinco requisitos y la confirmación', () {
       expect(ValidadoresRegistro.password('Segura123!'), isNull);
+      expect(ValidadoresRegistro.password('Segura12345!'), isNull); // 12
+      expect(ValidadoresRegistro.password('Segura123456!'), isNotNull); // 13
       for (final mala in [
         'segura123!',
         'SEGURA123!',
@@ -381,6 +403,149 @@ void main() {
 
       await tester.tap(find.text('Ir a iniciar sesión'));
       expect(volvio, 1);
+    });
+
+    testWidgets('empresa y domicilio se pueden omitir: viajan como null', (tester) async {
+      await abrir(tester);
+      await paso1(tester);
+      expect(find.text('Paso 3 de 5'), findsOneWidget);
+      await tester.tap(find.text('Omitir'));
+      await tester.pumpAndSettle();
+      expect(find.text('Paso 4 de 5'), findsOneWidget);
+      await tester.tap(find.text('Omitir'));
+      await tester.pumpAndSettle();
+      expect(find.text('Acceso a tu cuenta'), findsOneWidget);
+      expect(find.text('Omitir'), findsNothing); // el acceso sí es obligatorio
+      await paso4(tester);
+      await boton(tester, 'Crear mi cuenta');
+
+      final d = registro.enviados.single;
+      expect(d['ocupacion'], isNull);
+      expect(d['empresa'], isNull);
+      expect(d['ingresoMensual'], isNull);
+      expect(d['domicilio'], isNull);
+      expect(d['primerNombre'], 'Ana');
+    });
+
+    testWidgets('Omitir descarta lo escrito en ese paso', (tester) async {
+      await abrir(tester);
+      await paso1(tester);
+      await escribir(tester, 'empresa', 'Acme SA');
+      await tester.tap(find.text('Omitir'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Omitir'));
+      await tester.pumpAndSettle();
+      await paso4(tester);
+      await boton(tester, 'Crear mi cuenta');
+      expect(registro.enviados.single['empresa'], isNull);
+    });
+
+    testWidgets('Continuar en un paso opcional sigue validando todo el paso', (tester) async {
+      await abrir(tester);
+      await paso1(tester);
+      await escribir(tester, 'empresa', 'Acme SA');
+      await boton(tester, 'Continuar');
+      expect(find.text('Paso 3 de 5'), findsOneWidget);
+      expect(find.text('Este campo es obligatorio.'), findsWidgets);
+    });
+
+    testWidgets('los errores se muestran al escribir, sin pulsar Continuar', (tester) async {
+      await abrir(tester);
+      await escribir(tester, 'primerNombre', 'Al');
+      await tester.pump();
+      expect(find.text('Solo letras, de 3 a 50 caracteres.'), findsOneWidget);
+      await escribir(tester, 'primerNombre', 'Alan');
+      await tester.pump();
+      expect(find.text('Solo letras, de 3 a 50 caracteres.'), findsNothing);
+
+      await boton(tester, 'Continuar'); // no avanza: faltan datos del paso 1
+      await pasoNombre(tester);
+      await escribir(tester, 'curp', 'HEGG56');
+      await escribir(tester, 'rfc', 'VECJ88');
+      await escribir(tester, 'telefonoMovil', '551');
+      await tester.pump();
+      expect(find.text('Revisa la CURP: son 18 caracteres.'), findsOneWidget);
+      expect(find.text('Revisa el RFC: son 12 o 13 caracteres.'), findsOneWidget);
+      expect(find.text('Debe tener 10 dígitos.'), findsOneWidget);
+    });
+
+    testWidgets('la confirmación avisa al instante y se revalida si cambia la contraseña', (tester) async {
+      await abrir(tester);
+      await paso1(tester);
+      await tester.tap(find.text('Omitir'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Omitir'));
+      await tester.pumpAndSettle();
+      await escribir(tester, 'password', 'Segura123!');
+      await escribir(tester, 'confirmacion', 'Segura');
+      await tester.pump();
+      expect(find.text('Las contraseñas no coinciden.'), findsOneWidget);
+      await escribir(tester, 'confirmacion', 'Segura123!');
+      await tester.pump();
+      expect(find.text('Las contraseñas no coinciden.'), findsNothing);
+      // Cambiar la contraseña después deja la confirmación desactualizada: se avisa.
+      await escribir(tester, 'password', 'Otra1234!');
+      await tester.pump();
+      expect(find.text('Las contraseñas no coinciden.'), findsOneWidget);
+    });
+
+    testWidgets('el estado civil es opcional', (tester) async {
+      await abrir(tester);
+      await pasoNombre(tester);
+      expect(find.text('Estado civil (opcional)'), findsOneWidget);
+      await escribir(tester, 'curp', 'hegg560427mvzrrl04');
+      await escribir(tester, 'rfc', 'VECJ880326XXX');
+      await escribir(tester, 'telefonoMovil', '5512345678');
+      await boton(tester, 'Continuar'); // sin elegir estado civil
+      expect(find.text('Paso 3 de 5'), findsOneWidget);
+      await tester.tap(find.text('Omitir'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Omitir'));
+      await tester.pumpAndSettle();
+      await paso4(tester);
+      await boton(tester, 'Crear mi cuenta');
+      expect(registro.enviados.single['estadoCivil'], isNull);
+    });
+
+    testWidgets('calle y colonia piden al menos 3 caracteres', (tester) async {
+      await abrir(tester);
+      await paso1(tester);
+      await paso2(tester);
+      await escribir(tester, 'calle', 'Re');
+      await escribir(tester, 'colonia', 'Ce');
+      await boton(tester, 'Continuar');
+      expect(find.text('Paso 4 de 5'), findsOneWidget);
+      expect(find.text('Mínimo 3 caracteres.'), findsNWidgets(2));
+    });
+
+    testWidgets('el primer nombre pide al menos 3 letras', (tester) async {
+      await abrir(tester);
+      await escribir(tester, 'primerNombre', 'Al');
+      await boton(tester, 'Continuar');
+      expect(find.text('Solo letras, de 3 a 50 caracteres.'), findsOneWidget);
+    });
+
+    testWidgets('la contraseña se limita a 12 caracteres y la confirmación tiene su ojito', (tester) async {
+      await abrir(tester);
+      await paso1(tester);
+      await tester.tap(find.text('Omitir'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Omitir'));
+      await tester.pumpAndSettle();
+      await escribir(tester, 'password', 'Segura12345!XYZ');
+      await tester.pump();
+      expect(
+        tester.widget<TextFormField>(campo('password')).controller!.text,
+        'Segura12345!',
+      );
+      TextField conf() => tester.widget<TextField>(
+        find.descendant(of: campo('confirmacion'), matching: find.byType(TextField)),
+      );
+      expect(conf().obscureText, isTrue);
+      await tester.tap(find.byTooltip('Mostrar confirmación'));
+      await tester.pump();
+      expect(conf().obscureText, isFalse);
+      expect(find.byTooltip('Ocultar confirmación'), findsOneWidget);
     });
 
     testWidgets('Atrás conserva lo escrito', (tester) async {

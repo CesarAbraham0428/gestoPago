@@ -53,6 +53,20 @@ Map<String, dynamic> _clienteJson({int id = 7}) => {
   ],
 };
 
+/// Cliente recién registrado que omitió empleo y domicilio.
+Perfil _perfilMinimo() => Perfil(
+  primerNombre: 'Ana',
+  apellidoPaterno: 'Pérez',
+  apellidoMaterno: 'López',
+  fechaNacimiento: DateTime(1995, 4, 12),
+  curp: 'PELA950412MDFRPN09',
+  rfc: 'PELA950412AB1',
+  sexo: 'Femenino',
+  nacionalidad: 'Mexicana',
+  correoElectronico: 'ana@example.com',
+  telefonoMovil: '5512345678',
+);
+
 void main() {
   setUpAll(() => initializeDateFormatting('es_MX'));
 
@@ -76,8 +90,8 @@ void main() {
       expect(fechaIso(DateTime(5, 3, 9)), '0005-03-09');
       final p = perfilPrueba();
       expect(p.nombreCompleto, 'Ana Pérez López');
-      expect(p.domicilio.lineaCalle, 'Reforma 10');
-      expect(p.domicilio.lineaZona, contains('06000'));
+      expect(p.domicilio!.lineaCalle, 'Reforma 10');
+      expect(p.domicilio!.lineaZona, contains('06000'));
     });
   });
 
@@ -156,7 +170,23 @@ void main() {
 
     test('perfilDesdeJson rechaza datos incompletos', () {
       expect(() => perfilDesdeJson({..._clienteJson(), 'rfc': null}), throwsA(isA<AppException>()));
-      expect(() => perfilDesdeJson({..._clienteJson(), 'domicilio': null}), throwsA(isA<AppException>()));
+      expect(() => perfilDesdeJson({..._clienteJson(), 'domicilio': 'x'}), throwsA(isA<AppException>()));
+      expect(() => perfilDesdeJson({..._clienteJson(), 'ingresoMensual': 'x'}), throwsA(isA<AppException>()));
+    });
+
+    test('perfilDesdeJson acepta un cliente sin empleo ni domicilio', () {
+      final p = perfilDesdeJson({
+        ..._clienteJson(),
+        'ocupacion': null,
+        'empresa': null,
+        'ingresoMensual': null,
+        'domicilio': null,
+      });
+      expect(p.ocupacion, isNull);
+      expect(p.empresa, isNull);
+      expect(p.ingresoMensual, isNull);
+      expect(p.domicilio, isNull);
+      expect(p.aMapaEditable()['domicilio'], isNull);
     });
   });
 
@@ -221,7 +251,7 @@ void main() {
 
       await tester.tap(find.text('Editar perfil'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextFormField, 'Empresa'), 'Nueva');
+      await tester.enterText(find.widgetWithText(TextFormField, 'Empresa (opcional)'), 'Nueva');
       await tester.enterText(find.widgetWithText(TextFormField, 'Código postal'), '12');
       await tester.tap(find.text('Guardar cambios'));
       await tester.pumpAndSettle();
@@ -244,6 +274,53 @@ void main() {
       expect(find.text('Nueva'), findsOneWidget);
     });
 
+    testWidgets('perfil sin empleo ni domicilio: se ve vacío y se agregan al editar', (tester) async {
+      final repo = PerfilFalso(_perfilMinimo());
+      final c = PerfilController(repo);
+      await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 3000));
+      await tester.pumpAndSettle();
+      expect(find.text('Sin registrar'), findsWidgets);
+      expect(find.text('Estado civil'), findsOneWidget);
+
+      await tester.tap(find.text('Editar perfil'));
+      await tester.pumpAndSettle();
+      // Sin capturar nada no se exige el domicilio ni hay nada que guardar.
+      await tester.tap(find.text('Guardar cambios'));
+      await tester.pumpAndSettle();
+      expect(find.text('Este campo es obligatorio.'), findsNothing);
+      expect(repo.cambiosRecibidos, isEmpty);
+
+      // Sin cambios la pantalla vuelve a la vista: se entra a editar de nuevo.
+      await tester.tap(find.text('Editar perfil'));
+      await tester.pumpAndSettle();
+
+      // Un domicilio a medias sí se rechaza: calle de 2 letras y el resto vacío.
+      await tester.enterText(find.widgetWithText(TextFormField, 'Calle'), 'Re');
+      await tester.tap(find.text('Guardar cambios'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mínimo 3 caracteres.'), findsOneWidget);
+      expect(find.text('Este campo es obligatorio.'), findsWidgets);
+      expect(repo.cambiosRecibidos, isEmpty);
+
+      Future<void> escribir(String etiqueta, String texto) =>
+          tester.enterText(find.widgetWithText(TextFormField, etiqueta), texto);
+      await escribir('Calle', 'Reforma');
+      await escribir('Número exterior', '10');
+      await escribir('Colonia', 'Centro');
+      await escribir('Código postal', '06000');
+      await escribir('Municipio o alcaldía', 'Cuauhtémoc');
+      await escribir('Estado', 'CDMX');
+      await escribir('Ocupación (opcional)', 'Contadora');
+      await tester.tap(find.text('Guardar cambios'));
+      await tester.pumpAndSettle();
+
+      final cambios = repo.cambiosRecibidos.single;
+      expect(cambios['ocupacion'], 'Contadora');
+      expect(cambios.containsKey('empresa'), isFalse);
+      expect((cambios['domicilio']! as Map)['calle'], 'Reforma');
+      expect((cambios['domicilio']! as Map)['pais'], 'México');
+    });
+
     testWidgets('perfil: el teléfono alternativo se muestra con formato', (tester) async {
       final c = PerfilController(PerfilFalso(perfilPrueba(telefonoAlternativo: '5598765432')));
       await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 2400));
@@ -259,7 +336,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Editar perfil'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextFormField, 'Empresa'), 'Nueva');
+      await tester.enterText(find.widgetWithText(TextFormField, 'Empresa (opcional)'), 'Nueva');
       await tester.tap(find.text('Guardar cambios'));
       await tester.pumpAndSettle();
       expect(find.text('Correo en uso'), findsOneWidget);
