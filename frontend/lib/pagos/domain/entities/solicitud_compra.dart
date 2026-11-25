@@ -23,6 +23,5 @@ class SolicitudCompra {
   double get total => monto + producto.comision;
 
   @override
-  String toString() =>
-      'SolicitudCompra(${producto.clave}, monto: $monto)'; // sin código ni cuenta
+  String toString() => 'SolicitudCompra(${producto.clave}, monto: $monto)'; // sin código ni cuenta
 }

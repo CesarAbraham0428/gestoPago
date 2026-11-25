@@ -67,7 +67,9 @@ class DatosRecibo {
       comision: c.comision,
       total: c.total,
       destinoEtiqueta: esRecarga ? 'Celular' : 'Referencia de pago',
-      destino: esRecarga ? formatoTelefono(s.telefono!) : (c.referencia ?? s.referencia),
+      destino: esRecarga
+          ? formatoTelefono(s.telefono!)
+          : (c.referencia ?? s.referencia),
       cuenta: cuentaEnmascarada(s.numeroCuenta),
       idTx: c.idTx,
       numAutorizacion: c.numAutorizacion,
@@ -134,7 +136,10 @@ class Recibo extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Monograma(nombre: datos.servicio ?? datos.titulo, tamano: 44),
+                        Monograma(
+                          nombre: datos.servicio ?? datos.titulo,
+                          tamano: 44,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -152,10 +157,19 @@ class Recibo extends StatelessWidget {
                     const _Perforacion(),
                     const SizedBox(height: 8),
                     if (datos.destino != null && datos.destinoEtiqueta != null)
-                      FilaDato(etiqueta: datos.destinoEtiqueta!, valor: datos.destino!),
-                    FilaDato(etiqueta: 'Importe', valor: formatoMoneda(datos.monto)),
+                      FilaDato(
+                        etiqueta: datos.destinoEtiqueta!,
+                        valor: datos.destino!,
+                      ),
+                    FilaDato(
+                      etiqueta: 'Importe',
+                      valor: formatoMoneda(datos.monto),
+                    ),
                     if (datos.comision > 0) ...[
-                      FilaDato(etiqueta: 'Comisión', valor: formatoMoneda(datos.comision)),
+                      FilaDato(
+                        etiqueta: 'Comisión',
+                        valor: formatoMoneda(datos.comision),
+                      ),
                       FilaDato(
                         etiqueta: 'Total',
                         valor: formatoMoneda(datos.total),
@@ -182,14 +196,24 @@ class Recibo extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (datos.referenciaOperacion != null)
-                _FilaCopiable(etiqueta: 'Referencia', valor: datos.referenciaOperacion!),
+                _FilaCopiable(
+                  etiqueta: 'Referencia',
+                  valor: datos.referenciaOperacion!,
+                ),
               if (datos.idTx != null)
                 FilaDato(etiqueta: 'Transacción', valor: '${datos.idTx}'),
               if (datos.numAutorizacion != null)
-                FilaDato(etiqueta: 'Autorización', valor: datos.numAutorizacion!),
-              if (datos.codigoCanje != null && datos.codigoCanje!.isNotEmpty) ...[
+                FilaDato(
+                  etiqueta: 'Autorización',
+                  valor: datos.numAutorizacion!,
+                ),
+              if (datos.codigoCanje != null &&
+                  datos.codigoCanje!.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                _CodigoCanje(codigo: datos.codigoCanje!, leyenda: datos.leyenda),
+                _CodigoCanje(
+                  codigo: datos.codigoCanje!,
+                  leyenda: datos.leyenda,
+                ),
               ],
             ],
           ),
@@ -222,7 +246,11 @@ class _Cabecera extends StatelessWidget {
           Positioned(
             right: -14,
             top: -14,
-            child: Icon(visual.iconoGrande, size: 130, color: const Color(0x14FFFFFF)),
+            child: Icon(
+              visual.iconoGrande,
+              size: 130,
+              color: const Color(0x14FFFFFF),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
@@ -268,7 +296,9 @@ class _Cabecera extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   formatoFechaHora(datos.fecha),
-                  style: tema.bodySmall?.copyWith(color: const Color(0xCCFFFFFF)),
+                  style: tema.bodySmall?.copyWith(
+                    color: const Color(0xCCFFFFFF),
+                  ),
                 ),
               ],
             ),
@@ -281,7 +311,11 @@ class _Cabecera extends StatelessWidget {
 
 /// Una mitad del ticket: sombra, recorte con la forma y borde fino.
 class _Seccion extends StatelessWidget {
-  const _Seccion({required this.superior, required this.padding, required this.child});
+  const _Seccion({
+    required this.superior,
+    required this.padding,
+    required this.child,
+  });
   final bool superior;
   final EdgeInsets padding;
   final Widget child;
@@ -293,7 +327,11 @@ class _Seccion extends StatelessWidget {
       foregroundPainter: _BordeTicket(superior),
       child: ClipPath(
         clipper: _FormaTicket(superior),
-        child: Container(color: AppColors.superficie, padding: padding, child: child),
+        child: Container(
+          color: AppColors.superficie,
+          padding: padding,
+          child: child,
+        ),
       ),
     );
   }
@@ -321,7 +359,9 @@ class _FilaCopiable extends StatelessWidget {
               Expanded(
                 child: SelectableText(
                   valor,
-                  style: tema.titleMedium?.copyWith(fontFeatures: cifrasTabulares),
+                  style: tema.titleMedium?.copyWith(
+                    fontFeatures: cifrasTabulares,
+                  ),
                 ),
               ),
               IconButton(
@@ -370,7 +410,9 @@ class _CodigoCanje extends StatelessWidget {
               Expanded(
                 child: SelectableText(
                   codigo,
-                  style: tema.titleMedium?.copyWith(fontFeatures: cifrasTabulares),
+                  style: tema.titleMedium?.copyWith(
+                    fontFeatures: cifrasTabulares,
+                  ),
                 ),
               ),
               IconButton(
@@ -429,9 +471,13 @@ Path _trazoTicket(Size size, {required bool superior, bool relleno = true}) {
   final w = size.width;
   final h = size.height;
   final ruta = Path();
-  void tramo(double x, double y) => relleno ? ruta.lineTo(x, y) : ruta.moveTo(x, y);
-  void muesca(double x, double y) =>
-      ruta.arcToPoint(Offset(x, y), radius: const Radius.circular(r), clockwise: false);
+  void tramo(double x, double y) =>
+      relleno ? ruta.lineTo(x, y) : ruta.moveTo(x, y);
+  void muesca(double x, double y) => ruta.arcToPoint(
+    Offset(x, y),
+    radius: const Radius.circular(r),
+    clockwise: false,
+  );
 
   if (superior) {
     ruta
@@ -483,7 +529,8 @@ class _FormaTicket extends CustomClipper<Path> {
   Path getClip(Size size) => _trazoTicket(size, superior: superior);
 
   @override
-  bool shouldReclip(covariant _FormaTicket oldClipper) => oldClipper.superior != superior;
+  bool shouldReclip(covariant _FormaTicket oldClipper) =>
+      oldClipper.superior != superior;
 }
 
 class _SombraTicket extends CustomPainter {
@@ -501,7 +548,8 @@ class _SombraTicket extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _SombraTicket oldDelegate) => oldDelegate.superior != superior;
+  bool shouldRepaint(covariant _SombraTicket oldDelegate) =>
+      oldDelegate.superior != superior;
 }
 
 class _BordeTicket extends CustomPainter {
@@ -524,5 +572,6 @@ class _BordeTicket extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _BordeTicket oldDelegate) => oldDelegate.superior != superior;
+  bool shouldRepaint(covariant _BordeTicket oldDelegate) =>
+      oldDelegate.superior != superior;
 }

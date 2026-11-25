@@ -31,5 +31,4 @@ class ValidadoresCompra {
     if (monto < 0.01) return 'El monto debe ser mayor a cero.';
     return null;
   }
-
 }

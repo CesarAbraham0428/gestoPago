@@ -51,7 +51,9 @@ class RealizarCompra {
         // El proveedor nunca recibió el pago: la API devolvió el saldo.
         return ErrorDeComunicacion(e.message, resultadoIncierto: false);
       case 401:
-        return const CompraRechazada('Tu sesión terminó. Inicia sesión de nuevo.');
+        return const CompraRechazada(
+          'Tu sesión terminó. Inicia sesión de nuevo.',
+        );
       case >= 500:
         return const ErrorDeComunicacion(
           'El servicio tuvo un problema. Revisa tu historial antes de '

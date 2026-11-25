@@ -68,7 +68,8 @@ class _PanelCompraState extends State<PanelCompra> {
   String? _errorSaldo;
 
   Producto get _p => widget.producto;
-  bool get _pideCelular => _p.tipoCompra == TipoCompra.recarga && !_p.esCanjeable;
+  bool get _pideCelular =>
+      _p.tipoCompra == TipoCompra.recarga && !_p.esCanjeable;
   bool get _pideServicio => _p.tipoCompra == TipoCompra.pagoServicio;
 
   @override
@@ -120,11 +121,12 @@ class _PanelCompraState extends State<PanelCompra> {
   /// El servidor bloquea los pagos de la cuenta tras varios códigos incorrectos.
   DateTime? get _pinBloqueadoHasta {
     final c = _cuenta;
-    return c != null && c.bloqueoRestante() != null ? c.pinBloqueadoHasta : null;
+    return c != null && c.bloqueoRestante() != null
+        ? c.pinBloqueadoHasta
+        : null;
   }
 
-  double? get _montoIngresado =>
-      _p.montoFijo ?? parseMonto(_monto.text);
+  double? get _montoIngresado => _p.montoFijo ?? parseMonto(_monto.text);
 
   double? get _total {
     final monto = _montoIngresado;
@@ -139,8 +141,10 @@ class _PanelCompraState extends State<PanelCompra> {
     if (cuenta == null || monto == null) return;
     final total = monto + _p.comision;
     if (cuenta.saldo < total) {
-      setState(() => _errorSaldo =
-          'Tu saldo es ${formatoMoneda(cuenta.saldo)} y esta compra cuesta ${formatoMoneda(total)}.');
+      setState(
+        () => _errorSaldo =
+            'Tu saldo es ${formatoMoneda(cuenta.saldo)} y esta compra cuesta ${formatoMoneda(total)}.',
+      );
       return;
     }
     final codigo = await showDialog<String>(
@@ -228,22 +232,23 @@ class _PanelCompraState extends State<PanelCompra> {
         icono: Icons.error_outline,
         titulo: 'No pudimos cargar tu cuenta',
         texto: _errorCuentas!,
-        accion: OutlinedButton(onPressed: _cargarCuentas, child: const Text('Reintentar')),
+        accion: OutlinedButton(
+          onPressed: _cargarCuentas,
+          child: const Text('Reintentar'),
+        ),
       );
     }
     final cuentas = _cuentas;
     if (cuentas == null) {
-      return const Padding(
-        padding: EdgeInsets.all(24),
-        child: VistaCargando(),
-      );
+      return const Padding(padding: EdgeInsets.all(24), child: VistaCargando());
     }
     if (cuentas.isEmpty) {
       return const AvisoEstado(
         tono: Tono.aviso,
         icono: Icons.account_balance_wallet_outlined,
         titulo: 'No tienes una cuenta activa',
-        texto: 'Para comprar necesitas una cuenta activa con saldo. '
+        texto:
+            'Para comprar necesitas una cuenta activa con saldo. '
             'Comunícate con soporte para activarla.',
       );
     }
@@ -271,7 +276,9 @@ class _PanelCompraState extends State<PanelCompra> {
                 for (final c in cuentas)
                   DropdownMenuItem(
                     value: c,
-                    child: Text('${cuentaEnmascarada(c.numeroCuenta)} · ${formatoMoneda(c.saldo)}'),
+                    child: Text(
+                      '${cuentaEnmascarada(c.numeroCuenta)} · ${formatoMoneda(c.saldo)}',
+                    ),
                   ),
               ],
               onChanged: (c) => setState(() {
@@ -314,7 +321,9 @@ class _PanelCompraState extends State<PanelCompra> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _monto,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                 LengthLimitingTextInputFormatter(16),
@@ -345,10 +354,7 @@ class _PanelCompraState extends State<PanelCompra> {
           ],
           const SizedBox(height: 16),
           if (_pinBloqueadoHasta case final hasta?) ...[
-            _PinBloqueado(
-              hasta: hasta,
-              alTerminar: () => setState(() {}),
-            ),
+            _PinBloqueado(hasta: hasta, alTerminar: () => setState(() {})),
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: null,
@@ -392,7 +398,11 @@ class _CuentaFija extends StatelessWidget {
 }
 
 class _TotalLinea extends StatelessWidget {
-  const _TotalLinea({required this.etiqueta, required this.valor, this.detalle});
+  const _TotalLinea({
+    required this.etiqueta,
+    required this.valor,
+    this.detalle,
+  });
   final String etiqueta;
   final String valor;
   final String? detalle;
@@ -430,7 +440,8 @@ class _Enviando extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.symmetric(vertical: 48),
       child: VistaCargando(
-        mensaje: 'Procesando tu pago. Puede tardar hasta un minuto; '
+        mensaje:
+            'Procesando tu pago. Puede tardar hasta un minuto; '
             'no cierres esta pantalla.',
       ),
     );
@@ -501,7 +512,10 @@ class _DialogoConfirmacionState extends State<_DialogoConfirmacion> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.papel,
                     borderRadius: BorderRadius.circular(14),
@@ -552,7 +566,10 @@ class _DialogoConfirmacionState extends State<_DialogoConfirmacion> {
                 ),
                 const SizedBox(height: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.marcaTenue,
                     borderRadius: BorderRadius.circular(14),
@@ -565,10 +582,7 @@ class _DialogoConfirmacionState extends State<_DialogoConfirmacion> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  'Código de tu app autenticadora',
-                  style: tema.labelLarge,
-                ),
+                Text('Código de tu app autenticadora', style: tema.labelLarge),
                 const SizedBox(height: 8),
                 CampoCodigo(
                   controller: _codigo,
@@ -580,7 +594,11 @@ class _DialogoConfirmacionState extends State<_DialogoConfirmacion> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.info_outline, size: 16, color: AppColors.tintaSuave),
+                    const Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: AppColors.tintaSuave,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -650,7 +668,10 @@ class _Rechazo extends StatelessWidget {
             const SizedBox(height: 14),
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.exitoFondo,
                   borderRadius: BorderRadius.circular(999),
@@ -658,7 +679,11 @@ class _Rechazo extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.verified_user_outlined, size: 16, color: AppColors.exito),
+                    const Icon(
+                      Icons.verified_user_outlined,
+                      size: 16,
+                      color: AppColors.exito,
+                    ),
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
@@ -773,7 +798,10 @@ class _PinBloqueadoState extends State<_PinBloqueado> {
             const SizedBox(height: 14),
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(999),
@@ -781,11 +809,17 @@ class _PinBloqueadoState extends State<_PinBloqueado> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.timer_outlined, size: 20, color: AppColors.coral),
+                    const Icon(
+                      Icons.timer_outlined,
+                      size: 20,
+                      color: AppColors.coral,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       _cuenta,
-                      style: tema.titleLarge?.copyWith(fontFeatures: cifrasTabulares),
+                      style: tema.titleLarge?.copyWith(
+                        fontFeatures: cifrasTabulares,
+                      ),
                     ),
                   ],
                 ),
@@ -852,7 +886,8 @@ class _VistaResultadoState extends State<_VistaResultado> {
     } on AppException catch (e) {
       if (mounted) setState(() => _errorConsulta = e.message);
     } on Object {
-      if (mounted) setState(() => _errorConsulta = 'No pudimos consultar el estado.');
+      if (mounted)
+        setState(() => _errorConsulta = 'No pudimos consultar el estado.');
     }
     if (mounted) setState(() => _consultando = false);
   }
@@ -863,7 +898,9 @@ class _VistaResultadoState extends State<_VistaResultado> {
       CompraExitosa(:final comprobante) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Recibo(datos: DatosRecibo.deComprobante(comprobante, widget.solicitud)),
+          Recibo(
+            datos: DatosRecibo.deComprobante(comprobante, widget.solicitud),
+          ),
           const SizedBox(height: 20),
           FilledButton(
             onPressed: widget.alVerHistorial,
@@ -876,40 +913,45 @@ class _VistaResultadoState extends State<_VistaResultado> {
           ),
         ],
       ),
-      CompraRechazada(:final mensaje) => widget.pinBloqueadoHasta == null
-          ? _Rechazo(mensaje: mensaje, alReintentar: widget.alReintentar)
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _PinBloqueado(
-                  hasta: widget.pinBloqueadoHasta!,
-                  alTerminar: widget.alDesbloquear,
-                ),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: widget.alReintentar,
-                  child: const Text('Entendido'),
-                ),
-              ],
-            ),
-      CompraPendiente(:final mensaje, :final referencia) => _pendiente(mensaje, referencia),
-      ErrorDeComunicacion(:final mensaje, :final resultadoIncierto) => AvisoEstado(
-        tono: resultadoIncierto ? Tono.pendiente : Tono.aviso,
-        icono: Icons.wifi_off_outlined,
-        titulo: resultadoIncierto
-            ? 'No pudimos confirmar el resultado'
-            : 'No se pudo completar la compra',
-        texto: mensaje,
-        accion: resultadoIncierto
-            ? FilledButton(
-                onPressed: widget.alVerHistorial,
-                child: const Text('Revisar mis compras'),
-              )
-            : FilledButton(
-                onPressed: widget.alReintentar,
-                child: const Text('Intentar de nuevo'),
+      CompraRechazada(:final mensaje) =>
+        widget.pinBloqueadoHasta == null
+            ? _Rechazo(mensaje: mensaje, alReintentar: widget.alReintentar)
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _PinBloqueado(
+                    hasta: widget.pinBloqueadoHasta!,
+                    alTerminar: widget.alDesbloquear,
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: widget.alReintentar,
+                    child: const Text('Entendido'),
+                  ),
+                ],
               ),
+      CompraPendiente(:final mensaje, :final referencia) => _pendiente(
+        mensaje,
+        referencia,
       ),
+      ErrorDeComunicacion(:final mensaje, :final resultadoIncierto) =>
+        AvisoEstado(
+          tono: resultadoIncierto ? Tono.pendiente : Tono.aviso,
+          icono: Icons.wifi_off_outlined,
+          titulo: resultadoIncierto
+              ? 'No pudimos confirmar el resultado'
+              : 'No se pudo completar la compra',
+          texto: mensaje,
+          accion: resultadoIncierto
+              ? FilledButton(
+                  onPressed: widget.alVerHistorial,
+                  child: const Text('Revisar mis compras'),
+                )
+              : FilledButton(
+                  onPressed: widget.alReintentar,
+                  child: const Text('Intentar de nuevo'),
+                ),
+        ),
     };
   }
 
