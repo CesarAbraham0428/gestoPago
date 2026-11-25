@@ -91,16 +91,11 @@ class ClienteValidationTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"primerNombre,Al", "segundoNombre,Jo", "password,Segura#Clave2026", "password,Seg#1ab"})
-    void rechazaNombresDe2CaracteresYPasswordsFueraDe8A12(String campo, String valor) throws Exception {
+    @CsvSource({"primerNombre,Al", "segundoNombre,Jo", "apellidoPaterno,Li", "apellidoMaterno,Li", "password,Segura#Clave2026", "password,Seg#1ab"})
+    void rechazaNombresYApellidosDe2CaracteresYPasswordsFueraDe8A12(String campo, String valor) throws Exception {
         ObjectNode body = registro().put(campo, valor);
         assertTrue(validator.validate(mapper.treeToValue(body, ClienteRequest.class)).stream()
             .anyMatch(v -> v.getPropertyPath().toString().equals(campo)));
-    }
-
-    @Test void losApellidosSiguenAceptando2Caracteres() throws Exception {
-        var request = mapper.treeToValue(registro().put("apellidoPaterno", "Li"), ClienteRequest.class);
-        assertTrue(validator.validate(request).isEmpty());
     }
 
     @ParameterizedTest

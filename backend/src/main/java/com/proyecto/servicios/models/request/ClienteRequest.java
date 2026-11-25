@@ -10,8 +10,8 @@ import com.proyecto.servicios.validation.FormatosCliente;
 public record ClienteRequest(
     @NotBlank @com.proyecto.servicios.validation.NombreValido(min=3) String primerNombre,
     @com.proyecto.servicios.validation.NombreValido(min=3) String segundoNombre,
-    @NotBlank @com.proyecto.servicios.validation.NombreValido String apellidoPaterno,
-    @NotBlank @com.proyecto.servicios.validation.NombreValido String apellidoMaterno,
+    @NotBlank @com.proyecto.servicios.validation.NombreValido(min=3) String apellidoPaterno,
+    @NotBlank @com.proyecto.servicios.validation.NombreValido(min=3) String apellidoMaterno,
     @NotNull @Past LocalDate fechaNacimiento,
     @NotBlank @Pattern(regexp=FormatosCliente.CURP) String curp,
     @NotBlank @Pattern(regexp=FormatosCliente.RFC) String rfc,

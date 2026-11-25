@@ -7,10 +7,10 @@ import java.time.LocalDate;
 
 public record ClienteActualizacionRequest(
     
-    @NotBlank @com.proyecto.servicios.validation.NombreValido String primerNombre,
-    @com.proyecto.servicios.validation.NombreValido String segundoNombre,
-    @NotBlank @com.proyecto.servicios.validation.NombreValido String apellidoPaterno,
-    @NotBlank @com.proyecto.servicios.validation.NombreValido String apellidoMaterno,
+    @NotBlank @com.proyecto.servicios.validation.NombreValido(min=3) String primerNombre,
+    @com.proyecto.servicios.validation.NombreValido(min=3) String segundoNombre,
+    @NotBlank @com.proyecto.servicios.validation.NombreValido(min=3) String apellidoPaterno,
+    @NotBlank @com.proyecto.servicios.validation.NombreValido(min=3) String apellidoMaterno,
     @NotNull @Past LocalDate fechaNacimiento,
     @NotNull Sexo sexo,
     @NotBlank @Size(max=100) String nacionalidad,
