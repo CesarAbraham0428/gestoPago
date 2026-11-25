@@ -39,7 +39,7 @@ class HistorialController extends ChangeNotifier {
   static final _formatoUpc = RegExp(r'^[A-Z0-9]{15}$');
   bool _buscando = false;
   int _idBusqueda = 0; // descarta respuestas de una búsqueda ya cancelada
-  EstadoPago? _resultado;
+  CompraHistorial? _resultado;
   String? _errorBusqueda;
 
   EstadoHistorial get estado => _estado;
@@ -55,11 +55,13 @@ class HistorialController extends ChangeNotifier {
     final categoria = _filtro.categoria;
     return categoria == null
         ? compras
-        : _compras.where((c) => c.categoria == categoria).toList(growable: false);
+        : _compras
+              .where((c) => c.categoria == categoria)
+              .toList(growable: false);
   }
 
   bool get buscando => _buscando;
-  EstadoPago? get resultado => _resultado;
+  CompraHistorial? get resultado => _resultado;
   String? get errorBusqueda => _errorBusqueda;
   bool get busquedaActiva =>
       _buscando || _resultado != null || _errorBusqueda != null;
@@ -86,9 +88,22 @@ class HistorialController extends ChangeNotifier {
     _errorBusqueda = null;
     notifyListeners();
     try {
-      final consulta = await _pagos.consultarEstado(upc);
+      // El servicio confirma que el pago existe; la tarjeta sale del historial, que trae producto y fecha.
+      await _pagos.consultarEstado(upc);
+      // Si es de una página aún no cargada, se sigue paginando hasta dar con él.
+      _errorMas = null;
+      while (porReferencia(upc) == null &&
+          _hayMas &&
+          _estado == EstadoHistorial.listo &&
+          _errorMas == null &&
+          id == _idBusqueda) {
+        await cargarMas();
+      }
       if (id != _idBusqueda) return;
-      _resultado = consulta;
+      _resultado = porReferencia(upc);
+      if (_resultado == null) {
+        _errorBusqueda = 'Ese pago no aparece en tus compras.';
+      }
     } on AppException catch (e) {
       if (id != _idBusqueda) return;
       _errorBusqueda = e.message;
@@ -123,7 +138,10 @@ class HistorialController extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      final primera = await _pagos.historial(pagina: 0, tamanio: _tamanioPagina);
+      final primera = await _pagos.historial(
+        pagina: 0,
+        tamanio: _tamanioPagina,
+      );
       _compras
         ..clear()
         ..addAll(primera.elementos);

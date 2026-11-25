@@ -64,33 +64,39 @@ class _HistorialPageState extends State<HistorialPage> {
           alSeleccionar: widget.alSeleccionar,
         );
         if (!ancho) return lista;
-        return Row(
-          children: [
-            SizedBox(width: 420, child: lista),
-            const VerticalDivider(width: 1),
-            Expanded(
-              child: seleccion == null
-                  ? const VistaMensaje(
-                      icono: Icons.receipt_long_outlined,
-                      color: AppColors.azul,
-                      fondo: AppColors.azulTenue,
-                      titulo: 'Elige una compra',
-                      detalle: 'Aquí verás su recibo completo.',
-                    )
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(32),
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 520),
-                          child: Recibo(
-                            datos: DatosRecibo.deHistorial(seleccion),
+        // La lista crece con la pantalla (45 %, entre 440 y 600) sin quitarle al recibo sus 520 de ancho.
+        return LayoutBuilder(
+          builder: (context, caja) => Row(
+            children: [
+              SizedBox(
+                width: (caja.maxWidth * 0.45).clamp(440.0, 600.0),
+                child: lista,
+              ),
+              const VerticalDivider(width: 1),
+              Expanded(
+                child: seleccion == null
+                    ? const VistaMensaje(
+                        icono: Icons.receipt_long_outlined,
+                        color: AppColors.azul,
+                        fondo: AppColors.azulTenue,
+                        titulo: 'Elige una compra',
+                        detalle: 'Aquí verás su recibo completo.',
+                      )
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 520),
+                            child: Recibo(
+                              datos: DatosRecibo.deHistorial(seleccion),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-            ),
-          ],
+              ),
+            ],
+          ),
         );
       },
     );
@@ -150,6 +156,7 @@ class _Lista extends StatelessWidget {
           Expanded(
             child: _Resultado(
               controller: controller,
+              seleccionada: seleccionada,
               alSeleccionar: alSeleccionar,
             ),
           )
@@ -195,12 +202,12 @@ class _BuscadorState extends State<_Buscador> {
   Widget build(BuildContext context) {
     final activa = widget.controller.busquedaActiva;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       child: Row(
         children: [
           Expanded(child: _campo(activa)),
-          const SizedBox(width: 4),
-          IconButton(
+          const SizedBox(width: 8),
+          IconButton.filledTonal(
             tooltip: 'Actualizar pagos',
             icon: const Icon(Icons.refresh),
             onPressed: widget.controller.estado == EstadoHistorial.cargando
@@ -260,11 +267,12 @@ class _Filtros extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Row(
         children: [
           for (final f in FiltroPagos.values) ...[
             ChoiceChip(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               label: Text(_etiquetas[f]!),
               selected: controller.filtro == f,
               onSelected: (_) => controller.filtrar(f),
@@ -277,10 +285,15 @@ class _Filtros extends StatelessWidget {
   }
 }
 
-/// Respuesta de la consulta por UPC: estado, mensaje del servicio y datos.
+/// Respuesta de la búsqueda por UPC: solo la tarjeta de ese pago; al tocarla se abre su recibo.
 class _Resultado extends StatelessWidget {
-  const _Resultado({required this.controller, required this.alSeleccionar});
+  const _Resultado({
+    required this.controller,
+    required this.seleccionada,
+    required this.alSeleccionar,
+  });
   final HistorialController controller;
+  final String? seleccionada;
   final ValueChanged<String> alSeleccionar;
 
   @override
@@ -298,57 +311,21 @@ class _Resultado extends StatelessWidget {
         detalle: error,
       );
     }
-    final r = controller.resultado!;
-    final visual = estadoVisual(r.categoria);
-    final enLista = controller.porReferencia(r.upc);
+    final compra = controller.resultado!;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: _margenLista,
       children: [
-        AvisoEstado(
-          tono: visual.tono,
-          icono: visual.icono,
-          titulo: visual.texto,
-          texto: r.mensaje,
+        _FilaCompra(
+          compra: compra,
+          seleccionada: compra.upc == seleccionada,
+          alTocar: () => alSeleccionar(compra.upc),
         ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.superficie,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.lineaSuave),
-          ),
-          child: Column(
-            children: [
-              FilaDato(etiqueta: 'UPC', valor: r.upc),
-              if (r.monto != null)
-                FilaDato(etiqueta: 'Importe', valor: formatoMoneda(r.monto!)),
-              if (r.comision != null && r.comision! > 0)
-                FilaDato(
-                  etiqueta: 'Comisión',
-                  valor: formatoMoneda(r.comision!),
-                ),
-              if (r.referencia != null)
-                FilaDato(etiqueta: 'Referencia de pago', valor: r.referencia!),
-              if (r.idTx != null)
-                FilaDato(etiqueta: 'Transacción', valor: '${r.idTx}'),
-              if (r.numAutorizacion != null)
-                FilaDato(etiqueta: 'Autorización', valor: r.numAutorizacion!),
-            ],
-          ),
-        ),
-        if (enLista != null) ...[
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () => alSeleccionar(enLista.upc),
-            icon: const Icon(Icons.receipt_long_outlined, size: 18),
-            label: const Text('Ver recibo'),
-          ),
-        ],
       ],
     );
   }
 }
+
+const _margenLista = EdgeInsets.fromLTRB(16, 4, 16, 16);
 
 class _Contenido extends StatelessWidget {
   const _Contenido({
@@ -400,6 +377,7 @@ class _Contenido extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: controller.recargar,
       child: ListView.builder(
+        padding: _margenLista,
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: compras.length + (controller.hayMas ? 1 : 0),
         itemBuilder: (context, i) {
@@ -469,63 +447,90 @@ class _FilaCompra extends StatelessWidget {
     return Semantics(
       button: true,
       selected: seleccionada,
-      child: InkWell(
-        onTap: alTocar,
-        child: Container(
-          decoration: BoxDecoration(
-            color: seleccionada ? AppColors.marcaTenue : AppColors.superficie,
-            border: const Border(
-              bottom: BorderSide(color: AppColors.lineaSuave),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Material(
+          color: seleccionada ? AppColors.marcaTenue : AppColors.superficie,
+          elevation: seleccionada ? 0 : 1.5,
+          shadowColor: Colors.black38,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: seleccionada ? AppColors.marca : AppColors.lineaSuave,
+              width: seleccionada ? 1.5 : 1,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Monograma(nombre: compra.servicio ?? compra.titulo, tamano: 40),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      compra.titulo,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: tema.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: alTocar,
+            child: Stack(
+              children: [
+                // Franja con el color del estado: se distingue de un vistazo.
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 5,
+                  child: ColoredBox(color: visual.tono.texto),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+                  child: Row(
+                    children: [
+                      Monograma(
+                        nombre: compra.servicio ?? compra.titulo,
+                        tamano: 48,
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          formatoFechaHora(compra.fecha),
-                          style: tema.bodySmall,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              compra.titulo,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: tema.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  formatoFechaHora(compra.fecha),
+                                  style: tema.bodySmall,
+                                ),
+                                EtiquetaEstado(
+                                  texto: visual.texto,
+                                  tono: visual.tono,
+                                  icono: visual.icono,
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        EtiquetaEstado(
-                          texto: visual.texto,
-                          tono: visual.tono,
-                          icono: visual.icono,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        formatoMoneda(compra.total),
+                        style: tema.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: cifrasTabulares,
+                          decoration:
+                              compra.categoria == CategoriaPago.rechazado
+                              ? TextDecoration.lineThrough
+                              : null,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                formatoMoneda(compra.total),
-                style: tema.titleMedium?.copyWith(
-                  fontFeatures: cifrasTabulares,
-                  decoration: compra.categoria == CategoriaPago.rechazado
-                      ? TextDecoration.lineThrough
-                      : null,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
