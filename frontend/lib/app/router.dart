@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../authentication/infraestructure/ui/login_page.dart';
 import '../authentication/infraestructure/ui/registro_page.dart';
+import '../notificaciones/infraestructure/ui/notificaciones_page.dart';
 import '../pagos/infraestructure/ui/historial_page.dart';
 import '../pagos/infraestructure/ui/panel_compra.dart';
 import '../perfil/infraestructure/ui/perfil_page.dart';
@@ -61,6 +62,13 @@ GoRouter crearRouter(Dependencias deps, ConstructorShell shell) {
                     _historial(deps, state.pathParameters['upc']),
               ),
             ],
+          ),
+          GoRoute(
+            path: '/notificaciones',
+            builder: (context, state) => NotificacionesPage(
+              controller: deps.notificaciones,
+              alVerCompra: (upc) => context.go('/compras/$upc'),
+            ),
           ),
           GoRoute(
             path: '/perfil',

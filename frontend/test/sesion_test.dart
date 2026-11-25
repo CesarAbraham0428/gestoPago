@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/core/error/mensajes_usuario.dart';
 import 'package:frontend/authentication/application/sesion_controller.dart';
 import 'package:frontend/authentication/domain/entities/desafio_verificacion.dart';
+import 'package:frontend/authentication/domain/entities/evento_sesion.dart';
 import 'package:frontend/authentication/domain/entities/sesion.dart';
 import 'package:frontend/authentication/domain/ports/almacen_sesion.dart';
 import 'package:frontend/authentication/domain/ports/autenticacion_gateway.dart';
@@ -58,11 +59,11 @@ class _GatewayFalso implements AutenticacionGateway {
   }
 
   /// Cada conexión al canal de avisos abre uno nuevo; la prueba decide qué llega.
-  final List<StreamController<String>> canales = [];
+  final List<StreamController<EventoSesion>> canales = [];
 
   @override
-  Stream<String> cierresDeSesion() {
-    final canal = StreamController<String>();
+  Stream<EventoSesion> eventos() {
+    final canal = StreamController<EventoSesion>();
     canales.add(canal);
     return canal.stream;
   }
@@ -176,11 +177,26 @@ void main() {
     });
 
     test('si otro dispositivo toma la sesión, se cierra al instante sin navegar', () async {
-      gateway.canales.single.add('Tu sesión se cerró porque iniciaste sesión en otro dispositivo');
+      gateway.canales.single.add((
+        nombre: 'sesion_cerrada',
+        datos: 'Tu sesión se cerró porque iniciaste sesión en otro dispositivo',
+      ));
       await espera(0);
       expect(rapida.autenticado, isFalse);
       expect(rapida.aviso, contains('otro dispositivo'));
       expect(almacen.guardada, isNull);
+    });
+
+    test('los demás eventos no cierran la sesión y se reenvían a quien los escucha', () async {
+      final recibidos = <EventoSesion>[];
+      final suscripcion = rapida.eventos.listen(recibidos.add);
+
+      gateway.canales.single.add((nombre: 'notificacion', datos: '{"id":1}'));
+      await espera(0);
+
+      expect(rapida.autenticado, isTrue);
+      expect(recibidos, [(nombre: 'notificacion', datos: '{"id":1}')]);
+      await suscripcion.cancel();
     });
 
     test('un 401 al conectar cierra la sesión', () async {
@@ -254,7 +270,7 @@ void main() {
       return ApiAutenticacionGateway(ApiClient(baseUrl: 'http://localhost', client: cliente));
     }
 
-    test('el canal de avisos solo entrega los cierres de sesión', () async {
+    test('el canal de avisos entrega todos los eventos con su nombre', () async {
       late http.BaseRequest recibida;
       final cliente = MockClient((r) async {
         recibida = r;
@@ -268,7 +284,10 @@ void main() {
       final gateway = ApiAutenticacionGateway(
         ApiClient(baseUrl: 'http://localhost', client: cliente),
       );
-      expect(await gateway.cierresDeSesion().toList(), ['Tu sesión se cerró']);
+      expect(await gateway.eventos().toList(), [
+        (nombre: 'conectado', datos: 'ok'),
+        (nombre: 'sesion_cerrada', datos: 'Tu sesión se cerró'),
+      ]);
       expect(recibida.url.path, '/auth/sesion/eventos');
     });
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:toastification/toastification.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/authentication/domain/entities/desafio_verificacion.dart';
+import 'package:frontend/authentication/domain/entities/evento_sesion.dart';
 import 'package:frontend/authentication/domain/entities/sesion.dart';
 import 'package:frontend/authentication/domain/ports/almacen_sesion.dart';
 import 'package:frontend/authentication/domain/ports/autenticacion_gateway.dart';
@@ -87,7 +88,7 @@ class GatewayFalso implements AutenticacionGateway {
   Future<void> cerrarSesion() async => cierres++;
 
   @override
-  Stream<String> cierresDeSesion() => Stream<String>.multi((_) {});
+  Stream<EventoSesion> eventos() => Stream<EventoSesion>.multi((_) {});
 }
 
 class AlmacenFalso implements AlmacenSesion {

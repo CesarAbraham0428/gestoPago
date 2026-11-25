@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/error/app_exception.dart';
 import '../domain/entities/desafio_verificacion.dart';
+import '../domain/entities/evento_sesion.dart';
 import '../domain/entities/sesion.dart';
 import '../domain/ports/almacen_sesion.dart';
 import '../domain/ports/autenticacion_gateway.dart';
@@ -30,7 +31,8 @@ class SesionController extends ChangeNotifier {
 
   Sesion? _sesion;
   Timer? _temporizador;
-  StreamSubscription<String>? _avisos;
+  StreamSubscription<EventoSesion>? _avisos;
+  final _eventos = StreamController<EventoSesion>.broadcast();
   Timer? _reconexion;
   int _fallosSeguidos = 0;
   bool _restaurada = false;
@@ -46,6 +48,10 @@ class SesionController extends ChangeNotifier {
 
   /// Mensaje para mostrar en el login tras una expiración o cierre forzado.
   String? get aviso => _aviso;
+
+  /// Eventos del canal de la sesión que no son un cierre (`conectado`,
+  /// `notificacion`), para quien necesite reaccionar a ellos sin abrir otro canal.
+  Stream<EventoSesion> get eventos => _eventos.stream;
 
   Future<void> restaurar() async {
     try {
@@ -131,8 +137,14 @@ class SesionController extends ChangeNotifier {
   void _escucharAvisos() {
     _reconexion?.cancel();
     unawaited(_avisos?.cancel());
-    _avisos = _gateway.cierresDeSesion().listen(
-      sesionInvalidada,
+    _avisos = _gateway.eventos().listen(
+      (evento) {
+        if (evento.nombre == 'sesion_cerrada') {
+          sesionInvalidada(evento.datos);
+        } else {
+          _eventos.add(evento);
+        }
+      },
       onError: (Object error) {
         if (error is ApiException && error.statusCode == 401) {
           sesionInvalidada(error.message);
@@ -189,6 +201,7 @@ class SesionController extends ChangeNotifier {
     _temporizador?.cancel();
     _reconexion?.cancel();
     unawaited(_avisos?.cancel());
+    unawaited(_eventos.close());
     super.dispose();
   }
 }

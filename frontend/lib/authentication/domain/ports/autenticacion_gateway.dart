@@ -1,4 +1,5 @@
 import '../entities/desafio_verificacion.dart';
+import '../entities/evento_sesion.dart';
 import '../entities/sesion.dart';
 
 /// Puerto de salida hacia el servicio de autenticación. Todas las validaciones
@@ -21,8 +22,9 @@ abstract interface class AutenticacionGateway {
   /// Invalida en el servidor la sesión actual.
   Future<void> cerrarSesion();
 
-  /// Avisos del servidor sobre esta sesión: emite el motivo en cuanto se cierra
-  /// o la reemplaza otro dispositivo. Termina o falla si se corta la conexión;
+  /// Eventos del servidor sobre esta sesión por un único canal: `conectado` al abrirlo,
+  /// `sesion_cerrada` (con el motivo) en cuanto se cierra o la reemplaza otro dispositivo
+  /// y `notificacion` por cada aviso nuevo. Termina o falla si se corta la conexión;
   /// falla con `ApiException` 401 si la sesión ya no era válida al conectar.
-  Stream<String> cierresDeSesion();
+  Stream<EventoSesion> eventos();
 }

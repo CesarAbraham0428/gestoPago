@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/authentication/application/sesion_controller.dart';
 import 'package:frontend/authentication/domain/entities/desafio_verificacion.dart';
+import 'package:frontend/authentication/domain/entities/evento_sesion.dart';
 import 'package:frontend/authentication/domain/entities/sesion.dart';
 import 'package:frontend/authentication/domain/ports/almacen_sesion.dart';
 import 'package:frontend/authentication/domain/ports/autenticacion_gateway.dart';
@@ -57,7 +58,7 @@ class _Gateway implements AutenticacionGateway {
   }
 
   @override
-  Stream<String> cierresDeSesion() => Stream<String>.multi((_) {});
+  Stream<EventoSesion> eventos() => Stream<EventoSesion>.multi((_) {});
 }
 
 class _Almacen implements AlmacenSesion {

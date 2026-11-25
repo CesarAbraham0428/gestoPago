@@ -10,6 +10,8 @@ String formatoMoneda(num valor) => _moneda.format(valor);
 
 String formatoFecha(DateTime fecha) => _fecha.format(fecha.toLocal());
 
+String formatoHora(DateTime fecha) => _hora.format(fecha.toLocal());
+
 String formatoFechaHora(DateTime fecha) {
   final local = fecha.toLocal();
   return '${_fecha.format(local)}, ${_hora.format(local)}';

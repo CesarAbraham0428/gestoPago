@@ -36,8 +36,8 @@ Widget construirShellMovil(
                 destinations: [
                   for (final d in destinos)
                     NavigationRailDestination(
-                      icon: Icon(d.icono),
-                      selectedIcon: Icon(d.iconoActivo),
+                      icon: conInsignia(context, d, Icon(d.icono)),
+                      selectedIcon: conInsignia(context, d, Icon(d.iconoActivo)),
                       label: Text(d.etiqueta),
                     ),
                 ],
@@ -104,8 +104,8 @@ class _BarraInferior extends StatelessWidget {
             destinations: [
               for (final d in destinos)
                 NavigationDestination(
-                  icon: Icon(d.icono),
-                  selectedIcon: Icon(d.iconoActivo),
+                  icon: conInsignia(context, d, Icon(d.icono)),
+                  selectedIcon: conInsignia(context, d, Icon(d.iconoActivo)),
                   label: d.etiquetaCorta ?? d.etiqueta,
                   tooltip: d.etiqueta,
                 ),

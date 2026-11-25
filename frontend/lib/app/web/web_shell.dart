@@ -38,8 +38,8 @@ Widget construirShellWeb(
             destinations: [
               for (final d in destinos)
                 NavigationDestination(
-                  icon: Icon(d.icono),
-                  selectedIcon: Icon(d.iconoActivo),
+                  icon: conInsignia(context, d, Icon(d.icono)),
+                  selectedIcon: conInsignia(context, d, Icon(d.iconoActivo)),
                   label: d.etiqueta,
                 ),
             ],
@@ -324,11 +324,15 @@ class _ItemMenu extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  IconoEnRecuadro(
-                    icono: activo ? destino.iconoActivo : destino.icono,
-                    color: activo ? destino.color : claro,
-                    fondo: activo ? Colors.white : Colors.white.withValues(alpha: 0.10),
-                    tamano: 34,
+                  conInsignia(
+                    context,
+                    destino,
+                    IconoEnRecuadro(
+                      icono: activo ? destino.iconoActivo : destino.icono,
+                      color: activo ? destino.color : claro,
+                      fondo: activo ? Colors.white : Colors.white.withValues(alpha: 0.10),
+                      tamano: 34,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Flexible(

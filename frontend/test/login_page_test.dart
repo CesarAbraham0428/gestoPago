@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:frontend/core/ui/campo_codigo.dart';
 import 'package:frontend/authentication/application/sesion_controller.dart';
 import 'package:frontend/authentication/domain/entities/desafio_verificacion.dart';
+import 'package:frontend/authentication/domain/entities/evento_sesion.dart';
 import 'package:frontend/authentication/domain/entities/sesion.dart';
 import 'package:frontend/authentication/domain/ports/almacen_sesion.dart';
 import 'package:frontend/authentication/domain/ports/autenticacion_gateway.dart';
@@ -53,7 +54,7 @@ class _Gateway implements AutenticacionGateway {
   Future<void> cerrarSesion() async {}
 
   @override
-  Stream<String> cierresDeSesion() => Stream<String>.multi((_) {});
+  Stream<EventoSesion> eventos() => Stream<EventoSesion>.multi((_) {});
 }
 
 /// Cuenta inactiva: el servidor responde 403 ya al validar la contraseña.

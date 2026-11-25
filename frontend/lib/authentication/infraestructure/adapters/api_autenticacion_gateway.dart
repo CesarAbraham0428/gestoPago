@@ -2,6 +2,7 @@ import '../../../core/error/app_exception.dart';
 import '../../../core/error/mensajes_usuario.dart';
 import '../../../core/network/api_client.dart';
 import '../../domain/entities/desafio_verificacion.dart';
+import '../../domain/entities/evento_sesion.dart';
 import '../../domain/entities/sesion.dart';
 import '../../domain/ports/autenticacion_gateway.dart';
 
@@ -23,9 +24,10 @@ import '../../domain/ports/autenticacion_gateway.dart';
 ///   200 -> la sesión deja de ser válida de inmediato · 401 la sesión ya no estaba activa
 ///
 /// GET /auth/sesion/eventos (Bearer, text/event-stream)
-///   200 -> flujo Server-Sent Events: `conectado` al abrir, comentarios de latido
-///          y `sesion_cerrada` (data: motivo) cuando la sesión se cierra o la
-///          reemplaza otro dispositivo · 401 la sesión ya no era válida
+///   200 -> flujo Server-Sent Events: `conectado` al abrir, comentarios de latido,
+///          `sesion_cerrada` (data: motivo) cuando la sesión se cierra o la
+///          reemplaza otro dispositivo y `notificacion` (data: JSON) por cada aviso
+///          nuevo · 401 la sesión ya no era válida
 class ApiAutenticacionGateway implements AutenticacionGateway {
   ApiAutenticacionGateway(this._api);
   final ApiClient _api;
@@ -132,8 +134,5 @@ class ApiAutenticacionGateway implements AutenticacionGateway {
   }
 
   @override
-  Stream<String> cierresDeSesion() => _api
-      .eventos('/auth/sesion/eventos')
-      .where((e) => e.nombre == 'sesion_cerrada')
-      .map((e) => e.datos);
+  Stream<EventoSesion> eventos() => _api.eventos('/auth/sesion/eventos');
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../authentication/application/sesion_controller.dart';
+import 'dependencias.dart';
 import '../core/theme/app_colors.dart';
 
 /// Construye el marco de navegación (menú, barra superior) alrededor de la
@@ -56,6 +57,16 @@ const destinos = [
     descripcion: 'Tus recibos y pagos anteriores',
   ),
   DestinoNavegacion(
+    ruta: '/notificaciones',
+    etiqueta: 'Notificaciones',
+    etiquetaCorta: 'Avisos',
+    icono: Icons.notifications_none,
+    iconoActivo: Icons.notifications,
+    color: AppColors.indigo,
+    fondo: AppColors.indigoTenue,
+    descripcion: 'Avisos de tus pagos aprobados, rechazados o en revisión',
+  ),
+  DestinoNavegacion(
     ruta: '/perfil',
     etiqueta: 'Mi perfil',
     icono: Icons.person_outline,
@@ -76,9 +87,30 @@ const destinos = [
   ),
 ];
 
+/// Envuelve el icono de Notificaciones con la insignia de avisos sin leer; los
+/// demás destinos quedan igual.
+Widget conInsignia(
+  BuildContext context,
+  DestinoNavegacion destino,
+  Widget icono,
+) {
+  if (destino.ruta != '/notificaciones') return icono;
+  final bandeja = DependenciasScope.of(context).notificaciones;
+  return ListenableBuilder(
+    listenable: bandeja,
+    builder: (_, _) => Badge(
+      isLabelVisible: bandeja.noLeidas > 0,
+      label: Text(bandeja.noLeidas > 99 ? '99+' : '${bandeja.noLeidas}'),
+      child: icono,
+    ),
+  );
+}
+
 int indiceDestino(GoRouterState state) {
   final ruta = state.uri.path;
-  final i = destinos.indexWhere((d) => ruta == d.ruta || ruta.startsWith('${d.ruta}/'));
+  final i = destinos.indexWhere(
+    (d) => ruta == d.ruta || ruta.startsWith('${d.ruta}/'),
+  );
   return i < 0 ? 0 : i;
 }
 
@@ -135,7 +167,9 @@ class MenuUsuario extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                datos?.nombreCompleto.isNotEmpty == true ? datos!.nombreCompleto : 'Tu cuenta',
+                datos?.nombreCompleto.isNotEmpty == true
+                    ? datos!.nombreCompleto
+                    : 'Tu cuenta',
                 style: tema.titleMedium,
               ),
               Text(datos?.correo ?? '', style: tema.bodySmall),
@@ -176,6 +210,9 @@ PreferredSizeWidget barraSuperior(
           )
         : null,
     title: Text(tituloPantalla(state)),
-    actions: [menu ?? MenuUsuario(sesion: sesion), const SizedBox(width: 4)],
+    actions: [
+      menu ?? MenuUsuario(sesion: sesion),
+      const SizedBox(width: 4),
+    ],
   );
 }

@@ -18,6 +18,11 @@ import '../pagos/domain/ports/cuentas_repository.dart';
 import '../pagos/domain/ports/pagos_repository.dart';
 import '../pagos/infraestructure/adapters/api_cuentas_repository.dart';
 import '../pagos/infraestructure/adapters/api_pagos_repository.dart';
+import '../core/ui/notificaciones.dart';
+import '../notificaciones/application/notificaciones_controller.dart';
+import '../notificaciones/domain/entities/notificacion.dart';
+import '../notificaciones/domain/ports/notificaciones_repository.dart';
+import '../notificaciones/infraestructure/adapters/api_notificaciones_repository.dart';
 import '../perfil/application/perfil_controller.dart';
 import '../perfil/domain/ports/perfil_repository.dart';
 import '../perfil/infraestructure/adapters/api_perfil_repository.dart';
@@ -37,6 +42,7 @@ class Dependencias {
     required this.pagos,
     required this.realizarCompra,
     required this.perfil,
+    required this.notificaciones,
   });
 
   final SesionController sesion;
@@ -47,6 +53,7 @@ class Dependencias {
   final PagosRepository pagos;
   final RealizarCompra realizarCompra;
   final PerfilController perfil;
+  final NotificacionesController notificaciones;
 
   /// Construye el grafo con los adaptadores HTTP y de almacenamiento reales.
   /// Los parámetros opcionales permiten sustituir adaptadores en pruebas.
@@ -59,6 +66,7 @@ class Dependencias {
     PagosRepository? pagosRepositorio,
     CuentasRepository? cuentasRepositorio,
     PerfilRepository? perfilRepositorio,
+    NotificacionesRepository? notificacionesRepositorio,
     http.Client? clienteEventos,
   }) {
     late final SesionController sesion;
@@ -82,6 +90,13 @@ class Dependencias {
     final historial = HistorialController(pagos);
     final perfil = PerfilController(perfilRepositorio ?? ApiPerfilRepository(api));
 
+    final notificaciones = NotificacionesController(
+      notificacionesRepositorio ?? ApiNotificacionesRepository(api),
+      eventos: sesion.eventos,
+    );
+    // Cada aviso en tiempo real también sale como toast; la bandeja lo conserva.
+    notificaciones.nuevas.listen(_mostrarToast);
+
     // Al cerrar sesión se descartan los datos del usuario anterior.
     var estabaAutenticado = false;
     sesion.addListener(() {
@@ -89,6 +104,7 @@ class Dependencias {
         catalogo.limpiar();
         historial.limpiar();
         perfil.limpiar();
+        notificaciones.limpiar();
       }
       estabaAutenticado = sesion.autenticado;
     });
@@ -102,8 +118,15 @@ class Dependencias {
       pagos: pagos,
       realizarCompra: RealizarCompra(pagos),
       perfil: perfil,
+      notificaciones: notificaciones,
     );
   }
+
+  static void _mostrarToast(Notificacion n) => switch (n.tipo) {
+    TipoNotificacion.pagoAprobado => Notificaciones.exito(n.titulo, detalle: n.mensaje),
+    TipoNotificacion.pagoRechazado => Notificaciones.error(n.titulo, detalle: n.mensaje),
+    _ => Notificaciones.info(n.titulo, detalle: n.mensaje),
+  };
 }
 
 /// Expone [Dependencias] al árbol de widgets.
