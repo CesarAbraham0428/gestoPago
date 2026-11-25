@@ -16,7 +16,7 @@ El catálogo se consulta en el orden Redis → PostgreSQL → GestoPago. Los dat
 
 - **Edad:** el cliente debe tener al menos 18 años; la fecha de nacimiento es obligatoria y no puede ser futura.
 - **Identidad:** CURP y RFC son obligatorios, únicos e inmodificables. Se valida su formato mediante expresiones regulares: CURP de 18 caracteres y RFC de 12 o 13.
-- **Nombres:** primer nombre y ambos apellidos son obligatorios; segundo nombre es opcional. Cada valor proporcionado admite solo letras y espacios; los nombres de pila (primer y segundo) llevan de 3 a 50 caracteres y los apellidos de 2 a 50.
+- **Nombres:** primer nombre y ambos apellidos son obligatorios; segundo nombre es opcional. Cada valor proporcionado admite solo letras y espacios; los nombres y apellidos llevan de 3 a 50 caracteres.
 - **Contacto:** correo obligatorio, válido, único y de máximo 100 caracteres. El correo del usuario también es único y se sincroniza cuando cambia el del cliente. El teléfono móvil es obligatorio y debe tener exactamente 10 dígitos; el alternativo, si se proporciona, cumple la misma longitud.
 - **Domicilio y empleo (opcionales):** el registro puede omitir `domicilio`, `ocupacion`, `empresa` e `ingresoMensual`; se agregan después con `PATCH /clientes`. Si se envía el domicilio debe venir completo: `calle` y `colonia` de 3 a 100 caracteres, código postal de exactamente 5 dígitos. El ingreso mensual, si se captura, es mayor que cero. Un cliente sin domicilio se devuelve con `domicilio: null`.
 - **Cuentas:** número de cuenta único e inmodificable; saldo inicial no negativo, fijado actualmente en cero. Solo los clientes activos pueden tener cuentas activas.
