@@ -4,6 +4,7 @@ import com.proyecto.servicios.entity.gestopago.Producto;
 import com.proyecto.servicios.entity.sf.Cuenta;
 import com.proyecto.servicios.entity.sf.EstadoPago;
 import com.proyecto.servicios.entity.sf.Pago;
+import com.proyecto.servicios.entity.sf.TipoNotificacion;
 import com.proyecto.servicios.models.request.PagoServicioRequest;
 import com.proyecto.servicios.models.response.PagoServicioResponse;
 import com.proyecto.servicios.models.response.gestopago.GestoPagoPagosResponse;
@@ -42,13 +43,15 @@ public class PagoRegistroService {
     private final PagoRepository pagos;
     private final AutorizacionService autorizacion;
     private final OtpPagoService otpPago;
+    private final NotificacionService notificaciones;
 
     public PagoRegistroService(CuentaRepository cuentas, PagoRepository pagos,
-            AutorizacionService autorizacion, OtpPagoService otpPago) {
+            AutorizacionService autorizacion, OtpPagoService otpPago, NotificacionService notificaciones) {
         this.cuentas = cuentas;
         this.pagos = pagos;
         this.autorizacion = autorizacion;
         this.otpPago = otpPago;
+        this.notificaciones = notificaciones;
     }
 
     /** Un código OTP incorrecto no revierte la transacción: el intento fallido debe quedar guardado. */
@@ -114,6 +117,7 @@ public class PagoRegistroService {
         if (pago.getEstado() == EstadoPago.PENDIENTE) {
             pago.setEstado(EstadoPago.EN_REVISION);
             pago.setMensaje(recortar(motivo, LONGITUD_MENSAJE));
+            notificaciones.registrarPago(pago, TipoNotificacion.PAGO_EN_REVISION);
         }
     }
 
@@ -167,6 +171,7 @@ public class PagoRegistroService {
     }
 
     private void marcarAprobado(Pago pago, GestoPagoPagosResponse respuesta) {
+        boolean nuevo = pago.getEstado() != EstadoPago.APROBADO;
         pago.setEstado(EstadoPago.APROBADO);
         pago.setCodigoRespuesta(recortar(respuesta.getCodigo(), 4));
         pago.setIdTx(respuesta.getIdTx());
@@ -174,6 +179,9 @@ public class PagoRegistroService {
         pago.setComision(respuesta.getComision());
         String mensaje = respuesta.getLegend() != null ? respuesta.getLegend() : respuesta.getMensaje();
         pago.setMensaje(recortar(mensaje, LONGITUD_MENSAJE));
+        if (nuevo) {
+            notificaciones.registrarPago(pago, TipoNotificacion.PAGO_APROBADO);
+        }
     }
 
     private void devolverSaldo(Pago pago, String codigoRespuesta, String motivo) {
@@ -186,6 +194,7 @@ public class PagoRegistroService {
         pago.setEstado(EstadoPago.RECHAZADO);
         pago.setCodigoRespuesta(recortar(codigoRespuesta, 4));
         pago.setMensaje(recortar(motivo, LONGITUD_MENSAJE));
+        notificaciones.registrarPago(pago, TipoNotificacion.PAGO_RECHAZADO);
     }
 
     private Pago buscar(Integer pagoId) {

@@ -5,6 +5,7 @@ import com.proyecto.servicios.entity.sf.Cliente;
 import com.proyecto.servicios.entity.sf.Cuenta;
 import com.proyecto.servicios.entity.sf.EstadoPago;
 import com.proyecto.servicios.entity.sf.Pago;
+import com.proyecto.servicios.entity.sf.TipoNotificacion;
 import com.proyecto.servicios.entity.sf.Usuario;
 import com.proyecto.servicios.models.request.PagoServicioRequest;
 import com.proyecto.servicios.models.response.gestopago.GestoPagoPagosResponse;
@@ -32,8 +33,9 @@ class PagoRegistroServiceTest {
     private final CuentaRepository cuentas = mock(CuentaRepository.class);
     private final PagoRepository pagos = mock(PagoRepository.class);
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
+    private final NotificacionService notificaciones = mock(NotificacionService.class);
     private final PagoRegistroService service = new PagoRegistroService(cuentas, pagos,
-            new AutorizacionService(usuarios), new OtpPagoService(totp, em));
+            new AutorizacionService(usuarios), new OtpPagoService(totp, em), notificaciones);
     private final DestinoPago recarga = new DestinoPago("5512345678", null, null, BigDecimal.ZERO);
     private Cuenta cuenta;
     private Producto producto;
@@ -160,6 +162,7 @@ class PagoRegistroServiceTest {
         assertEquals(EstadoPago.RECHAZADO, pago.getEstado());
         assertEquals("02", pago.getCodigoRespuesta());
         assertEquals("<RESPONSE>02</RESPONSE>", pago.getRespuesta());
+        verify(notificaciones, times(1)).registrarPago(pago, TipoNotificacion.PAGO_RECHAZADO);
     }
 
     @Test
@@ -181,6 +184,16 @@ class PagoRegistroServiceTest {
         assertEquals("100024988", comprobante.numAutorizacion());
         assertEquals("REF1", comprobante.referencia());
         assertEquals(new BigDecimal("150.00"), comprobante.saldoDisponible());
+        verify(notificaciones).registrarPago(pago, TipoNotificacion.PAGO_APROBADO);
+    }
+
+    @Test
+    void confirmarAplicadoSobreUnPagoYaAprobadoNoRepiteLaNotificacion() {
+        Pago pago = pagoPendiente(EstadoPago.APROBADO);
+
+        service.confirmarAplicado(55, respuesta("06", "<RESPONSE>06</RESPONSE>"));
+
+        verify(notificaciones, never()).registrarPago(any(), any());
     }
 
     @Test
@@ -194,6 +207,7 @@ class PagoRegistroServiceTest {
         assertEquals(EstadoPago.APROBADO, pago.getEstado());
         assertEquals("<RESPONSE>06</RESPONSE>", pago.getRespuestaConfirmacion());
         assertEquals(new BigDecimal("150.00"), cuenta.getSaldo());
+        verify(notificaciones).registrarPago(pago, TipoNotificacion.PAGO_APROBADO);
     }
 
     @Test
@@ -205,6 +219,7 @@ class PagoRegistroServiceTest {
         assertEquals(EstadoPago.RECHAZADO, pago.getEstado());
         assertEquals(new BigDecimal("190.00"), cuenta.getSaldo());
         assertEquals("<RESPONSE>70</RESPONSE>", pago.getRespuestaConfirmacion());
+        verify(notificaciones).registrarPago(pago, TipoNotificacion.PAGO_RECHAZADO);
     }
 
     @Test

@@ -57,9 +57,9 @@ class PagosPostgresTest {
     @SpringBootConfiguration @EnableAutoConfiguration
     @Import({ConfigDB.class, FlywayConfig.class, SecurityConfiguration.class, JwtTokenService.class, ApiSecurityErrorWriter.class, LimitadorVentanaFija.class,
         ClienteController.class, CuentaController.class, UsuarioController.class, AutenticacionController.class,
-        PagoController.class, GlobalExceptionHandler.class,
+        PagoController.class, NotificacionController.class, GlobalExceptionHandler.class,
         ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class, UsuarioService.class,
-        AutenticacionServiceImpl.class, PagoServiceImpl.class, PagoRegistroService.class, OtpPagoService.class,
+        AutenticacionServiceImpl.class, PagoServiceImpl.class, PagoRegistroService.class, OtpPagoService.class, NotificacionService.class,
         GestoPagoPagosGateway.class, ResolutorDestinoPago.class, VerificadorAdeudo.class, ConciliacionPagoService.class,
         FirmaGestoPago.class, CifradoTokenConverter.class,
         CodigoVerificacionService.class, SesionService.class, NotificadorSesiones.class, TotpService.class, RelojDePrueba.class,
@@ -110,7 +110,7 @@ class PagosPostgresTest {
         String nombre = jdbc.queryForObject("select current_database()", String.class);
         assertTrue(nombre != null && nombre.matches("gestopago_backend_test_[a-f0-9]{32}"),
             "La limpieza solo está permitida en una BD temporal de pruebas");
-        jdbc.execute("TRUNCATE TABLE pagos, usuarios, cuentas, domicilios, clientes, producto RESTART IDENTITY CASCADE");
+        jdbc.execute("TRUNCATE TABLE notificaciones, pagos, usuarios, cuentas, domicilios, clientes, producto RESTART IDENTITY CASCADE");
         jdbc.update("insert into producto (producto, servicio, id_servicio, id_producto, id_cat_tipo_servicio, tipo_front, precio)"
             + " values ('Telcel $100', 'Telcel', 30, 20, 2, 1, 100.00), ('Luz', 'CFE', 31, 21, 5, 2, 12.00)");
         GestoPagoToken gp = new GestoPagoToken();
@@ -132,6 +132,30 @@ class PagosPostgresTest {
         assertSaldo("400.00");
         assertEquals("APROBADO", jdbc.queryForObject("select estado from pagos", String.class));
         assertEquals("<RESPONSE>01</RESPONSE>", jdbc.queryForObject("select respuesta from pagos", String.class));
+        assertEquals(List.of("PAGO_APROBADO"), tiposDeNotificacion());
+    }
+
+    @Test void lasNotificacionesDelPagoSoloLasVeSuDuenoYSePuedenMarcarComoLeidas() throws Exception {
+        when(gestoPago.enviar(any(), any())).thenReturn(respuesta("01", "<RESPONSE>01</RESPONSE>"));
+        pagar(recarga(codigoNuevo())).andExpect(status().isOk());
+
+        consultarNotificaciones(token).andExpect(status().isOk())
+            .andExpect(jsonPath("datos.noLeidas").value(1))
+            .andExpect(jsonPath("datos.lista.datos[0].tipo").value("PAGO_APROBADO"))
+            .andExpect(jsonPath("datos.lista.datos[0].mensaje").value(org.hamcrest.Matchers.containsString("••••5678")));
+
+        String otroToken = "Bearer " + registrarOtroClienteYIniciarSesion();
+        consultarNotificaciones(otroToken).andExpect(status().isOk())
+            .andExpect(jsonPath("datos.noLeidas").value(0));
+        Integer id = jdbc.queryForObject("select id from notificaciones", Integer.class);
+        mvc.perform(post("/notificaciones/leer").header("Authorization", otroToken).contentType("application/json")
+            .content("{\"id\":" + id + "}")).andExpect(status().isOk());
+        assertEquals(1, jdbc.queryForObject("select count(*) from notificaciones where not leida", Integer.class));
+
+        mvc.perform(post("/notificaciones/leer-todas").header("Authorization", token)).andExpect(status().isOk());
+        consultarNotificaciones(token).andExpect(jsonPath("datos.noLeidas").value(0));
+        mvc.perform(post("/notificaciones/consultar").contentType("application/json").content("{}"))
+            .andExpect(status().isUnauthorized());
     }
 
     @Test void pagoDeServicioCobraMontoMasComision() throws Exception {
@@ -154,6 +178,7 @@ class PagosPostgresTest {
 
         assertSaldo("500.00");
         assertEquals("Detalle interno del proveedor", jdbc.queryForObject("select mensaje from pagos", String.class));
+        assertEquals(List.of("PAGO_RECHAZADO"), tiposDeNotificacion());
     }
 
     @Test void timeoutRetieneElSaldoHastaQueConfirmTxDiceNoAplicada() throws Exception {
@@ -170,6 +195,7 @@ class PagosPostgresTest {
 
         assertSaldo("500.00");
         assertEquals("RECHAZADO", jdbc.queryForObject("select estado from pagos", String.class));
+        assertEquals(List.of("PAGO_EN_REVISION", "PAGO_RECHAZADO"), tiposDeNotificacion());
     }
 
     @Test void cincoCodigosIncorrectosBloqueanLosPagosAunqueLaTransaccionFalle() throws Exception {
@@ -235,6 +261,15 @@ class PagosPostgresTest {
                 .content("{\"upc\":\"" + upc + "\"}")).andExpect(status().isNotFound());
         mvc.perform(post("/pagos/consulta").contentType("application/json")
                 .content("{\"upc\":\"" + upc + "\"}")).andExpect(status().isUnauthorized());
+    }
+
+    private ResultActions consultarNotificaciones(String bearer) throws Exception {
+        return mvc.perform(post("/notificaciones/consultar").header("Authorization", bearer)
+            .contentType("application/json").content("{}"));
+    }
+
+    private List<String> tiposDeNotificacion() {
+        return jdbc.queryForList("select tipo from notificaciones order by id", String.class);
     }
 
     private ResultActions pagar(String cuerpo) throws Exception {

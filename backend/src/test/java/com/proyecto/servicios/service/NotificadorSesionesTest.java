@@ -4,7 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.proyecto.servicios.models.response.NotificacionResponse;
+import com.proyecto.servicios.service.NotificacionService.NotificacionCreada;
 import com.proyecto.servicios.service.NotificadorSesiones.SesionTerminada;
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -93,6 +96,27 @@ class NotificadorSesionesTest {
         assertTrue(aviso.contains("data:otro dispositivo"));
         assertEquals(1, nuevo.enviados.size());
         assertEquals(1, otroUsuario.enviados.size());
+        assertEquals(2, notificador.abiertas());
+    }
+
+    @Test
+    void unaNotificacionSoloLlegaAlCanalDelUsuarioYNoLoCierra() {
+        EmisorDePrueba suyo = new EmisorDePrueba();
+        EmisorDePrueba ajeno = new EmisorDePrueba();
+        EmisorDePrueba cortado = new EmisorDePrueba(null, true);
+        notificador.suscribir(1, "a", suyo);
+        notificador.suscribir(2, "b", ajeno);
+        notificador.suscribir(1, "c", cortado);
+
+        notificador.alCrearNotificacion(new NotificacionCreada(1,
+            new NotificacionResponse(9, "PAGO_APROBADO", "Pago aprobado", "Detalle", "UPC1", false, Instant.EPOCH)));
+
+        assertEquals(2, suyo.enviados.size());
+        assertTrue(suyo.enviados.get(1).contains("event:" + NotificadorSesiones.EVENTO_NOTIFICACION));
+        assertTrue(suyo.enviados.get(1).contains("Pago aprobado")); // el emisor de prueba recibe el objeto; Jackson lo serializa al enviar
+        assertEquals(1, ajeno.enviados.size());
+        assertTrue(!suyo.completado);
+        assertTrue(cortado.completado);
         assertEquals(2, notificador.abiertas());
     }
 

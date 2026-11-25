@@ -51,7 +51,7 @@ class PagosYCuentasComplementoTest {
     private final AutorizacionService autorizacion = new AutorizacionService(usuarios);
     private final CuentaService cuentaService = new CuentaService(cuentas, clientes, em, autorizacion);
     private final PagoRegistroService registro = new PagoRegistroService(cuentas, pagos, autorizacion,
-            new OtpPagoService(mock(TotpService.class), em));
+            new OtpPagoService(mock(TotpService.class), em), mock(NotificacionService.class));
     private Cliente cliente;
     private Usuario usuario;
     private Cuenta cuenta;

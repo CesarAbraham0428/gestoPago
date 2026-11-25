@@ -1,9 +1,11 @@
 package com.proyecto.servicios.service;
 
 import java.io.IOException;
+import com.proyecto.servicios.service.NotificacionService.NotificacionCreada;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -20,6 +22,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class NotificadorSesiones {
 
     public static final String EVENTO_CIERRE = "sesion_cerrada";
+    public static final String EVENTO_NOTIFICACION = "notificacion";
 
     /** Lo publica {@link SesionService}: terminaron las sesiones del usuario distintas de {@code jtiVigente}. */
     public record SesionTerminada(Integer usuarioId, String jtiVigente, String motivo) { }
@@ -64,6 +67,14 @@ public class NotificadorSesiones {
             }
             return afectada;
         });
+    }
+
+    /** Empuja la notificación a la sesión conectada del usuario; si no hay ninguna, queda en la bandeja. */
+    @TransactionalEventListener(fallbackExecution = true)
+    public void alCrearNotificacion(NotificacionCreada evento) {
+        suscripciones.removeIf(s -> s.usuarioId().equals(evento.usuarioId())
+                && !enviar(s, SseEmitter.event().name(EVENTO_NOTIFICACION)
+                        .data(evento.notificacion(), MediaType.APPLICATION_JSON)));
     }
 
     /** Latido para que proxies y balanceadores no corten un canal sin tráfico; descarta los canales muertos. */
