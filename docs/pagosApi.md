@@ -13,7 +13,7 @@ Documenta cómo la API de Spring Boot procesa `POST /pagos`: validaciones, cuán
 | `VerificadorAdeudo` | Compara el monto con el adeudo real (`verifyReference.do`) en los servicios que tienen consulta (sección 3.3). |
 | `GestoPagoPagosGateway` | Llama a `sendTx`, `confirmTx` y `verifyReference` con el token vigente; si GestoPago lo rechaza, lo renueva y reintenta **una vez**. |
 | `ConciliacionPagoService` | Resuelve con `confirmTx` los pagos sin resultado (sección 6). Lo invoca `PagoConciliacionScheduler`. |
-| `PinAutorizacionService` | Verifica el PIN y lo bloquea 15 min tras 5 intentos fallidos. Lo usan el pago y el cambio de PIN. |
+| `OtpPagoService` | Verifica el código TOTP de la app autenticadora del usuario y bloquea los pagos de la cuenta 15 min tras 5 códigos incorrectos. |
 | `PagoRegistroService` | Pasos transaccionales sobre BD (`reservar`, `aprobar`, `revertir`, `marcarEnRevision`, `confirmarAplicado`, `confirmarNoAplicado`). Cada método es una transacción corta. |
 | `GestoPagoPagosClient` | Llama a `sendTx.do`, `confirmTx.do` y `verifyReference.do` (Feign), interpreta el XML y clasifica los errores en *seguros* o *inciertos*. |
 | `PagoConciliacionScheduler` | Cada 60 s ejecuta `ConciliacionPagoService`, que llama a `confirmTx` para los pagos que quedaron sin resultado. |
@@ -32,7 +32,7 @@ Documenta cómo la API de Spring Boot procesa `POST /pagos`: validaciones, cuán
 | `monto` | Obligatorio, ≥ 0.01, máx. 2 decimales. |
 | `telefono` | Opcional, 10 dígitos (recargas). |
 | `referencia` | Opcional, alfanumérica 1–100 (pago de servicios). |
-| `pinAutorizacion` | Obligatorio, 4–6 dígitos. No aparece en logs (`toString` lo omite). |
+| `codigoOtp` | Obligatorio, 6 dígitos de la app autenticadora. No aparece en logs (`toString` lo omite). |
 
 Cualquier campo extra se rechaza (`@JsonAnySetter` lanza excepción). El cliente **no** dice si es recarga o servicio: la API lo decide con el `tipoFront` del producto.
 
@@ -53,7 +53,7 @@ POST /pagos
    ▼
  4. registro.reservar(...)          ══ TRANSACCIÓN 1 (commit) ══
       · bloquear cuenta (SELECT … FOR UPDATE)
-      · validar propietario, cuenta activa, PIN (con bloqueo por intentos), saldo
+      · validar propietario, cuenta activa, código OTP (con bloqueo por intentos), saldo
       · saldo = saldo - (monto + comisión)
       · INSERT pagos (estado PENDIENTE, upc, petición firmada en claro)
    │      ← el saldo ya está descontado y persistido
@@ -86,12 +86,12 @@ Se ejecutan en este orden, **con la cuenta ya bloqueada**:
 | Cuenta existe | 404 |
 | Usuario es propietario de la cuenta y usuario/cliente activos | 403 (401 si no hay usuario) |
 | Cuenta activa | 409 "La cuenta no está activa" |
-| Cuenta tiene PIN configurado | 409 |
-| PIN no bloqueado | 423 "El PIN está bloqueado por intentos fallidos…" |
-| PIN correcto (comparado con hash `PasswordEncoder`) | 403 "PIN de autorización incorrecto" |
+| Usuario con app autenticadora confirmada | 409 |
+| Pagos de la cuenta no bloqueados | 423 "Los pagos están bloqueados por códigos incorrectos…" |
+| Código TOTP válido y de un paso no usado (`TotpService`) | 403 "Código incorrecto o ya usado…" |
 | Saldo ≥ monto + comisión | 422 "Saldo insuficiente para realizar el pago" |
 
-Si alguna falla, la transacción se revierte completa: no se descuenta saldo ni se crea el pago. La única excepción es el PIN incorrecto: la transacción **sí se confirma** (`noRollbackFor = PinIncorrectoException`) para que el intento fallido quede guardado (ver 7.9).
+Si alguna falla, la transacción se revierte completa: no se descuenta saldo ni se crea el pago. La única excepción es el código incorrecto: la transacción **sí se confirma** (`noRollbackFor = OtpIncorrectoException`) para que el intento fallido quede guardado (ver 7.9).
 
 ### 3.3 Verificación del adeudo (`verifyReference.do`)
 
@@ -182,7 +182,7 @@ Por qué el `82` no se trata como error: GestoPago dice "la transacción no ha s
 | Más de `limite-por-minuto` solicitudes del mismo usuario en 60 s | Rechaza | 429 | Sin cambio |
 | Validación del request | Rechaza | 400 | Sin cambio |
 | Producto inexistente | Rechaza | 404 | Sin cambio |
-| Cuenta/propiedad/saldo/PIN inválido | Rechaza (ver 3.2) | 403 / 409 / 422 / 423 | Sin cambio |
+| Cuenta/propiedad/saldo/código OTP inválido | Rechaza (ver 3.2) | 403 / 409 / 422 / 423 | Sin cambio |
 | Monto distinto al adeudo, sin adeudo o consulta fallida | Rechaza (ver 3.3) | 400 / 422 / 502 | Sin cambio |
 | Timeout de lectura (70 s), HTTP 5xx/408, respuesta ilegible | `EN_REVISION` | 504 "quedó en revisión… no lo intentes de nuevo" | **Retenido** |
 | No se pudo conectar (`ConnectException`, DNS, connect timeout) | Revierte (GestoPago nunca recibió la petición) | 502 "no se realizó ningún cargo" | Devuelto |
@@ -261,23 +261,25 @@ Si GestoPago cobró (`01`) pero falla `registro.aprobar` (`DataAccessException`/
 
 ### 7.8 Evidencia (log en BD)
 
-La tabla `pagos` guarda `peticion`, `respuesta` y `respuesta_confirmacion` tal cual (requisito de GestoPago). Los logs de aplicación omiten token, cuerpo firmado y PIN. Las columnas del pedido (cuenta, producto, monto, upc, petición…) son `updatable = false`: no se pueden alterar después.
+La tabla `pagos` guarda `peticion`, `respuesta` y `respuesta_confirmacion` tal cual (requisito de GestoPago). Los logs de aplicación omiten token, cuerpo firmado y código OTP. Las columnas del pedido (cuenta, producto, monto, upc, petición…) son `updatable = false`: no se pueden alterar después.
 
-### 7.9 Bloqueo del PIN por intentos fallidos
+### 7.9 Código OTP y bloqueo por intentos fallidos
 
-Un PIN de 4 dígitos tiene solo 10,000 combinaciones, así que `PinAutorizacionService` cuenta los fallos en `cuentas.intentos_pin_fallidos`:
+Cada pago se autoriza con el código TOTP de la app autenticadora del usuario que paga, el mismo del segundo factor del inicio de sesión. `OtpPagoService` bloquea la fila del usuario (`em.refresh(usuario, PESSIMISTIC_WRITE)`) y, si el código es válido, anota su paso en `usuarios.totp_ultimo_paso`: un código no sirve dos veces, ni para dos pagos simultáneos ni para el login y un pago dentro de los mismos 30 s (hay que esperar el siguiente código).
 
-- Un PIN correcto reinicia el contador.
+Los fallos se cuentan en `cuentas.intentos_pin_fallidos` (el nombre de la columna viene del PIN anterior):
+
+- Un código correcto reinicia el contador.
 - Al **5.º** fallo se fija `cuentas.pin_bloqueado_hasta = ahora + 15 min` y el contador vuelve a 0.
-- Mientras dure el bloqueo, todo intento (incluso con el PIN correcto) responde **423**.
+- Mientras dure el bloqueo, todo intento (incluso con el código correcto) responde **423**.
 
-El contador debe sobrevivir a la excepción, por eso `reservar` y `CuentaService.configurarPin` usan `@Transactional(noRollbackFor = PinIncorrectoException.class)`. Antes de un fallo de PIN no se modifica nada más, así que confirmar la transacción no deja datos a medias. La fila de la cuenta está bloqueada (`FOR UPDATE`) en ambos casos, de modo que intentos simultáneos no pierden incrementos. El cambio de PIN también exige el PIN actual y comparte el mismo contador, para que no sea una vía alterna de fuerza bruta.
+El contador debe sobrevivir a la excepción, por eso `reservar` usa `@Transactional(noRollbackFor = OtpIncorrectoException.class)`. Antes de un fallo no se modifica nada más, así que confirmar la transacción no deja datos a medias. El código incorrecto responde 403 y no 401, porque el cliente trata el 401 como sesión vencida.
 
 ### 7.10 Límite de solicitudes (rate limiting)
 
 `LimitePagosService` incrementa `limite:pagos:<usuarioId>` en Redis (`INCR`; `EXPIRE` de 60 s en la primera solicitud de la ventana). Si se pasan de `gestopago.pagos.limite-por-minuto` (5 por defecto), responde 429 antes de tocar la BD o GestoPago. El contador vive en Redis, así que se comparte entre instancias.
 
-Si Redis no responde, la solicitud **pasa** y se deja un `warn`. Es una decisión deliberada: el bloqueo del PIN sigue protegiendo en la BD y una caída de Redis no debe detener los pagos.
+Si Redis no responde, la solicitud **pasa** y se deja un `warn`. Es una decisión deliberada: el bloqueo por códigos incorrectos sigue protegiendo en la BD y una caída de Redis no debe detener los pagos.
 
 ### 7.11 Token de GestoPago cifrado en reposo
 

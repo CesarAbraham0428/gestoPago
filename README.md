@@ -46,7 +46,6 @@ URL local predeterminada: `http://localhost:8080`. El registro y los dos pasos d
 | POST | `/usuarios/consultar` | Consultar usuarios mediante filtros combinables en JSON. |
 | PUT | `/usuarios/me/password` | Cambiar su contraseña con `passwordActual` y `passwordNueva`. |
 | GET | `/productos` | Consultar el catálogo de GestoPago. |
-| PUT | `/cuentas/pin` | Configurar o cambiar el PIN de autorización de pagos de una cuenta. |
 | POST | `/pagos` | Pagar una recarga (`tipoFront 1`) o un servicio con referencia (`tipoFront 2`) con el saldo de la cuenta. |
 | POST | `/pagos/consulta` | Consultar el estado de un pago con su `upc`. |
 | POST | `/pagos/historial` | Historial paginado de pagos del usuario autenticado, del más reciente al más antiguo. Cuerpo `{"pagina":0,"tamanio":20}` (ambos opcionales; `pagina` ≥ 0 y `tamanio` de 1 a 100, si no, 400). |
@@ -168,7 +167,7 @@ POST /auth/verificar  {"desafioId":"…","codigo":"123456","cerrarSesionAnterior
 | `monto` | Obligatorio, mayor a cero y con máximo 2 decimales. En recargas debe ser igual al precio del catálogo; en servicios con consulta de adeudo, igual al adeudo de la referencia. |
 | `telefono` | 10 dígitos. Obligatorio en recargas (`tipoFront 1`); no se usa en servicios. |
 | `referencia` | Alfanumérica. Obligatoria en servicios (`tipoFront 2`); no se usa en recargas. |
-| `pinAutorizacion` | Obligatorio, de 4 a 6 dígitos. |
+| `codigoOtp` | Obligatorio, 6 dígitos: el código actual de la app autenticadora del usuario. |
 
 Cualquier campo no listado se rechaza. El estado de un pago es `PENDIENTE`, `APROBADO`, `RECHAZADO` o `EN_REVISION`; los pagos aprobados devuelven los mismos datos que GestoPago (`idTx`, `numAutorizacion`, `fecha`) y, en artículos canjeables, `pin` y `legend`. El detalle del flujo está en [docs/pagosApi.md](docs/pagosApi.md) y el contrato del proveedor en [docs/pagosGestoPago.md](docs/pagosGestoPago.md).
 
@@ -184,7 +183,7 @@ Recarga sin referencia (`tipoFront 1`):
   "monto": 100,
   "telefono": "4181500241",
   "referencia": null,
-  "pinAutorizacion": "123456"
+  "codigoOtp": "123456"
 }
 ```
 
@@ -236,7 +235,7 @@ Pago de servicio con referencia (`tipoFront 2`):
   "monto": 100,
   "telefono": "4181500241",
   "referencia": "5555555555",
-  "pinAutorizacion": "123456"
+  "codigoOtp": "123456"
 }
 ```
 
@@ -296,15 +295,15 @@ Respuesta de ejemplo:
 ### Diseño de seguridad e integridad
 
 - **Validación de entrada y montos:** los Request DTO validan formato y rechazan campos desconocidos. El producto debe existir en el catálogo; el monto se compara con el precio del catálogo (recargas, que deben tener precio positivo) o con el adeudo real de la referencia (`verifyReference.do`, en los servicios que ofrecen la consulta). Una petición inválida, incompleta o con monto manipulado se rechaza antes de tocar el saldo.
-- **Identidad y autorización:** el usuario sale del JWT, nunca del body. Antes de cobrar se comprueba que la cuenta sea del usuario, que usuario y cliente estén activos, que la cuenta esté activa, que el PIN sea correcto (guardado como hash; se bloquea 15 minutos tras 5 intentos fallidos) y que el saldo alcance.
+- **Identidad y autorización:** el usuario sale del JWT, nunca del body. Antes de cobrar se comprueba que la cuenta sea del usuario, que usuario y cliente estén activos, que la cuenta esté activa, que el código OTP de la app autenticadora sea válido y no se haya usado antes (los pagos de la cuenta se bloquean 15 minutos tras 5 códigos incorrectos) y que el saldo alcance.
 - **Descuento del saldo:** el saldo se retiene antes de llamar a GestoPago y se devuelve solo cuando hay certeza de que el proveedor no cobró. Cada paso de base de datos es una transacción corta, para no mantener bloqueada la cuenta durante la llamada externa.
 - **Concurrencia y duplicados:** la cuenta se bloquea con `SELECT ... FOR UPDATE`, por lo que dos pagos simultáneos no gastan el mismo saldo. Cada pago lleva un `upc` aleatorio y único que identifica la operación ante GestoPago; además hay un límite de solicitudes por usuario (5 por minuto, configurable, contador en Redis) y GestoPago rechaza con código `06` los pagos duplicados.
 - **Fallos y tiempos de espera:** un timeout no se interpreta como pago fallido. El pago queda `EN_REVISION` con el monto retenido y un proceso programado lo resuelve con `confirmTx.do` (mismos parámetros, a partir de 62 s y dentro de 24 h); solo entonces se confirma o se devuelve el saldo. Si el token de GestoPago vence, se renueva y se reintenta una sola vez con el mismo `upc`.
 - **Secretos:** credenciales, llaves de firma y de cifrado se leen de variables de entorno (`.env` está en `.gitignore`). El token Bearer de GestoPago se guarda cifrado con AES-256-GCM, se envía solo en la cabecera `Authorization` y no aparece en respuestas ni en logs. La petición a GestoPago se firma con AES-256.
-- **Sin información sensible:** al cliente se le responde con mensajes propios, nunca con el texto del proveedor (que solo se guarda en la base de datos). Los logs omiten el token, el PIN y el cuerpo firmado.
+- **Sin información sensible:** al cliente se le responde con mensajes propios, nunca con el texto del proveedor (que solo se guarda en la base de datos). Los logs omiten el token, el código OTP y el cuerpo firmado.
 - **Errores centralizados:** `GlobalExceptionHandler` (`@RestControllerAdvice`) traduce cada escenario a su código HTTP (ver la tabla de errores).
 - **Capas:** `PagoController` solo recibe y delega; `PagoServiceImpl` orquesta el pago, apoyado en `ResolutorDestinoPago` (reglas por `tipoFront`), `VerificadorAdeudo`, `GestoPagoPagosGateway` (token y llamadas a GestoPago) y `ConciliacionPagoService`; `PagoRegistroService` y `PagoRepository` persisten el estado.
-- **Pruebas:** pruebas unitarias por componente, pruebas del controller y pruebas de integración contra PostgreSQL que incluyen pagos simultáneos, timeout con conciliación y bloqueo del PIN.
+- **Pruebas:** pruebas unitarias por componente, pruebas del controller y pruebas de integración contra PostgreSQL que incluyen pagos simultáneos, timeout con conciliación y bloqueo por códigos OTP incorrectos.
 
 ## Organización de DTO y errores
 
@@ -347,10 +346,10 @@ Las excepciones de negocio conservan mensajes específicos para correos, RFC y C
 | 401 | Credenciales incorrectas o falta de autenticación válida. |
 | 403 | Usuario o cliente inactivo en el login, o acceso a otro usuario. |
 | 404 | Cliente, cuenta o usuario no encontrado. |
-| 409 | Registro duplicado o conflicto con el estado del cliente, cuenta inactiva o sin PIN, o pago duplicado. |
+| 409 | Registro duplicado o conflicto con el estado del cliente, cuenta inactiva, app autenticadora sin configurar, o pago duplicado. |
 | 405 / 406 / 415 | Método HTTP, formato de respuesta o tipo de contenido no admitido. |
 | 422 | Pago: saldo insuficiente, referencia sin adeudo o rechazo del proveedor. |
-| 423 | El PIN de la cuenta está bloqueado por intentos fallidos. |
+| 423 | Los pagos de la cuenta están bloqueados por códigos OTP incorrectos. |
 | 429 | Demasiadas solicitudes de pago del mismo usuario. |
 | 500 | Error interno o de persistencia. |
 | 502 | Error al comunicarse con GestoPago. |
@@ -409,7 +408,7 @@ La suite cubre validación, clientes, cuentas, usuarios, autenticación, JWT, ca
 .\backend\scripts\test-postgres.ps1 -EsquemaManual
 ```
 
-Estas ejecuciones verifican, respectivamente, las migraciones en una base vacía y la adopción del esquema manual, y corren también las pruebas de integración de pagos (pagos simultáneos sobre una misma cuenta, conciliación tras un timeout y bloqueo del PIN). Crean y eliminan una base temporal, por lo que requieren permiso para crear bases. Sin `TEST_DB_URL`, las pruebas de PostgreSQL se omiten en `gradlew test`.
+Estas ejecuciones verifican, respectivamente, las migraciones en una base vacía y la adopción del esquema manual, y corren también las pruebas de integración de pagos (pagos simultáneos sobre una misma cuenta, conciliación tras un timeout y bloqueo por códigos OTP incorrectos). Crean y eliminan una base temporal, por lo que requieren permiso para crear bases. Sin `TEST_DB_URL`, las pruebas de PostgreSQL se omiten en `gradlew test`.
 
 ## Calidad del código (SonarQube)
 

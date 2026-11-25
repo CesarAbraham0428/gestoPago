@@ -38,7 +38,7 @@ lib/
 ├── authentication/   Registro, iniciar y cerrar sesión, sesión vigente
 ├── productos/        Catálogo y detalle
 ├── pagos/            Compra, resultado, historial
-├── perfil/           Datos del cliente, cuentas bancarias y PIN
+├── perfil/           Datos del cliente y cuentas bancarias
 │   ├── domain/
 │   │   ├── entities/        Modelos del negocio (sin Flutter ni HTTP)
 │   │   └── ports/           Puertos de salida: interfaces que el dominio necesita
@@ -66,8 +66,8 @@ lib/
 | Sesión única | Si el usuario ya tiene sesión en otro dispositivo (web o móvil), el servidor responde `409`; la app pide confirmar y reenvía el código con `cerrarSesionAnterior: true`. La sesión desplazada vuelve al login con el motivo **al instante**, aunque el usuario no esté navegando: la app mantiene abierto un canal Server-Sent Events (`GET /auth/sesion/eventos`) y el servidor le avisa. Si el canal se corta, se reabre con espera creciente (2 s, 4 s… hasta 64 s) y al volver a la app o pestaña; reabrirlo vuelve a validar la sesión (401 → login). |
 | Expiración de sesión | El token trae `expiraEnMs`; un temporizador cierra la sesión al vencer. Además se cierra tras 15 min sin interacción (`GuardiaInactividad`). Un `401` en cualquier ruta protegida también la cierra. |
 | Cierre de sesión | Llama a `/auth/logout` (el JWT queda revocado en el servidor) y borra el token del dispositivo y los datos en memoria (catálogo, historial). Si no hay red, igual se cierra localmente. |
-| Credenciales | Token en `flutter_secure_storage`; la contraseña y el PIN no se guardan, no se registran y los campos los ocultan. |
-| Validación | Formato de correo, celular, referencia, monto y PIN antes de enviar; el servidor vuelve a validar. |
+| Credenciales | Token en `flutter_secure_storage`; la contraseña y los códigos OTP no se guardan ni se registran; la contraseña se oculta. |
+| Validación | Formato de correo, celular, referencia, monto y código OTP antes de enviar; el servidor vuelve a validar. |
 | Errores | Se muestra el campo `mensaje` de la API (ya redactado para el usuario); los errores 5xx y de red usan textos genéricos. |
 
 ### Limitaciones
@@ -134,7 +134,7 @@ Las categorías de la interfaz (Recargas, Tarjetas y códigos, Pago de servicios
 | | |
 |---|---|
 | Endpoint | `POST /pagos` (Bearer) |
-| Cuerpo | `{ numeroCuenta (18 dígitos), idProducto, idServicio, monto (≥0.01, 2 decimales), telefono? (10 dígitos), referencia? (alfanumérica 1–100), pinAutorizacion (4–6 dígitos) }`. Un campo extra se rechaza. |
+| Cuerpo | `{ numeroCuenta (18 dígitos), idProducto, idServicio, monto (≥0.01, 2 decimales), telefono? (10 dígitos), referencia? (alfanumérica 1–100), codigoOtp (6 dígitos de la app autenticadora) }`. Un campo extra se rechaza. |
 | Respuesta 200 | `datos: { estado, idTx, numAutorizacion, monto, comision, referencia, saldoDisponible, fecha, pin?, legend? }` |
 | Tiempo de espera | 85 s (el servidor puede tardar hasta ~70 s) |
 | Adaptador | `pagos/infraestructure/adapters/api_pagos_repository.dart` |
@@ -144,7 +144,7 @@ Cada respuesta se clasifica en `pagos/application/realizar_compra.dart`:
 | Resultado en pantalla | Cuándo | Qué dice la app |
 |---|---|---|
 | **Compra exitosa** (recibo) | 200 y `estado == "APROBADO"` | Muestra el recibo. Es el único caso que cuenta como compra realizada. |
-| **Compra rechazada** | 400, 403 (PIN), 404, 409 (duplicado), 422 (saldo o rechazo), 423 (PIN bloqueado), 429 (límite), 503 | Muestra el mensaje del servidor y que no hubo cargo. Permite corregir y reintentar. |
+| **Compra rechazada** | 400, 403 (código OTP), 404, 409 (duplicado), 422 (saldo o rechazo), 423 (pagos bloqueados), 429 (límite), 503 | Muestra el mensaje del servidor y que no hubo cargo. Permite corregir y reintentar. |
 | **Compra pendiente** | 504 (pago en revisión), o 200 con otro estado | El saldo está retenido; no se debe repetir el pago. Extrae la referencia del mensaje y permite consultar su estado. |
 | **Error de comunicación** | 502 (proveedor sin recibir el pago, sin cargo) · otros 5xx, sin red o tiempo agotado (resultado **incierto**) | Si es incierto, indica revisar el historial antes de reintentar. |
 
@@ -176,8 +176,7 @@ Un 401 cierra la sesión.
 | Usuario | `GET /usuarios/me` (Bearer) → `datos: { clienteId, correo, ... }` |
 | Datos del cliente | `POST /clientes/consultar` (Bearer) · `{ correo, pagina: 0, tamanio: 5 }` → lista paginada; la app toma el cliente con el `clienteId` de `/usuarios/me` (a un administrador la consulta le devuelve varios) |
 | Editar | `PATCH /clientes` (Bearer) · `{ identificacion: { rfc }, cambios: { solo campos modificados } }` → `datos: ClienteResponse`. CURP, RFC y teléfono móvil son de solo lectura |
-| PIN de pagos | `PUT /cuentas/pin` (Bearer) · `{ numeroCuenta, pinActual?, pinNuevo }` (4–6 dígitos; `pinActual` solo si ya tenía PIN) |
-| Errores | 400 datos inválidos · 403 PIN actual incorrecto · 409 dato repetido · 423 PIN bloqueado |
+| Errores | 400 datos inválidos · 409 dato repetido |
 | Adaptador | `perfil/infraestructure/adapters/api_perfil_repository.dart` |
 
 ## Cambios en el backend
