@@ -132,9 +132,12 @@ void main() {
       await tester.tap(find.text('Mis compras'));
       await tester.pumpAndSettle();
       expect(find.text('Elige una compra'), findsOneWidget);
+      final consultas = (deps.pagos as PagosFalso).historiales;
       await tester.tap(find.text('Recarga 50'));
       await tester.pumpAndSettle();
       expect(find.text('Compra confirmada'), findsOneWidget);
+      // Elegir un pago solo muestra su recibo: no vuelve a consultar ni recarga la lista.
+      expect((deps.pagos as PagosFalso).historiales, consultas);
 
       await tester.tap(find.text('Catálogo'));
       await tester.pumpAndSettle();

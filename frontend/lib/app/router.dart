@@ -18,7 +18,8 @@ GoRouter crearRouter(Dependencias deps, ConstructorShell shell) {
     initialLocation: '/catalogo',
     refreshListenable: deps.sesion,
     redirect: (context, state) {
-      final enAcceso = state.uri.path == '/login' || state.uri.path == '/registro';
+      final enAcceso =
+          state.uri.path == '/login' || state.uri.path == '/registro';
       if (!deps.sesion.autenticado) return enAcceso ? null : '/login';
       if (enAcceso || state.uri.path == '/') return '/catalogo';
       return null;
@@ -52,16 +53,16 @@ GoRouter crearRouter(Dependencias deps, ConstructorShell shell) {
               ),
             ],
           ),
+          // Hermanas y con la misma llave de página: elegir un pago no crea otra pantalla,
+          // así la lista conserva su estado y su desplazamiento en vez de recargarse.
           GoRoute(
             path: '/compras',
-            builder: (context, state) => _historial(deps, null),
-            routes: [
-              GoRoute(
-                path: ':upc',
-                builder: (context, state) =>
-                    _historial(deps, state.pathParameters['upc']),
-              ),
-            ],
+            pageBuilder: (context, state) => _paginaHistorial(deps, null),
+          ),
+          GoRoute(
+            path: '/compras/:upc',
+            pageBuilder: (context, state) =>
+                _paginaHistorial(deps, state.pathParameters['upc']),
           ),
           GoRoute(
             path: '/notificaciones',
@@ -76,7 +77,8 @@ GoRouter crearRouter(Dependencias deps, ConstructorShell shell) {
           ),
           GoRoute(
             path: '/cuentas',
-            builder: (context, state) => CuentasBancariasPage(controller: deps.perfil),
+            builder: (context, state) =>
+                CuentasBancariasPage(controller: deps.perfil),
           ),
         ],
       ),
@@ -99,6 +101,13 @@ Widget _catalogo(Dependencias deps, String? clave) {
         alVerHistorial: () => context.go('/compras'),
       ),
     ),
+  );
+}
+
+Page<void> _paginaHistorial(Dependencias deps, String? upc) {
+  return NoTransitionPage(
+    key: const ValueKey('compras'),
+    child: _historial(deps, upc),
   );
 }
 
