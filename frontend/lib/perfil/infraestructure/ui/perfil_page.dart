@@ -10,7 +10,6 @@ import '../../../core/ui/widgets_estado.dart';
 import '../../../pagos/domain/entities/cuenta.dart';
 import '../../application/perfil_controller.dart';
 import '../../domain/entities/perfil.dart';
-import 'dialogo_pin.dart';
 import 'formulario_perfil.dart';
 
 /// Carga el perfil al abrirse y muestra cargando / error / [construir].
@@ -27,7 +26,8 @@ class _ConPerfilState extends State<_ConPerfil> {
   @override
   void initState() {
     super.initState();
-    if (widget.controller.estado == EstadoPerfil.inicial) widget.controller.cargar();
+    if (widget.controller.estado == EstadoPerfil.inicial)
+      widget.controller.cargar();
   }
 
   @override
@@ -200,24 +200,6 @@ class CuentasBancariasPage extends StatelessWidget {
   const CuentasBancariasPage({super.key, required this.controller});
   final PerfilController controller;
 
-  Future<void> _cambiarPin(BuildContext context, Cuenta cuenta) async {
-    final mensajes = ScaffoldMessenger.of(context);
-    final guardado = await showDialog<bool>(
-      context: context,
-      builder: (_) => DialogoCambiarPin(
-        numeroCuenta: cuenta.numeroCuenta,
-        alGuardar: (actual, nuevo) => controller.cambiarPin(
-          numeroCuenta: cuenta.numeroCuenta,
-          pinActual: actual,
-          pinNuevo: nuevo,
-        ),
-      ),
-    );
-    if (guardado == true) {
-      mensajes.showSnackBar(const SnackBar(content: Text('Tu PIN se actualizó.')));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return _ConPerfil(
@@ -243,8 +225,7 @@ class CuentasBancariasPage extends StatelessWidget {
                 detalle: 'No tienes cuentas bancarias registradas.',
               )
             else ...[
-              for (final c in p.cuentas)
-                _TarjetaCuenta(cuenta: c, alCambiarPin: () => _cambiarPin(context, c)),
+              for (final c in p.cuentas) _TarjetaCuenta(cuenta: c),
             ],
           ],
         );
@@ -295,9 +276,15 @@ class _Encabezado extends StatelessWidget {
               children: [
                 Monograma(nombre: perfil.nombreCompleto, tamano: 72),
                 const SizedBox(height: 14),
-                DefaultTextStyle.merge(textAlign: TextAlign.center, child: nombre),
+                DefaultTextStyle.merge(
+                  textAlign: TextAlign.center,
+                  child: nombre,
+                ),
                 const SizedBox(height: 4),
-                DefaultTextStyle.merge(textAlign: TextAlign.center, child: correo),
+                DefaultTextStyle.merge(
+                  textAlign: TextAlign.center,
+                  child: correo,
+                ),
                 const SizedBox(height: 18),
                 SizedBox(width: double.infinity, child: accion),
               ],
@@ -318,9 +305,7 @@ class _Encabezado extends StatelessWidget {
             ],
           );
         },
-    required this.alAgregar,
       ),
-  final VoidCallback alAgregar;
     );
   }
 }
@@ -333,7 +318,9 @@ class _Seccion extends StatelessWidget {
     required this.datos,
     required this.color,
     required this.fondo,
+    required this.alAgregar,
   });
+  final VoidCallback alAgregar;
   final IconData icono;
   final Color color;
   final Color fondo;
@@ -352,7 +339,12 @@ class _Seccion extends StatelessWidget {
         children: [
           Row(
             children: [
-              IconoEnRecuadro(icono: icono, color: color, fondo: fondo, tamano: 36),
+              IconoEnRecuadro(
+                icono: icono,
+                color: color,
+                fondo: fondo,
+                tamano: 36,
+              ),
               const SizedBox(width: 12),
               Text(titulo, style: tema.titleMedium),
             ],
@@ -361,7 +353,8 @@ class _Seccion extends StatelessWidget {
           LayoutBuilder(
             builder: (context, restricciones) {
               final columnas = restricciones.maxWidth >= 560 ? 2 : 1;
-              final ancho = (restricciones.maxWidth - 24 * (columnas - 1)) / columnas;
+              final ancho =
+                  (restricciones.maxWidth - 24 * (columnas - 1)) / columnas;
               return Wrap(
                 spacing: 24,
                 runSpacing: 16,
@@ -374,7 +367,9 @@ class _Seccion extends StatelessWidget {
                         children: [
                           Text(
                             e.key,
-                            style: tema.bodySmall?.copyWith(color: AppColors.tintaSuave),
+                            style: tema.bodySmall?.copyWith(
+                              color: AppColors.tintaSuave,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           if (e.value == null || e.value!.trim().isEmpty)
@@ -389,6 +384,11 @@ class _Seccion extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
 /// Marcador de un dato que el usuario no llenó: invita a completarlo.
 class _CampoPendiente extends StatelessWidget {
   const _CampoPendiente({required this.alTocar});
@@ -446,15 +446,9 @@ class _CampoPendiente extends StatelessWidget {
   }
 }
 
-      ),
-    );
-  }
-}
-
 class _TarjetaCuenta extends StatelessWidget {
-  const _TarjetaCuenta({required this.cuenta, required this.alCambiarPin});
+  const _TarjetaCuenta({required this.cuenta});
   final Cuenta cuenta;
-  final VoidCallback alCambiarPin;
 
   @override
   Widget build(BuildContext context) {
@@ -466,7 +460,10 @@ class _TarjetaCuenta extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text('Cuenta ${cuentaEnmascarada(cuenta.numeroCuenta)}', style: tema.titleMedium),
+                child: Text(
+                  'Cuenta ${cuentaEnmascarada(cuenta.numeroCuenta)}',
+                  style: tema.titleMedium,
+                ),
               ),
               EtiquetaEstado(
                 texto: cuenta.activa ? 'Activa' : 'Inactiva',
@@ -479,24 +476,6 @@ class _TarjetaCuenta extends StatelessWidget {
             numeroCuenta: cuenta.numeroCuenta,
             saldo: cuenta.saldo,
             activa: cuenta.activa,
-          ),
-          const Divider(height: 32, color: AppColors.lineaSuave),
-          Row(
-            children: [
-              const Icon(Icons.lock_outline, size: 18, color: AppColors.tintaSuave),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'PIN de autorización · ••••••',
-                  style: tema.bodyMedium?.copyWith(color: AppColors.tintaSuave),
-                ),
-              ),
-              TextButton.icon(
-                onPressed: alCambiarPin,
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('Cambiar PIN'),
-              ),
-            ],
           ),
         ],
       ),

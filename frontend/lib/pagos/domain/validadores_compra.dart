@@ -32,12 +32,4 @@ class ValidadoresCompra {
     return null;
   }
 
-  static String? pin(String? valor) {
-    final texto = valor ?? '';
-    if (texto.isEmpty) return 'Escribe tu PIN de autorización.';
-    if (!RegExp(r'^\d{4,6}$').hasMatch(texto)) {
-      return 'El PIN tiene de 4 a 6 dígitos.';
-    }
-    return null;
-  }
 }

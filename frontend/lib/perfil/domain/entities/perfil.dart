@@ -1,7 +1,13 @@
 import '../../../pagos/domain/entities/cuenta.dart';
 
 /// Valores que acepta la API para estado civil (con espacio en "Union libre").
-const estadosCiviles = ['Soltero', 'Casado', 'Divorciado', 'Viudo', 'Union libre'];
+const estadosCiviles = [
+  'Soltero',
+  'Casado',
+  'Divorciado',
+  'Viudo',
+  'Union libre',
+];
 const sexos = ['Masculino', 'Femenino'];
 
 class Domicilio {

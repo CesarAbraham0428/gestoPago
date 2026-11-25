@@ -59,7 +59,7 @@ SolicitudCompra _solicitud({String? telefono, String? referencia}) =>
       ),
       numeroCuenta: '123456789012345678',
       monto: 50,
-      pin: '1234',
+      codigoOtp: '123456',
       telefono: telefono,
       referencia: referencia,
     );
@@ -245,7 +245,7 @@ void main() {
       expect(await ApiCuentasRepository(s.api).obtenerActivas(), isEmpty);
     });
 
-    test('lee el bloqueo del PIN y ignora fechas ilegibles', () async {
+    test('lee el bloqueo de pagos y ignora fechas ilegibles', () async {
       final s = _Servidor({
         'datos': [
           {
@@ -337,7 +337,7 @@ void main() {
       expect(c.leyenda, 'Gracias');
       expect(s.cuerpo['telefono'], '5512345678');
       expect(s.cuerpo['referencia'], 'R1');
-      expect(s.cuerpo['pinAutorizacion'], '1234');
+      expect(s.cuerpo['codigoOtp'], '123456');
     });
 
     test('pagar sin teléfono/referencia ni datos opcionales', () async {

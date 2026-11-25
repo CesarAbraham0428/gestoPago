@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frontend/core/ui/campo_codigo.dart';
 import 'package:frontend/core/error/app_exception.dart';
 import 'package:frontend/pagos/application/realizar_compra.dart';
 import 'package:frontend/pagos/domain/entities/comprobante.dart';
@@ -78,8 +79,8 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> pagarConPin(WidgetTester tester, [String pin = '1234']) async {
-    await tester.enterText(campo('PIN de autorización'), pin);
+  Future<void> pagarConCodigo(WidgetTester tester, [String codigo = '123456']) async {
+    await tester.enterText(find.byKey(CampoCodigo.claveCampo), codigo);
     await tester.tap(find.textContaining('Pagar \$'));
     await tester.pump();
     await tester.pumpAndSettle();
@@ -184,7 +185,7 @@ void main() {
       expect(e.confirmadas, 0);
     });
 
-    testWidgets('PIN inválido, mostrar/ocultar y confirmar con el teclado', (tester) async {
+    testWidgets('código vacío y confirmar con el teclado', (tester) async {
       await abrir(tester, recarga);
       await tester.pumpAndSettle();
       await ponerCelular(tester);
@@ -192,15 +193,9 @@ void main() {
 
       await tester.tap(find.textContaining('Pagar \$'));
       await tester.pump();
-      expect(find.text('Escribe tu PIN de autorización.'), findsOneWidget);
+      expect(find.text('Escribe el código que muestra tu app de autenticación.'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Mostrar PIN'));
-      await tester.pump();
-      expect(find.byTooltip('Ocultar PIN'), findsOneWidget);
-      await tester.tap(find.byTooltip('Ocultar PIN'));
-      await tester.pump();
-
-      await tester.enterText(campo('PIN de autorización'), '1234');
+      await tester.enterText(find.byKey(CampoCodigo.claveCampo), '123456');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pumpAndSettle();
       expect(find.text('Recarga 50'), findsWidgets); // recibo del pago aprobado
@@ -213,7 +208,7 @@ void main() {
       await tester.pumpAndSettle();
       await ponerCelular(tester);
       await revisar(tester);
-      await pagarConPin(tester);
+      await pagarConCodigo(tester);
       expect(find.text('Compra confirmada'), findsOneWidget);
       expect(e.confirmadas, 1);
       expect(e.cuentas.llamadas, 2); // el saldo se recargó
@@ -232,7 +227,7 @@ void main() {
       await tester.pumpAndSettle();
       await ponerCelular(tester);
       await revisar(tester);
-      await tester.enterText(campo('PIN de autorización'), '1234');
+      await tester.enterText(find.byKey(CampoCodigo.claveCampo), '123456');
       await tester.tap(find.textContaining('Pagar \$'));
       await tester.pump();
       await tester.pump();
@@ -244,20 +239,20 @@ void main() {
 
     testWidgets('rechazada: corregir y reintentar conserva los datos', (tester) async {
       final pagos = PagosFalso()
-        ..alPagar = (_) async => throw const ApiException(422, 'PIN incorrecto');
+        ..alPagar = (_) async => throw const ApiException(403, 'Código incorrecto');
       await abrir(tester, recarga, pagos: pagos);
       await tester.pumpAndSettle();
       await ponerCelular(tester);
       await revisar(tester);
-      await pagarConPin(tester);
+      await pagarConCodigo(tester);
       expect(find.text('Compra rechazada'), findsOneWidget);
-      expect(find.textContaining('PIN incorrecto'), findsOneWidget);
+      expect(find.textContaining('Código incorrecto'), findsOneWidget);
       await tester.tap(find.text('Corregir y reintentar'));
       await tester.pumpAndSettle();
       expect(find.text('5512345678'), findsOneWidget);
     });
 
-    testWidgets('cuenta con el PIN bloqueado: no deja comprar y avisa', (tester) async {
+    testWidgets('cuenta con los pagos bloqueados: no deja comprar y avisa', (tester) async {
       final bloqueada = Cuenta(
         id: 1,
         numeroCuenta: '123456789012345678',
@@ -267,7 +262,7 @@ void main() {
       );
       await abrir(tester, recarga, cuentas: () async => [bloqueada]);
       await tester.pumpAndSettle();
-      expect(find.text('PIN bloqueado temporalmente'), findsOneWidget);
+      expect(find.text('Pagos bloqueados temporalmente'), findsOneWidget);
       expect(find.text('Compras bloqueadas'), findsOneWidget);
       expect(find.text('Realizar compra'), findsNothing);
       expect(find.textContaining('Podrás volver a comprar a las'), findsOneWidget);
@@ -292,11 +287,11 @@ void main() {
       expect(find.text('Compras bloqueadas'), findsNothing);
     });
 
-    testWidgets('el PIN que se bloquea al pagar muestra el bloqueo y no deja reintentar', (tester) async {
+    testWidgets('el código que bloquea los pagos muestra el bloqueo y no deja reintentar', (tester) async {
       final pagos = PagosFalso()
         ..alPagar = (_) async => throw const ApiException(
           422,
-          'PIN incorrecto; se bloqueó por 15 minutos por intentos fallidos',
+          'Código incorrecto; los pagos se bloquearon por 15 minutos por intentos fallidos',
         );
       var consultas = 0;
       await abrir(
@@ -320,8 +315,8 @@ void main() {
       await tester.pumpAndSettle();
       await ponerCelular(tester);
       await revisar(tester);
-      await pagarConPin(tester);
-      expect(find.text('PIN bloqueado temporalmente'), findsOneWidget);
+      await pagarConCodigo(tester);
+      expect(find.text('Pagos bloqueados temporalmente'), findsOneWidget);
       expect(find.text('Corregir y reintentar'), findsNothing);
       await tester.tap(find.text('Entendido'));
       await tester.pumpAndSettle();
@@ -333,7 +328,7 @@ void main() {
       final pagos = PagosFalso()
         ..alPagar = (_) async => throw const ApiException(
           422,
-          'PIN incorrecto; se bloqueó por 15 minutos por intentos fallidos',
+          'Código incorrecto; los pagos se bloquearon por 15 minutos por intentos fallidos',
         );
       var consultas = 0;
       await abrir(
@@ -357,8 +352,8 @@ void main() {
       await tester.pumpAndSettle();
       await ponerCelular(tester);
       await revisar(tester);
-      await pagarConPin(tester);
-      expect(find.text('PIN bloqueado temporalmente'), findsOneWidget);
+      await pagarConCodigo(tester);
+      expect(find.text('Pagos bloqueados temporalmente'), findsOneWidget);
 
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 400)));
       await tester.pump(const Duration(seconds: 1));
@@ -372,7 +367,7 @@ void main() {
       await tester.pumpAndSettle();
       await ponerCelular(tester);
       await revisar(tester);
-      await pagarConPin(tester);
+      await pagarConCodigo(tester);
       expect(find.text('No pudimos confirmar el resultado'), findsOneWidget);
       await tester.tap(find.text('Revisar mis compras'));
       expect(e.verHistorial, 1);
@@ -383,7 +378,7 @@ void main() {
       await tester.pumpAndSettle();
       await ponerCelular(tester);
       await revisar(tester);
-      await pagarConPin(tester);
+      await pagarConCodigo(tester);
       expect(find.text('No se pudo completar la compra'), findsOneWidget);
       await tester.tap(find.text('Intentar de nuevo'));
       await tester.pumpAndSettle();
@@ -397,7 +392,7 @@ void main() {
       await tester.pumpAndSettle();
       await ponerCelular(tester);
       await revisar(tester);
-      await tester.enterText(campo('PIN de autorización'), '1234');
+      await tester.enterText(find.byKey(CampoCodigo.claveCampo), '123456');
       await tester.tap(find.textContaining('Pagar \$'));
       await tester.pump();
       await tester.pump();
@@ -418,7 +413,7 @@ void main() {
       await tester.pumpAndSettle();
       await ponerCelular(tester);
       await revisar(tester);
-      await pagarConPin(tester);
+      await pagarConCodigo(tester);
       expect(find.text('Compra pendiente'), findsOneWidget);
       expect(find.text('ABCDEFGHIJ12345'), findsOneWidget);
       return e;
@@ -488,7 +483,7 @@ void main() {
       await tester.pumpAndSettle();
       await ponerCelular(tester);
       await revisar(tester);
-      await pagarConPin(tester);
+      await pagarConCodigo(tester);
       expect(find.text('Compra pendiente'), findsOneWidget);
       expect(find.text('Consultar estado'), findsNothing);
     });
@@ -549,7 +544,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Comisión'), findsOneWidget);
-      await pagarConPin(tester);
+      await pagarConCodigo(tester);
       expect(find.text('Compra confirmada'), findsOneWidget);
 
       await tester.tap(find.text('Comprar otro'));

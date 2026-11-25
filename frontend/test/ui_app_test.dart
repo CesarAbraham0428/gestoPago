@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:frontend/core/ui/campo_codigo.dart';
 import 'package:frontend/app/app.dart';
 import 'package:frontend/app/dependencias.dart';
 import 'package:frontend/app/mobile/mobile_shell.dart';
@@ -197,10 +198,7 @@ void main() {
       await tester.ensureVisible(find.text('Realizar compra'));
       await tester.tap(find.text('Realizar compra'));
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'PIN de autorización'),
-        '1234',
-      );
+      await tester.enterText(find.byKey(CampoCodigo.claveCampo), '123456');
       await tester.tap(find.textContaining('Pagar \$'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Ver mis compras'));

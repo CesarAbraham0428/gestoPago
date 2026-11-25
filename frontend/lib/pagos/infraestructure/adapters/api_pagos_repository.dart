@@ -12,11 +12,11 @@ import '../../domain/ports/pagos_repository.dart';
 /// POST /pagos  (Bearer)
 ///   {"numeroCuenta":"18 dígitos","idProducto":int,"idServicio":int,
 ///    "monto":number(2 dec),"telefono":"10 dígitos"?,"referencia":"alfanum"?,
-///    "pinAutorizacion":"4-6 dígitos"}
+///    "codigoOtp":"6 dígitos"}
 ///   200 -> datos: {estado,idTx,numAutorizacion,monto,comision,referencia,
 ///                  saldoDisponible,fecha,pin?,legend?}
-///   400 validación · 403 PIN/propiedad · 404 producto · 409 duplicado/cuenta
-///   422 saldo o rechazo · 423 PIN bloqueado · 429 límite · 502 sin cargo
+///   400 validación · 403 código OTP/propiedad · 404 producto · 409 duplicado/cuenta
+///   422 saldo o rechazo · 423 pagos bloqueados · 429 límite · 502 sin cargo
 ///   503 sin cargo · 504 en revisión (saldo retenido)
 ///
 /// POST /pagos/consulta (Bearer)  {"upc":"15 caracteres A-Z0-9"}
@@ -42,7 +42,7 @@ class ApiPagosRepository implements PagosRepository {
         'monto': solicitud.monto,
         if (solicitud.telefono != null) 'telefono': solicitud.telefono,
         if (solicitud.referencia != null) 'referencia': solicitud.referencia,
-        'pinAutorizacion': solicitud.pin,
+        'codigoOtp': solicitud.codigoOtp,
       },
     );
     final d = respuesta.dataAsMap;

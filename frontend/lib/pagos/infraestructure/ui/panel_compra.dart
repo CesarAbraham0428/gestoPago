@@ -7,6 +7,8 @@ import '../../../core/error/app_exception.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../authentication/domain/validadores_credenciales.dart';
+import '../../../core/ui/campo_codigo.dart';
 import '../../../core/ui/ilustracion.dart';
 import '../../../core/ui/tarjeta_debito.dart';
 import '../../../core/ui/widgets_estado.dart';
@@ -23,7 +25,7 @@ import 'recibo.dart';
 
 enum _Fase { formulario, enviando, resultado }
 
-/// Flujo de compra de un producto: formulario, confirmación con PIN, envío y
+/// Flujo de compra de un producto: formulario, confirmación con el código de la app autenticadora, envío y
 /// resultado. Cada desenlace (exitosa, rechazada, pendiente, error de
 /// comunicación) tiene su propia presentación.
 class PanelCompra extends StatefulWidget {
@@ -115,7 +117,7 @@ class _PanelCompraState extends State<PanelCompra> {
     }
   }
 
-  /// El servidor bloquea los pagos de la cuenta tras varios PIN incorrectos.
+  /// El servidor bloquea los pagos de la cuenta tras varios códigos incorrectos.
   DateTime? get _pinBloqueadoHasta {
     final c = _cuenta;
     return c != null && c.bloqueoRestante() != null ? c.pinBloqueadoHasta : null;
@@ -141,7 +143,7 @@ class _PanelCompraState extends State<PanelCompra> {
           'Tu saldo es ${formatoMoneda(cuenta.saldo)} y esta compra cuesta ${formatoMoneda(total)}.');
       return;
     }
-    final pin = await showDialog<String>(
+    final codigo = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _DialogoConfirmacion(
@@ -152,13 +154,13 @@ class _PanelCompraState extends State<PanelCompra> {
         referencia: _pideServicio ? _referencia.text.trim() : null,
       ),
     );
-    if (pin == null || !mounted) return;
+    if (codigo == null || !mounted) return;
 
     final solicitud = SolicitudCompra(
       producto: _p,
       numeroCuenta: cuenta.numeroCuenta,
       monto: monto,
-      pin: pin,
+      codigoOtp: codigo,
       telefono: _pideCelular ? _telefono.text.trim() : null,
       referencia: _pideServicio ? _referencia.text.trim() : null,
     );
@@ -167,7 +169,7 @@ class _PanelCompraState extends State<PanelCompra> {
       _solicitud = solicitud;
     });
     final resultado = await widget.realizarCompra.ejecutar(solicitud);
-    // Un PIN incorrecto pudo bloquear la cuenta: se consulta antes de mostrar el resultado.
+    // Un código incorrecto pudo bloquear la cuenta: se consulta antes de mostrar el resultado.
     if (resultado is CompraRechazada) await _cargarCuentas(silencioso: true);
     if (!mounted) return;
     setState(() {
@@ -435,7 +437,8 @@ class _Enviando extends StatelessWidget {
   }
 }
 
-/// Confirmación previa a cobrar: resume la operación y pide el PIN.
+/// Confirmación previa a cobrar: resume la operación y pide el código
+/// de la app autenticadora.
 class _DialogoConfirmacion extends StatefulWidget {
   const _DialogoConfirmacion({
     required this.producto,
@@ -457,18 +460,17 @@ class _DialogoConfirmacion extends StatefulWidget {
 
 class _DialogoConfirmacionState extends State<_DialogoConfirmacion> {
   final _clave = GlobalKey<FormState>();
-  final _pin = TextEditingController();
-  bool _ocultar = true;
+  final _codigo = TextEditingController();
 
   @override
   void dispose() {
-    _pin.dispose();
+    _codigo.dispose();
     super.dispose();
   }
 
   void _confirmar() {
     if (_clave.currentState?.validate() ?? false) {
-      Navigator.of(context).pop(_pin.text);
+      Navigator.of(context).pop(_codigo.text);
     }
   }
 
@@ -563,30 +565,16 @@ class _DialogoConfirmacionState extends State<_DialogoConfirmacion> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _pin,
+                Text(
+                  'Código de tu app autenticadora',
+                  style: tema.labelLarge,
+                ),
+                const SizedBox(height: 8),
+                CampoCodigo(
+                  controller: _codigo,
                   autofocus: true,
-                  obscureText: _ocultar,
-                  keyboardType: TextInputType.number,
-                  textInputAction: TextInputAction.done,
-                  enableSuggestions: false,
-                  autocorrect: false,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(6),
-                  ],
-                  onFieldSubmitted: (_) => _confirmar(),
-                  decoration: InputDecoration(
-                    labelText: 'PIN de autorización',
-                    helperText: 'De 4 a 6 dígitos',
-                    prefixIcon: const Icon(Icons.lock_outline, color: AppColors.marca),
-                    suffixIcon: IconButton(
-                      tooltip: _ocultar ? 'Mostrar PIN' : 'Ocultar PIN',
-                      icon: Icon(_ocultar ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                      onPressed: () => setState(() => _ocultar = !_ocultar),
-                    ),
-                  ),
-                  validator: ValidadoresCompra.pin,
+                  validator: ValidadoresCredenciales.codigo,
+                  alEnviar: _confirmar,
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -698,7 +686,7 @@ class _Rechazo extends StatelessWidget {
   }
 }
 
-/// PIN bloqueado por intentos fallidos: explica el bloqueo y cuenta hacia atrás
+/// Pagos bloqueados por códigos incorrectos: explica el bloqueo y cuenta hacia atrás
 /// hasta que se pueda volver a pagar; entonces avisa con [alTerminar].
 class _PinBloqueado extends StatefulWidget {
   const _PinBloqueado({required this.hasta, required this.alTerminar});
@@ -771,14 +759,14 @@ class _PinBloqueadoState extends State<_PinBloqueado> {
             ),
             const SizedBox(height: 8),
             Text(
-              'PIN bloqueado temporalmente',
+              'Pagos bloqueados temporalmente',
               textAlign: TextAlign.center,
               style: tema.titleLarge?.copyWith(color: AppColors.coral),
             ),
             const SizedBox(height: 6),
             Text(
               'Por tu seguridad bloqueamos las compras de esta cuenta tras '
-              'varios intentos con un PIN incorrecto. No se hizo ningún cargo.',
+              'varios intentos con un código incorrecto. No se hizo ningún cargo.',
               textAlign: TextAlign.center,
               style: tema.bodyMedium,
             ),
@@ -833,7 +821,7 @@ class _VistaResultado extends StatefulWidget {
   final ResultadoCompra resultado;
   final SolicitudCompra solicitud;
 
-  /// Hasta cuándo está bloqueado el PIN de la cuenta (si lo está).
+  /// Hasta cuándo están bloqueados los pagos de la cuenta (si lo está).
   final DateTime? pinBloqueadoHasta;
   final VoidCallback alDesbloquear;
   final PagosRepository pagos;

@@ -10,12 +10,4 @@ abstract interface class PerfilRepository {
     required String rfc,
     required Map<String, Object?> cambios,
   });
-
-  /// Cambia el PIN de autorización de la cuenta. [pinActual] solo hace falta
-  /// si la cuenta ya tiene uno.
-  Future<void> cambiarPin({
-    required String numeroCuenta,
-    String? pinActual,
-    required String pinNuevo,
-  });
 }

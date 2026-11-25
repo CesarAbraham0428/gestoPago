@@ -14,7 +14,7 @@ class Cuenta {
   final double saldo;
   final bool activa;
 
-  /// Tras demasiados PIN incorrectos el servidor bloquea los pagos de la cuenta
+  /// Tras demasiados códigos incorrectos el servidor bloquea los pagos de la cuenta
   /// hasta este momento; `null` si no está bloqueada.
   final DateTime? pinBloqueadoHasta;
 

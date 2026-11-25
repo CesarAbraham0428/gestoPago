@@ -38,7 +38,7 @@ const _solicitud = SolicitudCompra(
   producto: _recarga,
   numeroCuenta: '123456789012345678',
   monto: 50,
-  pin: '1234',
+  codigoOtp: '123456',
   telefono: '5512345678',
 );
 

@@ -207,8 +207,6 @@ class PerfilFalso implements PerfilRepository {
   Object? errorObtener;
   Object? errorActualizar;
   final List<Map<String, Object?>> cambiosRecibidos = [];
-  Object? errorPin;
-  final List<({String cuenta, String? actual, String nuevo})> pinesRecibidos = [];
 
   @override
   Future<Perfil> obtener() async {
@@ -216,15 +214,6 @@ class PerfilFalso implements PerfilRepository {
     return perfil;
   }
 
-  @override
-  Future<void> cambiarPin({
-    required String numeroCuenta,
-    String? pinActual,
-    required String pinNuevo,
-  }) async {
-    pinesRecibidos.add((cuenta: numeroCuenta, actual: pinActual, nuevo: pinNuevo));
-    if (errorPin != null) throw errorPin!; // ignore: only_throw_errors
-  }
 
   @override
   Future<Perfil> actualizar({

@@ -154,20 +154,6 @@ void main() {
       });
     });
 
-    test('cambiarPin envía PUT sin pinActual cuando no se da', () async {
-      responder = (_) => {};
-      final repo = ApiPerfilRepository(api());
-      await repo.cambiarPin(numeroCuenta: '123456789012345678', pinNuevo: '1234');
-      await repo.cambiarPin(numeroCuenta: '123456789012345678', pinActual: '0000', pinNuevo: '1234');
-      expect(peticiones.first.method, 'PUT');
-      expect(peticiones.first.url.path, '/cuentas/pin');
-      expect(jsonDecode(peticiones.first.body), {
-        'numeroCuenta': '123456789012345678',
-        'pinNuevo': '1234',
-      });
-      expect((jsonDecode(peticiones.last.body) as Map)['pinActual'], '0000');
-    });
-
     test('perfilDesdeJson rechaza datos incompletos', () {
       expect(() => perfilDesdeJson({..._clienteJson(), 'rfc': null}), throwsA(isA<AppException>()));
       expect(() => perfilDesdeJson({..._clienteJson(), 'domicilio': 'x'}), throwsA(isA<AppException>()));
@@ -216,17 +202,6 @@ void main() {
       expect(c.estado, EstadoPerfil.inicial);
     });
 
-    test('cambiarPin devuelve null o el mensaje de error', () async {
-      final repo = PerfilFalso();
-      final c = PerfilController(repo);
-      expect(await c.cambiarPin(numeroCuenta: '1', pinActual: '1111', pinNuevo: '2222'), isNull);
-      expect(repo.pinesRecibidos.single, (cuenta: '1', actual: '1111', nuevo: '2222'));
-      repo.errorPin = const ApiException(403, 'PIN incorrecto');
-      expect(await c.cambiarPin(numeroCuenta: '1', pinNuevo: '2222'), 'PIN incorrecto');
-      repo.errorPin = StateError('x');
-      expect(await c.cambiarPin(numeroCuenta: '1', pinNuevo: '2222'), isNotNull);
-    });
-
     test('error al cargar', () async {
       final repo = PerfilFalso()..errorObtener = const ConexionException();
       final c = PerfilController(repo);
@@ -243,15 +218,10 @@ void main() {
       final repo = PerfilFalso();
       final c = PerfilController(repo);
       await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 2400));
-      // El aviso se quita solo a los 4 s: se comprueba mientras está visible.
-      for (var i = 0; i < 10; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
+      await tester.pumpAndSettle();
       expect(find.text('Datos personales'), findsOneWidget);
       expect(find.text('Domicilio'), findsOneWidget);
       expect(find.text('Empleo'), findsOneWidget);
-      await drenarToasts(tester);
-      expect(find.text('Tus datos se guardaron.'), findsNothing);
       expect(find.text('Acme'), findsOneWidget);
 
       await tester.tap(find.text('Editar perfil'));
@@ -271,13 +241,17 @@ void main() {
       }
       expect(find.text('PELA950412AB1'), findsOneWidget);
       final alternativo = tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'Teléfono alternativo (opcional)'));
-      await drenarToasts(tester); // el aviso tapa el botón arriba a la derecha
       expect(alternativo.enabled, isNot(isFalse));
       await tester.tap(find.text('Guardar cambios'));
-      await tester.pumpAndSettle();
+      // El aviso se quita solo a los 4 s: se comprueba mientras está visible.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
       expect(repo.cambiosRecibidos.single, {'empresa': 'Nueva'});
       expect(find.text('Tus datos se guardaron.'), findsOneWidget);
       expect(find.text('Nueva'), findsOneWidget);
+      await drenarToasts(tester);
+      expect(find.text('Tus datos se guardaron.'), findsNothing);
     });
 
     testWidgets('perfil sin empleo ni domicilio: se ve vacío y se agregan al editar', (tester) async {
@@ -297,10 +271,10 @@ void main() {
       expect(repo.cambiosRecibidos, isEmpty);
 
       // Sin cambios la pantalla vuelve a la vista: se entra a editar de nuevo.
+      await drenarToasts(tester); // el aviso tapa el botón arriba a la derecha
       await tester.tap(find.text('Editar perfil'));
       await tester.pumpAndSettle();
 
-      await drenarToasts(tester);
       // Un domicilio a medias sí se rechaza: calle de 2 letras y el resto vacío.
       await tester.enterText(find.widgetWithText(TextFormField, 'Calle'), 'Re');
       await tester.tap(find.text('Guardar cambios'));
@@ -326,6 +300,7 @@ void main() {
       expect(cambios.containsKey('empresa'), isFalse);
       expect((cambios['domicilio']! as Map)['calle'], 'Reforma');
       expect((cambios['domicilio']! as Map)['pais'], 'México');
+      await drenarToasts(tester);
     });
 
     testWidgets('perfil: el teléfono alternativo se muestra con formato', (tester) async {
@@ -394,46 +369,6 @@ void main() {
       await tester.pump();
       expect(copiado, '123456789012345678');
       expect(find.text('Número de cuenta copiado.'), findsOneWidget);
-    });
-
-    testWidgets('cuentas bancarias: cambiar PIN con campos ocultos y ojito', (tester) async {
-      final repo = PerfilFalso();
-      await montar(tester, CuentasBancariasPage(controller: PerfilController(repo)));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Cambiar PIN').first);
-      await tester.pumpAndSettle();
-
-      bool oculto(String e) =>
-          tester.widget<EditableText>(find.descendant(
-            of: find.widgetWithText(TextFormField, e),
-            matching: find.byType(EditableText),
-          )).obscureText;
-      expect(oculto('PIN nuevo'), isTrue);
-      await tester.tap(find.byTooltip('Mostrar PIN nuevo'));
-      await tester.pump();
-      expect(oculto('PIN nuevo'), isFalse);
-      expect(oculto('PIN actual'), isTrue); // cada campo tiene su ojito
-
-      await tester.enterText(find.widgetWithText(TextFormField, 'PIN actual'), '1111');
-      await tester.enterText(find.widgetWithText(TextFormField, 'PIN nuevo'), '2222');
-      await tester.enterText(find.widgetWithText(TextFormField, 'Confirmar PIN nuevo'), '3333');
-      await tester.tap(find.text('Guardar PIN'));
-      await tester.pumpAndSettle();
-      expect(find.text('Los PIN no coinciden.'), findsOneWidget);
-      expect(repo.pinesRecibidos, isEmpty);
-
-      repo.errorPin = const ApiException(403, 'PIN incorrecto');
-      await tester.enterText(find.widgetWithText(TextFormField, 'Confirmar PIN nuevo'), '2222');
-      await tester.tap(find.text('Guardar PIN'));
-      await tester.pumpAndSettle();
-      expect(find.text('PIN incorrecto'), findsOneWidget); // el diálogo sigue abierto
-
-      repo.errorPin = null;
-      await tester.tap(find.text('Guardar PIN'));
-      await tester.pumpAndSettle();
-      expect(repo.pinesRecibidos.last.nuevo, '2222');
-      expect(find.text('Tu PIN se actualizó.'), findsOneWidget);
-      expect(find.text('Guardar PIN'), findsNothing);
     });
 
     testWidgets('cuentas bancarias: sin cuentas', (tester) async {

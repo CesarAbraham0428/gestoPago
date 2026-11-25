@@ -51,7 +51,10 @@ class PerfilController extends ChangeNotifier {
     notifyListeners();
     String? error;
     try {
-      _perfil = await _repositorio.actualizar(rfc: actual.rfc, cambios: cambios);
+      _perfil = await _repositorio.actualizar(
+        rfc: actual.rfc,
+        cambios: cambios,
+      );
     } on AppException catch (e) {
       error = e.message;
     } on Object {
@@ -60,27 +63,6 @@ class PerfilController extends ChangeNotifier {
     _guardando = false;
     notifyListeners();
     return error;
-  }
-
-  /// Cambia el PIN de una cuenta. Devuelve null si salió bien o el mensaje de
-  /// error. El PIN no se guarda aquí: solo pasa de la pantalla a la API.
-  Future<String?> cambiarPin({
-    required String numeroCuenta,
-    String? pinActual,
-    required String pinNuevo,
-  }) async {
-    try {
-      await _repositorio.cambiarPin(
-        numeroCuenta: numeroCuenta,
-        pinActual: pinActual,
-        pinNuevo: pinNuevo,
-      );
-      return null;
-    } on AppException catch (e) {
-      return e.message;
-    } on Object {
-      return 'No pudimos cambiar tu PIN.';
-    }
   }
 
   void limpiar() {

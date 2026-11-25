@@ -12,7 +12,6 @@ import '../../domain/ports/perfil_repository.dart';
 ///   -> datos: {datos:[ClienteResponse con domicilio y cuentas]}
 /// PATCH /clientes {identificacion:{rfc}, cambios:{...solo campos cambiados}}
 ///   -> datos: ClienteResponse
-/// PUT   /cuentas/pin {numeroCuenta, pinActual?, pinNuevo}
 ///
 /// Se filtra por el clienteId de /usuarios/me porque a un administrador la
 /// consulta le devuelve todos los clientes.
@@ -52,22 +51,6 @@ class ApiPerfilRepository implements PerfilRepository {
       },
     );
     return perfilDesdeJson(respuesta.dataAsMap);
-  }
-
-  @override
-  Future<void> cambiarPin({
-    required String numeroCuenta,
-    String? pinActual,
-    required String pinNuevo,
-  }) async {
-    await _api.put(
-      '/cuentas/pin',
-      body: {
-        'numeroCuenta': numeroCuenta,
-        'pinActual': ?pinActual,
-        'pinNuevo': pinNuevo,
-      },
-    );
   }
 
   static AppException _invalida() =>
@@ -132,12 +115,14 @@ Perfil perfilDesdeJson(Map<String, dynamic> j) {
                 final id = c['id'];
                 final numero = c['numeroCuenta'];
                 final saldo = c['saldo'];
-                if (id is! int || numero is! String || saldo is! num) return null;
+                if (id is! int || numero is! String || saldo is! num)
+                  return null;
                 return Cuenta(
                   id: id,
                   numeroCuenta: numero,
                   saldo: saldo.toDouble(),
-                  activa: c['estaActiva'] == true,                );
+                  activa: c['estaActiva'] == true,
+                );
               })
               .whereType<Cuenta>()
               .toList(growable: false)

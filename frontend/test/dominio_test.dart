@@ -48,7 +48,7 @@ SolicitudCompra _solicitud() => SolicitudCompra(
   producto: _producto(),
   numeroCuenta: '123456789012345678',
   monto: 50,
-  pin: '1234',
+  codigoOtp: '123456',
 );
 
 void main() {
@@ -118,12 +118,6 @@ void main() {
       expect(ValidadoresCompra.monto('10.50'), isNull);
     });
 
-    test('pin', () {
-      expect(ValidadoresCompra.pin(null), isNotNull);
-      expect(ValidadoresCompra.pin(''), isNotNull);
-      expect(ValidadoresCompra.pin('12'), contains('4 a 6'));
-      expect(ValidadoresCompra.pin('1234'), isNull);
-    });
   });
 
   group('Producto', () {
@@ -233,7 +227,7 @@ void main() {
         producto: _producto(tipoFront: 2, precio: 3),
         numeroCuenta: '123456789012345678',
         monto: 100,
-        pin: '9876',
+        codigoOtp: '123456',
       );
       expect(s.total, 103);
       expect(s.toString(), isNot(contains('9876')));
@@ -324,9 +318,9 @@ void main() {
       expect((p500 as ErrorDeComunicacion).resultadoIncierto, isTrue);
 
       final p422 = await ejecutar(
-        () async => throw const ApiException(422, 'PIN incorrecto'),
+        () async => throw const ApiException(422, 'Saldo insuficiente'),
       );
-      expect((p422 as CompraRechazada).mensaje, 'PIN incorrecto');
+      expect((p422 as CompraRechazada).mensaje, 'Saldo insuficiente');
     });
 
     test('fallos de conexión y errores inesperados son inciertos', () async {

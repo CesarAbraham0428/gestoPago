@@ -230,7 +230,7 @@ void main() {
           producto: producto('Recarga 50', 'Telcel', 1),
           numeroCuenta: '123456789012345678',
           monto: 50,
-          pin: '1234',
+          codigoOtp: '123456',
           telefono: telefono,
           referencia: referencia,
         );

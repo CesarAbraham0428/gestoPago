@@ -13,7 +13,7 @@ class CompraExitosa extends ResultadoCompra {
   final Comprobante comprobante;
 }
 
-/// El pago no se realizó y no se cobró nada (validación, PIN, saldo, rechazo
+/// El pago no se realizó y no se cobró nada (validación, código, saldo, rechazo
 /// del proveedor).
 class CompraRechazada extends ResultadoCompra {
   const CompraRechazada(this.mensaje);

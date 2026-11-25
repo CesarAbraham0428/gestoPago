@@ -54,7 +54,6 @@ import 'package:frontend/perfil/application/perfil_controller.dart';
 import 'package:frontend/perfil/domain/entities/perfil.dart';
 import 'package:frontend/perfil/domain/ports/perfil_repository.dart';
 import 'package:frontend/perfil/infraestructure/adapters/api_perfil_repository.dart';
-import 'package:frontend/perfil/infraestructure/ui/dialogo_pin.dart';
 import 'package:frontend/perfil/infraestructure/ui/formulario_perfil.dart';
 import 'package:frontend/perfil/infraestructure/ui/perfil_page.dart';
 import 'package:frontend/core/ui/logo_app.dart';

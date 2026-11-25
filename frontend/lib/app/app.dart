@@ -35,7 +35,11 @@ Future<void> iniciarAplicacion(
 }
 
 class GestoPagoApp extends StatefulWidget {
-  const GestoPagoApp({super.key, required this.dependencias, required this.shell});
+  const GestoPagoApp({
+    super.key,
+    required this.dependencias,
+    required this.shell,
+  });
 
   final Dependencias dependencias;
   final ConstructorShell shell;
