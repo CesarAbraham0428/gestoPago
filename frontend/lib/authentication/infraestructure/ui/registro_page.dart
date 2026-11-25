@@ -637,27 +637,24 @@ class _RegistroPageState extends State<RegistroPage> {
   ]);
 
   Widget _domicilio() => _Columna(gap: _gap, [
-    _fila(
-      flex: [4, 2, 3],
-      minAncho: 460,
-      [
-        _campo(
-          'calle',
-          'Calle',
-          validator: (v) => ValidadoresRegistro.requerido(v, min: 3, max: 100),
-          max: 100,
-          capitalizar: TextCapitalization.words,
-          hints: [AutofillHints.streetAddressLine1],
-        ),
-        _campo(
-          'numeroExterior',
-          'Exterior',
-          validator: (v) => ValidadoresRegistro.requerido(v, max: 50),
-          max: 50,
-        ),
-        _campo('numeroInterior', 'Interior (opcional)', max: 50),
-      ],
+    // La calle va sola: compartir fila con los números dejaba las etiquetas cortadas.
+    _campo(
+      'calle',
+      'Calle',
+      validator: (v) => ValidadoresRegistro.requerido(v, min: 3, max: 100),
+      max: 100,
+      capitalizar: TextCapitalization.words,
+      hints: [AutofillHints.streetAddressLine1],
     ),
+    _fila(minAncho: 360, [
+      _campo(
+        'numeroExterior',
+        'Número exterior',
+        validator: (v) => ValidadoresRegistro.requerido(v, max: 50),
+        max: 50,
+      ),
+      _campo('numeroInterior', 'Número interior (opcional)', max: 50),
+    ]),
     _fila(
       flex: [3, 2],
       [
@@ -864,7 +861,7 @@ class _RegistroPageState extends State<RegistroPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (var i = 0; i < hijos.length; i++) ...[
-                if (i > 0) const SizedBox(width: 12),
+                if (i > 0) const SizedBox(width: 16),
                 Expanded(flex: flex?[i] ?? 1, child: hijos[i]),
               ],
             ],
