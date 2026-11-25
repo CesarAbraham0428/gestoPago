@@ -5,7 +5,6 @@ import '../../authentication/application/sesion_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/ui/breakpoints.dart';
 import '../../core/ui/ilustracion.dart';
-import '../../core/ui/monograma.dart';
 import '../../core/ui/logo_app.dart';
 import '../dependencias.dart';
 import '../shell_comun.dart';
@@ -104,7 +103,8 @@ class _MarcoAnchoState extends State<_MarcoAncho> {
                 _CabeceraContenido(
                   destino: destinoActual(widget.state),
                   menuAbierto: _menuAbierto,
-                  alAlternarMenu: () => setState(() => _menuAbierto = !_menuAbierto),
+                  alAlternarMenu: () =>
+                      setState(() => _menuAbierto = !_menuAbierto),
                 ),
                 Expanded(child: widget.contenido),
               ],
@@ -165,7 +165,11 @@ class _CabeceraContenido extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(destino.etiqueta, overflow: TextOverflow.ellipsis, style: tema.titleLarge),
+                Text(
+                  destino.etiqueta,
+                  overflow: TextOverflow.ellipsis,
+                  style: tema.titleLarge,
+                ),
                 Text(
                   destino.descripcion,
                   overflow: TextOverflow.ellipsis,
@@ -190,9 +194,6 @@ class _BarraLateral extends StatelessWidget {
   Widget build(BuildContext context) {
     final tema = Theme.of(context).textTheme;
     final activo = esNotificaciones(state) ? -1 : indiceDestino(state);
-    final datos = sesion.sesion;
-    final conNombre = datos?.nombreCompleto.isNotEmpty == true;
-    final nombre = conNombre ? datos!.nombreCompleto : (datos?.correo ?? '');
     return Container(
       width: 248,
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
@@ -231,53 +232,19 @@ class _BarraLateral extends StatelessWidget {
               alTocar: () => context.go(destinos[i].ruta),
             ),
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
+          // Rojo claro sobre fondo rojo translúcido: contrasta con el verde sin romper la paleta.
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              foregroundColor: const Color(0xFFFFB4AB),
+              backgroundColor: const Color(0xFFE5484D).withValues(alpha: 0.18),
+              side: BorderSide(
+                color: const Color(0xFFFF8A80).withValues(alpha: 0.45),
+              ),
+              minimumSize: const Size.fromHeight(48),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Monograma(nombre: nombre, tamano: 36),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            nombre,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: tema.titleSmall?.copyWith(color: Colors.white),
-                          ),
-                          if (conNombre)
-                            Text(
-                              datos!.correo,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: tema.bodySmall?.copyWith(color: Colors.white70),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white24),
-                  ),
-                  onPressed: () => confirmarCierreDeSesion(context, sesion),
-                  icon: const Icon(Icons.logout, size: 18),
-                  label: const Text('Cerrar sesión'),
-                ),
-              ],
-            ),
+            onPressed: () => confirmarCierreDeSesion(context, sesion),
+            icon: const Icon(Icons.logout, size: 18),
+            label: const Text('Cerrar sesión'),
           ),
         ],
       ),
@@ -307,7 +274,9 @@ class _ItemMenu extends StatelessWidget {
         button: true,
         selected: activo,
         child: Material(
-          color: activo ? Colors.white.withValues(alpha: 0.14) : Colors.transparent,
+          color: activo
+              ? Colors.white.withValues(alpha: 0.14)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -328,7 +297,9 @@ class _ItemMenu extends StatelessWidget {
                   IconoEnRecuadro(
                     icono: activo ? destino.iconoActivo : destino.icono,
                     color: activo ? destino.color : claro,
-                    fondo: activo ? Colors.white : Colors.white.withValues(alpha: 0.10),
+                    fondo: activo
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.10),
                     tamano: 34,
                   ),
                   const SizedBox(width: 12),
@@ -338,7 +309,9 @@ class _ItemMenu extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: tema.bodyLarge?.copyWith(
                         fontWeight: activo ? FontWeight.w700 : FontWeight.w500,
-                        color: activo ? Colors.white : Colors.white.withValues(alpha: 0.82),
+                        color: activo
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.82),
                       ),
                     ),
                   ),

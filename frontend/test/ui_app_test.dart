@@ -40,7 +40,12 @@ void main() {
       pagosRepositorio: pagos,
       cuentasRepositorio: CuentasFalso(
         () async => [
-          const Cuenta(id: 1, numeroCuenta: '123456789012345678', saldo: 900, activa: true),
+          const Cuenta(
+            id: 1,
+            numeroCuenta: '123456789012345678',
+            saldo: 900,
+            activa: true,
+          ),
         ],
       ),
     );
@@ -109,11 +114,16 @@ void main() {
   });
 
   group('shell web', () {
-    testWidgets('barra lateral: navegar, detalle y cerrar sesión', (tester) async {
+    testWidgets('barra lateral: navegar, detalle y cerrar sesión', (
+      tester,
+    ) async {
       final deps = await crear(sesion: sesionPrueba());
       await abrir(tester, deps, construirShellWeb);
-      expect(find.text('Ana Pérez'), findsOneWidget);
-      expect(find.text('ana@example.com'), findsOneWidget);
+      expect(
+        find.text('Ana Pérez'),
+        findsNothing,
+      ); // la barra ya no muestra al usuario
+      expect(find.text('ana@example.com'), findsNothing);
 
       await tester.tap(find.text('Recarga 50'));
       await tester.pumpAndSettle();
@@ -137,7 +147,7 @@ void main() {
 
       await tester.tap(find.text('Cerrar sesión'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Cerrar sesión'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Cerrar sesión').last);
       await tester.pumpAndSettle();
       expect(deps.sesion.autenticado, isFalse);
       expect(find.text('Inicia sesión'), findsOneWidget);
@@ -145,22 +155,16 @@ void main() {
       await cerrar(tester, deps);
     });
 
-    testWidgets('barra lateral sin nombre muestra solo el correo', (tester) async {
-      final sinNombre = Sesion(
-        token: 't',
-        correo: 'solo@example.com',
-        nombreCompleto: '',
-        expiraEn: DateTime.now().add(const Duration(hours: 1)),
-      );
-      final deps = await crear(sesion: sinNombre);
-      await abrir(tester, deps, construirShellWeb);
-      expect(find.text('solo@example.com'), findsOneWidget);
-      await cerrar(tester, deps);
-    });
-
-    testWidgets('pantalla angosta: barra superior y navegación inferior', (tester) async {
+    testWidgets('pantalla angosta: barra superior y navegación inferior', (
+      tester,
+    ) async {
       final deps = await crear(sesion: sesionPrueba());
-      await abrir(tester, deps, construirShellWeb, tamano: const Size(500, 900));
+      await abrir(
+        tester,
+        deps,
+        construirShellWeb,
+        tamano: const Size(500, 900),
+      );
       expect(find.byType(NavigationBar), findsOneWidget);
 
       await tester.tap(find.text('Mis compras').last);
@@ -210,9 +214,16 @@ void main() {
   });
 
   group('shell móvil', () {
-    testWidgets('angosto: navegación inferior y menú de usuario', (tester) async {
+    testWidgets('angosto: navegación inferior y menú de usuario', (
+      tester,
+    ) async {
       final deps = await crear(sesion: sesionPrueba());
-      await abrir(tester, deps, construirShellMovil, tamano: const Size(420, 900));
+      await abrir(
+        tester,
+        deps,
+        construirShellMovil,
+        tamano: const Size(420, 900),
+      );
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.byType(NavigationRail), findsNothing);
 
@@ -234,7 +245,12 @@ void main() {
 
     testWidgets('ancho: riel de navegación', (tester) async {
       final deps = await crear(sesion: sesionPrueba());
-      await abrir(tester, deps, construirShellMovil, tamano: const Size(900, 900));
+      await abrir(
+        tester,
+        deps,
+        construirShellMovil,
+        tamano: const Size(900, 900),
+      );
       expect(find.byType(NavigationRail), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
       await tester.tap(find.text('Mis compras'));
@@ -251,7 +267,12 @@ void main() {
         expiraEn: DateTime.now().add(const Duration(hours: 1)),
       );
       final deps = await crear(sesion: sinNombre);
-      await abrir(tester, deps, construirShellMovil, tamano: const Size(420, 900));
+      await abrir(
+        tester,
+        deps,
+        construirShellMovil,
+        tamano: const Size(420, 900),
+      );
       await tester.tap(find.byTooltip('Tu cuenta'));
       await tester.pumpAndSettle();
       expect(find.text('Tu cuenta'), findsWidgets);
@@ -263,11 +284,15 @@ void main() {
   });
 
   group('GestoPagoApp', () {
-    testWidgets('cambiar las dependencias reconstruye el ámbito', (tester) async {
+    testWidgets('cambiar las dependencias reconstruye el ámbito', (
+      tester,
+    ) async {
       final a = await crear(sesion: sesionPrueba());
       final b = await crear();
       await abrir(tester, a, construirShellWeb);
-      await tester.pumpWidget(GestoPagoApp(dependencias: b, shell: construirShellWeb));
+      await tester.pumpWidget(
+        GestoPagoApp(dependencias: b, shell: construirShellWeb),
+      );
       await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox());
       a.sesion.dispose();
@@ -277,12 +302,21 @@ void main() {
 
   group('iniciarAplicacion', () {
     testWidgets('se niega a arrancar sin HTTPS en producción', (tester) async {
-      await iniciarAplicacion(construirShellWeb, produccion: true, conexionPermitida: false);
+      await iniciarAplicacion(
+        construirShellWeb,
+        produccion: true,
+        conexionPermitida: false,
+      );
       await tester.pump();
-      expect(find.textContaining('no puede conectarse de forma segura'), findsOneWidget);
+      expect(
+        find.textContaining('no puede conectarse de forma segura'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('arranque normal restaura la sesión y muestra el login', (tester) async {
+    testWidgets('arranque normal restaura la sesión y muestra el login', (
+      tester,
+    ) async {
       FlutterSecureStorage.setMockInitialValues({});
       tester.view.physicalSize = const Size(500, 900);
       tester.view.devicePixelRatio = 1;
@@ -293,24 +327,34 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
 
-    testWidgets('en producción con la URL por omisión (local) arranca', (tester) async {
-      FlutterSecureStorage.setMockInitialValues({});
-      tester.view.physicalSize = const Size(500, 900);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      await tester.runAsync(() => iniciarAplicacion(construirShellMovil, produccion: true));
-      await tester.pumpAndSettle();
-      expect(find.text('Inicia sesión'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
-    });
-
-    testWidgets('en producción con HTTPS permitido arranca normalmente', (tester) async {
+    testWidgets('en producción con la URL por omisión (local) arranca', (
+      tester,
+    ) async {
       FlutterSecureStorage.setMockInitialValues({});
       tester.view.physicalSize = const Size(500, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await tester.runAsync(
-        () => iniciarAplicacion(construirShellMovil, produccion: true, conexionPermitida: true),
+        () => iniciarAplicacion(construirShellMovil, produccion: true),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Inicia sesión'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('en producción con HTTPS permitido arranca normalmente', (
+      tester,
+    ) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      tester.view.physicalSize = const Size(500, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.runAsync(
+        () => iniciarAplicacion(
+          construirShellMovil,
+          produccion: true,
+          conexionPermitida: true,
+        ),
       );
       await tester.pumpAndSettle();
       expect(find.text('Inicia sesión'), findsOneWidget);
