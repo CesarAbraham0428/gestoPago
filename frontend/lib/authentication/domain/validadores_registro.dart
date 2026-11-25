@@ -26,8 +26,8 @@ class ValidadoresRegistro {
   }
 
   /// Nombre o apellido: solo letras y espacios, de [min] a 50 caracteres.
-  /// Los nombres de pila piden 3; los apellidos, 2.
-  static String? nombre(String? v, {bool opcional = false, int min = 2}) {
+  /// Nombres y apellidos piden 3 por defecto.
+  static String? nombre(String? v, {bool opcional = false, int min = 3}) {
     final t = v?.trim() ?? '';
     if (t.isEmpty) return opcional ? null : _obligatorio;
     return t.length >= min && t.length <= 50 && _letras.hasMatch(t)

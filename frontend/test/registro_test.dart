@@ -52,7 +52,7 @@ void main() {
       expect(ValidadoresRegistro.nombre('Ana', min: 3), isNull);
       expect(ValidadoresRegistro.nombre('Jo', opcional: true, min: 3), isNotNull);
       expect(ValidadoresRegistro.nombre('', opcional: true, min: 3), isNull);
-      expect(ValidadoresRegistro.nombre('Li'), isNull);
+      expect(ValidadoresRegistro.nombre('Li'), isNotNull);
     });
 
     test('requerido con mínimo y máximo (calle y colonia: 3 a 100)', () {
