@@ -169,6 +169,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Saldo insuficiente'), findsNothing);
     });
+
+    testWidgets('sin saldo suficiente avisa desde el inicio y deshabilita la compra', (tester) async {
+      await abrir(tester, recarga, cuentas: () async => [_cuenta2]);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Saldo insuficiente'), findsOneWidget);
+      final boton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Realizar compra'));
+      expect(boton.onPressed, isNull);
+    });
   });
 
   group('diálogo de confirmación', () {

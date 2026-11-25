@@ -65,7 +65,6 @@ class _PanelCompraState extends State<PanelCompra> {
   _Fase _fase = _Fase.formulario;
   ResultadoCompra? _resultado;
   SolicitudCompra? _solicitud;
-  String? _errorSaldo;
 
   Producto get _p => widget.producto;
   bool get _pideCelular =>
@@ -75,7 +74,7 @@ class _PanelCompraState extends State<PanelCompra> {
   @override
   void initState() {
     super.initState();
-    _monto.addListener(() => setState(() => _errorSaldo = null));
+    _monto.addListener(() => setState(() {}));
     _cargarCuentas();
   }
 
@@ -133,20 +132,21 @@ class _PanelCompraState extends State<PanelCompra> {
     return monto == null ? null : monto + _p.comision;
   }
 
+  /// Mensaje si la cuenta elegida no alcanza para el total; null si alcanza o aún no hay total.
+  String? get _errorSaldo {
+    final cuenta = _cuenta;
+    final total = _total;
+    if (cuenta == null || total == null || cuenta.saldo >= total) return null;
+    return 'Tu saldo es ${formatoMoneda(cuenta.saldo)} y esta compra cuesta ${formatoMoneda(total)}.';
+  }
+
   Future<void> _revisar() async {
     if (_pinBloqueadoHasta != null) return;
     if (!(_clave.currentState?.validate() ?? false)) return;
     final cuenta = _cuenta;
     final monto = _montoIngresado;
     if (cuenta == null || monto == null) return;
-    final total = monto + _p.comision;
-    if (cuenta.saldo < total) {
-      setState(
-        () => _errorSaldo =
-            'Tu saldo es ${formatoMoneda(cuenta.saldo)} y esta compra cuesta ${formatoMoneda(total)}.',
-      );
-      return;
-    }
+    if (_errorSaldo != null) return;
     final codigo = await showDialog<String>(
       context: context,
       barrierDismissible: false,
@@ -253,6 +253,7 @@ class _PanelCompraState extends State<PanelCompra> {
       );
     }
     final total = _total;
+    final errorSaldo = _errorSaldo;
     return Form(
       key: _clave,
       child: Column(
@@ -281,10 +282,7 @@ class _PanelCompraState extends State<PanelCompra> {
                     ),
                   ),
               ],
-              onChanged: (c) => setState(() {
-                _cuenta = c;
-                _errorSaldo = null;
-              }),
+              onChanged: (c) => setState(() => _cuenta = c),
             ),
           const SizedBox(height: 16),
           if (_pideCelular)
@@ -343,13 +341,13 @@ class _PanelCompraState extends State<PanelCompra> {
                 ? 'Incluye ${formatoMoneda(_p.comision)} de comisión'
                 : null,
           ),
-          if (_errorSaldo != null) ...[
+          if (errorSaldo != null) ...[
             const SizedBox(height: 12),
             AvisoEstado(
               tono: Tono.rechazo,
               icono: Icons.error_outline,
               titulo: 'Saldo insuficiente',
-              texto: _errorSaldo!,
+              texto: errorSaldo,
             ),
           ],
           const SizedBox(height: 16),
@@ -363,7 +361,7 @@ class _PanelCompraState extends State<PanelCompra> {
             ),
           ] else
             FilledButton.icon(
-              onPressed: _revisar,
+              onPressed: errorSaldo == null ? _revisar : null,
               icon: const Icon(Icons.shopping_cart_checkout),
               label: const Text('Realizar compra'),
             ),
