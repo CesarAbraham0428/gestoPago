@@ -13,7 +13,6 @@ import com.proyecto.servicios.models.request.ClienteActualizacionPorIdentidadReq
 import com.proyecto.servicios.models.request.ClienteConsultaRequest;
 import com.proyecto.servicios.models.request.ClienteIdentificacionRequest;
 import com.proyecto.servicios.models.request.ClienteRequest;
-import com.proyecto.servicios.models.request.CuentaPinRequest;
 import com.proyecto.servicios.models.request.DomicilioRequest;
 import com.proyecto.servicios.models.request.LoginRequest;
 import com.proyecto.servicios.models.request.PagoServicioRequest;
@@ -35,12 +34,11 @@ class ModelosTest {
 
     @Test
     void laPeticionesRechazanCamposDesconocidosYNoRevelanSecretosEnToString() {
-        assertThrows(IllegalArgumentException.class, () -> new CuentaPinRequest("1", "1234", "5678").rechazarCampo("x", 1));
         assertThrows(IllegalArgumentException.class, () -> new LoginRequest("a@b.mx", "secreto").rechazarCampo("x", 1));
         assertThrows(IllegalArgumentException.class,
                 () -> new VerificacionCodigoRequest("d", "123456", false).rechazarCampo("x", 1));
         assertThrows(IllegalArgumentException.class,
-                () -> new PagoServicioRequest("1", 1, 1, BigDecimal.ONE, null, null, "1234").rechazarCampo("x", 1));
+                () -> new PagoServicioRequest("1", 1, 1, BigDecimal.ONE, null, null, "123456").rechazarCampo("x", 1));
         assertThrows(IllegalArgumentException.class,
                 () -> new DomicilioRequest("c", "1", null, "c", "m", "e", "12345", "p").rechazarCampo("x", 1));
         assertThrows(IllegalArgumentException.class,
@@ -50,7 +48,7 @@ class ModelosTest {
         assertThrows(IllegalArgumentException.class, () -> new ClienteConsultaRequest().rechazarCampo("x", 1));
         assertThrows(IllegalArgumentException.class, () -> clienteRequest().rechazarCampo("x", 1));
 
-        assertFalse(new CuentaPinRequest("123", "1234", "5678").toString().contains("5678"));
+        assertFalse(new PagoServicioRequest("1", 1, 1, BigDecimal.ONE, null, null, "654321").toString().contains("654321"));
         assertFalse(new LoginRequest("a@b.mx", "secreto").toString().contains("secreto"));
         assertFalse(new DesafioResponse.Enrolamiento("SECRETOBASE32", "otpauth://totp/x?secret=SECRETOBASE32")
                 .toString().contains("SECRETOBASE32"));

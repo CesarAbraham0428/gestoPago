@@ -26,10 +26,8 @@ import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import com.proyecto.servicios.service.exception.ClienteNoEncontradoException;
 import com.proyecto.servicios.service.exception.CuentaNoEncontradaException;
 import com.proyecto.servicios.service.exception.NegocioException;
-import com.proyecto.servicios.service.exception.PinIncorrectoException;
 import com.proyecto.servicios.service.exception.ValidacionException;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -40,23 +38,20 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 /** Rutas secundarias de CuentaService, PagoRegistroService y AutorizacionService. */
 class PagosYCuentasComplementoTest {
 
     private static final String NUMERO = "000000000000000001";
-    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
     private final CuentaRepository cuentas = mock(CuentaRepository.class);
     private final ClientesRepository clientes = mock(ClientesRepository.class);
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
     private final PagoRepository pagos = mock(PagoRepository.class);
     private final EntityManager em = mock(EntityManager.class);
     private final AutorizacionService autorizacion = new AutorizacionService(usuarios);
-    private final CuentaService cuentaService = new CuentaService(cuentas, clientes, em, autorizacion, encoder,
-            new PinAutorizacionService(encoder));
+    private final CuentaService cuentaService = new CuentaService(cuentas, clientes, em, autorizacion);
     private final PagoRegistroService registro = new PagoRegistroService(cuentas, pagos, autorizacion,
-            new PinAutorizacionService(encoder));
+            new OtpPagoService(mock(TotpService.class), em));
     private Cliente cliente;
     private Usuario usuario;
     private Cuenta cuenta;
@@ -136,35 +131,16 @@ class PagosYCuentasComplementoTest {
     }
 
     @Test
-    void configurarPinInicialNoVerificaElPinActual() {
-        when(cuentas.findByNumeroCuentaAndClienteId(NUMERO, 3)).thenReturn(Optional.of(cuenta));
-
-        cuentaService.configurarPin(NUMERO, null, "1234", 7);
-
-        verify(em).refresh(cuenta, LockModeType.PESSIMISTIC_WRITE);
-        assertTrue(encoder.matches("1234", cuenta.getPinHash()));
-    }
-
-    @Test
-    void cambiarElPinExigeElActualYLoReemplaza() {
-        cuenta.setPinHash(encoder.encode("1234"));
-        when(cuentas.findByNumeroCuentaAndClienteId(NUMERO, 3)).thenReturn(Optional.of(cuenta));
-
-        assertThrows(PinIncorrectoException.class, () -> cuentaService.configurarPin(NUMERO, "0000", "9999", 7));
-        cuentaService.configurarPin(NUMERO, "1234", "9999", 7);
-
-        assertTrue(encoder.matches("9999", cuenta.getPinHash()));
-    }
-
-    @Test
     void unAdministradorBuscaLaCuentaSinFiltrarPorCliente() {
         cliente.setRol(Rol.Administrador);
         when(cuentas.findByNumeroCuenta(NUMERO)).thenReturn(Optional.of(cuenta));
 
-        cuentaService.configurarPin(NUMERO, null, "1234", 7);
+        when(clientes.bloquearPorId(3)).thenReturn(Optional.of(cliente));
+
+        cuentaService.cambiarEstado(NUMERO, false, 7);
         when(cuentas.findByNumeroCuenta(NUMERO)).thenReturn(Optional.empty());
 
-        assertThrows(CuentaNoEncontradaException.class, () -> cuentaService.configurarPin(NUMERO, null, "1", 7));
+        assertThrows(CuentaNoEncontradaException.class, () -> cuentaService.cambiarEstado(NUMERO, false, 7));
     }
 
     // ---------- PagoRegistroService ----------

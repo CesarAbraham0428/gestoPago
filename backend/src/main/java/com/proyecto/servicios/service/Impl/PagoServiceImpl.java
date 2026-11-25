@@ -39,7 +39,7 @@ import java.time.format.DateTimeFormatter;
 
 /**
  * Flujo del pago de servicios:
- * 1. Generar la petición (validar catálogo, cuenta, saldo y PIN; retener saldo).
+ * 1. Generar la petición (validar catálogo, cuenta, saldo y código OTP; retener saldo).
  * 2. Pagar servicio: serializar la petición a JSON.
  * 3. Firmar la petición (AES-256).
  * 4. Enviar a sendTx.do con el token vigente de GestoPago ({@link GestoPagoPagosGateway}) y validar que CODIGO sea 01.

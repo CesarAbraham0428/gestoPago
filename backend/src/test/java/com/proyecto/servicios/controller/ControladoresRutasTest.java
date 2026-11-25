@@ -26,7 +26,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-/** Rutas de los controladores que no tenían prueba: registro, baja, PIN e historial de pagos. */
+/** Rutas de los controladores que no tenían prueba: registro, baja e historial de pagos. */
 class ControladoresRutasTest {
 
     private static final String JSON = "application/json";
@@ -102,20 +102,6 @@ class ControladoresRutasTest {
                 .andExpect(jsonPath("mensaje").value("Cliente desactivado"));
 
         verify(clientes).desactivar(any(), eq(7));
-    }
-
-    @Test
-    void configurarPinPasaLosTresDatosYElUsuario() throws Exception {
-        CuentaService cuentas = mock(CuentaService.class);
-
-        mvc(new CuentaController(cuentas))
-                .perform(put("/cuentas/pin").principal(usuario).contentType(JSON)
-                        .content("{\"numeroCuenta\":\"000000000000000001\",\"pinActual\":\"1234\","
-                                + "\"pinNuevo\":\"5678\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("mensaje").value("PIN de autorización actualizado"));
-
-        verify(cuentas).configurarPin("000000000000000001", "1234", "5678", 7);
     }
 
     @Test

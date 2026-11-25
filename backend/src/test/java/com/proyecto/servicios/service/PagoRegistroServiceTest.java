@@ -17,7 +17,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import jakarta.persistence.EntityManager;
+import java.util.OptionalLong;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -26,12 +27,13 @@ import static org.mockito.Mockito.*;
 class PagoRegistroServiceTest {
 
     private static final String NUMERO = "000000000000000001";
-    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
+    private final EntityManager em = mock(EntityManager.class);
+    private final TotpService totp = mock(TotpService.class);
     private final CuentaRepository cuentas = mock(CuentaRepository.class);
     private final PagoRepository pagos = mock(PagoRepository.class);
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
     private final PagoRegistroService service = new PagoRegistroService(cuentas, pagos,
-            new AutorizacionService(usuarios), new PinAutorizacionService(encoder));
+            new AutorizacionService(usuarios), new OtpPagoService(totp, em));
     private final DestinoPago recarga = new DestinoPago("5512345678", null, null, BigDecimal.ZERO);
     private Cuenta cuenta;
     private Producto producto;
@@ -43,13 +45,16 @@ class PagoRegistroServiceTest {
         Usuario usuario = new Usuario();
         usuario.setId(7);
         usuario.setCliente(cliente);
+        usuario.setTotpSecreto("SECRETO");
+        usuario.setTotpConfirmado(true);
         when(usuarios.findById(7)).thenReturn(Optional.of(usuario));
+        when(em.find(Usuario.class, 7)).thenReturn(usuario);
+        when(totp.verificar(eq("SECRETO"), eq("123456"), anyLong())).thenReturn(OptionalLong.of(10));
         cuenta = new Cuenta();
         cuenta.setId(4);
         cuenta.setCliente(cliente);
         cuenta.setNumeroCuenta(NUMERO);
         cuenta.setSaldo(new BigDecimal("150.00"));
-        cuenta.setPinHash(encoder.encode("1234"));
         when(cuentas.bloquearPorNumero(NUMERO)).thenReturn(Optional.of(cuenta));
         when(cuentas.bloquearPorId(4)).thenReturn(Optional.of(cuenta));
         when(pagos.saveAndFlush(any(Pago.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -61,7 +66,7 @@ class PagoRegistroServiceTest {
 
     @Test
     void reservarDescuentaSaldoYRegistraPagoPendiente() {
-        Pago pago = service.reservar(request("100.00", "1234"), producto, recarga, "UPC1234567",
+        Pago pago = service.reservar(request("100.00", "123456"), producto, recarga, "UPC1234567",
                 "{\"upc\":\"UPC1234567\"}", 7);
 
         assertEquals(new BigDecimal("50.00"), cuenta.getSaldo());
@@ -74,23 +79,23 @@ class PagoRegistroServiceTest {
     @Test
     void cuentaInactivaNoPuedePagar() {
         cuenta.setEstaActiva(false);
-        assertEstado(HttpStatus.CONFLICT, request("10.00", "1234"));
+        assertEstado(HttpStatus.CONFLICT, request("10.00", "123456"));
     }
 
     @Test
     void cuentaSinSaldoNoPuedePagar() {
         cuenta.setSaldo(BigDecimal.ZERO);
-        assertEstado(HttpStatus.UNPROCESSABLE_ENTITY, request("10.00", "1234"));
+        assertEstado(HttpStatus.UNPROCESSABLE_ENTITY, request("10.00", "123456"));
     }
 
     @Test
     void saldoMenorAlMontoNoPuedePagar() {
-        assertEstado(HttpStatus.UNPROCESSABLE_ENTITY, request("150.01", "1234"));
+        assertEstado(HttpStatus.UNPROCESSABLE_ENTITY, request("150.01", "123456"));
     }
 
     @Test
     void saldoIgualAlMontoSiPuedePagar() {
-        service.reservar(request("150.00", "1234"), producto, recarga, "UPC1234567", "{}", 7);
+        service.reservar(request("150.00", "123456"), producto, recarga, "UPC1234567", "{}", 7);
         assertEquals(0, cuenta.getSaldo().signum());
     }
 
@@ -98,7 +103,7 @@ class PagoRegistroServiceTest {
     void pagoDeServicioDescuentaMontoMasComision() {
         DestinoPago servicio = new DestinoPago("1111111111", "REF1", new BigDecimal("100.00"), new BigDecimal("12.00"));
 
-        Pago pago = service.reservar(request("100.00", "1234"), producto, servicio, "UPC1234567", "{}", 7);
+        Pago pago = service.reservar(request("100.00", "123456"), producto, servicio, "UPC1234567", "{}", 7);
 
         assertEquals(new BigDecimal("38.00"), cuenta.getSaldo());
         assertEquals(new BigDecimal("12.00"), pago.getComisionCliente());
@@ -108,21 +113,21 @@ class PagoRegistroServiceTest {
     void saldoQueNoCubreLaComisionNoPuedePagar() {
         DestinoPago servicio = new DestinoPago("1111111111", "REF1", new BigDecimal("150.00"), BigDecimal.ONE);
         NegocioException error = assertThrows(NegocioException.class, () ->
-                service.reservar(request("150.00", "1234"), producto, servicio, "UPC1234567", "{}", 7));
+                service.reservar(request("150.00", "123456"), producto, servicio, "UPC1234567", "{}", 7));
         assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, error.getStatus());
     }
 
     @Test
-    void pinIncorrectoNoDescuentaSaldoYCuentaElIntento() {
-        assertEstado(HttpStatus.FORBIDDEN, request("10.00", "9999"));
+    void codigoOtpIncorrectoNoDescuentaSaldoYCuentaElIntento() {
+        assertEstado(HttpStatus.FORBIDDEN, request("10.00", "000000"));
         assertEquals(new BigDecimal("150.00"), cuenta.getSaldo());
         assertEquals(1, cuenta.getIntentosPinFallidos());
     }
 
     @Test
-    void cuentaSinPinConfiguradoNoPuedePagar() {
-        cuenta.setPinHash(null);
-        assertEstado(HttpStatus.CONFLICT, request("10.00", "1234"));
+    void usuarioSinAppAutenticadoraNoPuedePagar() {
+        usuarios.findById(7).orElseThrow().setTotpConfirmado(false);
+        assertEstado(HttpStatus.CONFLICT, request("10.00", "123456"));
     }
 
     @Test
@@ -130,7 +135,7 @@ class PagoRegistroServiceTest {
         Cliente otro = new Cliente();
         otro.setId(99);
         cuenta.setCliente(otro);
-        assertEstado(HttpStatus.FORBIDDEN, request("10.00", "1234"));
+        assertEstado(HttpStatus.FORBIDDEN, request("10.00", "123456"));
     }
 
     @Test
@@ -236,7 +241,7 @@ class PagoRegistroServiceTest {
         verify(pagos, never()).saveAndFlush(any());
     }
 
-    private PagoServicioRequest request(String monto, String pin) {
-        return new PagoServicioRequest(NUMERO, 20, 30, new BigDecimal(monto), "5512345678", null, pin);
+    private PagoServicioRequest request(String monto, String codigo) {
+        return new PagoServicioRequest(NUMERO, 20, 30, new BigDecimal(monto), "5512345678", null, codigo);
     }
 }

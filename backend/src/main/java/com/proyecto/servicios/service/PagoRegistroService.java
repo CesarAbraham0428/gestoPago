@@ -11,7 +11,7 @@ import com.proyecto.servicios.repositorys.sf.CuentaRepository;
 import com.proyecto.servicios.repositorys.sf.PagoRepository;
 import com.proyecto.servicios.service.exception.CuentaNoEncontradaException;
 import com.proyecto.servicios.service.exception.NegocioException;
-import com.proyecto.servicios.service.exception.PinIncorrectoException;
+import com.proyecto.servicios.service.exception.OtpIncorrectoException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -41,18 +41,18 @@ public class PagoRegistroService {
     private final CuentaRepository cuentas;
     private final PagoRepository pagos;
     private final AutorizacionService autorizacion;
-    private final PinAutorizacionService pinAutorizacion;
+    private final OtpPagoService otpPago;
 
     public PagoRegistroService(CuentaRepository cuentas, PagoRepository pagos,
-            AutorizacionService autorizacion, PinAutorizacionService pinAutorizacion) {
+            AutorizacionService autorizacion, OtpPagoService otpPago) {
         this.cuentas = cuentas;
         this.pagos = pagos;
         this.autorizacion = autorizacion;
-        this.pinAutorizacion = pinAutorizacion;
+        this.otpPago = otpPago;
     }
 
-    /** Un PIN incorrecto no revierte la transacción: el intento fallido debe quedar guardado. */
-    @Transactional(noRollbackFor = PinIncorrectoException.class)
+    /** Un código OTP incorrecto no revierte la transacción: el intento fallido debe quedar guardado. */
+    @Transactional(noRollbackFor = OtpIncorrectoException.class)
     public Pago reservar(PagoServicioRequest request, Producto producto, DestinoPago destino,
             String upc, String peticion, Integer usuarioAutenticadoId) {
         Cuenta cuenta = cuentas.bloquearPorNumero(request.numeroCuenta())
@@ -62,11 +62,7 @@ public class PagoRegistroService {
         if (!cuenta.isEstaActiva()) {
             throw new NegocioException(HttpStatus.CONFLICT, "La cuenta no está activa");
         }
-        if (cuenta.getPinHash() == null) {
-            throw new NegocioException(HttpStatus.CONFLICT,
-                    "La cuenta no tiene un PIN de autorización configurado");
-        }
-        pinAutorizacion.verificar(cuenta, request.pinAutorizacion());
+        otpPago.verificar(cuenta, usuarioAutenticadoId, request.codigoOtp());
 
         BigDecimal cargo = request.monto().add(destino.comision());
         if (cuenta.getSaldo().compareTo(cargo) < 0) {

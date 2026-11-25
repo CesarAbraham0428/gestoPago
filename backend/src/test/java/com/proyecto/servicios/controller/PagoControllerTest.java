@@ -26,7 +26,7 @@ class PagoControllerTest {
 
     private static final String PAGO = """
             {"numeroCuenta":"000000000000000001","idProducto":20,"idServicio":30,"monto":100.00,
-             "telefono":"5512345678","pinAutorizacion":"1234"}""";
+             "telefono":"5512345678","codigoOtp":"123456"}""";
     private final PagoService service = mock(PagoService.class);
     private final LimitePagosService limite = mock(LimitePagosService.class);
     private final UsernamePasswordAuthenticationToken usuario =
@@ -62,8 +62,8 @@ class PagoControllerTest {
 
     @Test
     void faltaElPinSeRechaza() throws Exception {
-        pagar(PAGO.replace(",\"pinAutorizacion\":\"1234\"", "")).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("mensaje", containsString("pinAutorizacion")));
+        pagar(PAGO.replace(",\"codigoOtp\":\"123456\"", "")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("mensaje", containsString("codigoOtp")));
         verifyNoInteractions(service);
     }
 

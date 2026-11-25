@@ -49,7 +49,7 @@ class ClientesPostgresTest {
         ClienteController.class, CuentaController.class, UsuarioController.class, AutenticacionController.class,
         GlobalExceptionHandler.class,
         ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class,
-        UsuarioService.class, AutenticacionServiceImpl.class, PinAutorizacionService.class,
+        UsuarioService.class, AutenticacionServiceImpl.class, OtpPagoService.class,
         CodigoVerificacionService.class, SesionService.class, NotificadorSesiones.class, TotpService.class, CifradoTokenConverter.class, RelojDePrueba.class,
         CodigosDePrueba.class})
     static class Config {}

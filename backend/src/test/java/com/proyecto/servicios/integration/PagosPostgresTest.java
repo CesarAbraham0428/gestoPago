@@ -48,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Flujo de pago contra PostgreSQL real (BD temporal de backend/scripts/test-postgres.ps1); GestoPago se simula.
- * Comprueba lo que solo se ve con commits reales: saldo retenido/devuelto, estados y el contador del PIN.
+ * Comprueba lo que solo se ve con commits reales: saldo retenido/devuelto, estados y el contador de códigos OTP incorrectos.
  */
 @EnabledIfEnvironmentVariable(named="TEST_DB_URL", matches=".*gestopago_backend_test_[a-zA-Z0-9_]+.*")
 @SpringBootTest(classes=PagosPostgresTest.Config.class)
@@ -59,7 +59,7 @@ class PagosPostgresTest {
         ClienteController.class, CuentaController.class, UsuarioController.class, AutenticacionController.class,
         PagoController.class, GlobalExceptionHandler.class,
         ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class, UsuarioService.class,
-        AutenticacionServiceImpl.class, PagoServiceImpl.class, PagoRegistroService.class, PinAutorizacionService.class,
+        AutenticacionServiceImpl.class, PagoServiceImpl.class, PagoRegistroService.class, OtpPagoService.class,
         GestoPagoPagosGateway.class, ResolutorDestinoPago.class, VerificadorAdeudo.class, ConciliacionPagoService.class,
         FirmaGestoPago.class, CifradoTokenConverter.class,
         CodigoVerificacionService.class, SesionService.class, NotificadorSesiones.class, TotpService.class, RelojDePrueba.class,
@@ -119,15 +119,13 @@ class PagosPostgresTest {
 
         numeroCuenta = registrarCliente().get("cuentas").get(0).get("numeroCuenta").asText();
         token = "Bearer " + iniciarSesion("ana1@example.com");
-        mvc.perform(put("/cuentas/pin").header("Authorization", token).contentType("application/json")
-            .content("{\"numeroCuenta\":\"" + numeroCuenta + "\",\"pinNuevo\":\"1234\"}")).andExpect(status().isOk());
         jdbc.update("update cuentas set saldo = 500 where numero_cuenta = ?", numeroCuenta);
     }
 
     @Test void recargaAprobadaDescuentaSaldoYGuardaLaEvidencia() throws Exception {
         when(gestoPago.enviar(eq("tok-1"), anyString())).thenReturn(respuesta("01", "<RESPONSE>01</RESPONSE>"));
 
-        pagar(recarga("1234")).andExpect(status().isOk())
+        pagar(recarga(codigoNuevo())).andExpect(status().isOk())
             .andExpect(jsonPath("datos.estado").value("APROBADO"))
             .andExpect(jsonPath("datos.saldoDisponible").value(400.00));
 
@@ -140,7 +138,7 @@ class PagosPostgresTest {
         when(gestoPago.enviar(any(), any())).thenReturn(respuesta("01", "<RESPONSE>01</RESPONSE>"));
 
         pagar("{\"numeroCuenta\":\"" + numeroCuenta + "\",\"idProducto\":21,\"idServicio\":31,\"monto\":100.00,"
-            + "\"referencia\":\"REF123\",\"pinAutorizacion\":\"1234\"}")
+            + "\"referencia\":\"REF123\",\"codigoOtp\":\"" + codigoNuevo() + "\"}")
             .andExpect(status().isOk()).andExpect(jsonPath("datos.comision").value(12.00));
 
         assertSaldo("388.00");
@@ -151,7 +149,7 @@ class PagosPostgresTest {
         rechazo.setMensaje("Detalle interno del proveedor");
         when(gestoPago.enviar(any(), any())).thenReturn(rechazo);
 
-        pagar(recarga("1234")).andExpect(status().isUnprocessableEntity())
+        pagar(recarga(codigoNuevo())).andExpect(status().isUnprocessableEntity())
             .andExpect(jsonPath("mensaje").value("El proveedor rechazó el pago; no se realizó ningún cargo"));
 
         assertSaldo("500.00");
@@ -162,7 +160,7 @@ class PagosPostgresTest {
         when(gestoPago.enviar(any(), any())).thenThrow(new GestoPagoPagoException("timeout",
             GestoPagoPagoException.Tipo.TIMEOUT, null, true, null));
 
-        pagar(recarga("1234")).andExpect(status().isGatewayTimeout());
+        pagar(recarga(codigoNuevo())).andExpect(status().isGatewayTimeout());
         assertSaldo("400.00");
         assertEquals("EN_REVISION", jdbc.queryForObject("select estado from pagos", String.class));
 
@@ -174,22 +172,22 @@ class PagosPostgresTest {
         assertEquals("RECHAZADO", jdbc.queryForObject("select estado from pagos", String.class));
     }
 
-    @Test void cincoPinesIncorrectosBloqueanElPinAunqueLaTransaccionFalle() throws Exception {
+    @Test void cincoCodigosIncorrectosBloqueanLosPagosAunqueLaTransaccionFalle() throws Exception {
         for (int i = 0; i < 4; i++) {
-            pagar(recarga("9999")).andExpect(status().isForbidden());
+            pagar(recarga("000000")).andExpect(status().isForbidden());
         }
         assertEquals(4, jdbc.queryForObject("select intentos_pin_fallidos from cuentas", Integer.class));
 
-        pagar(recarga("9999")).andExpect(status().isForbidden());
-        pagar(recarga("1234")).andExpect(status().isLocked());
+        pagar(recarga("000000")).andExpect(status().isForbidden());
+        pagar(recarga(codigoNuevo())).andExpect(status().isLocked());
 
         assertSaldo("500.00");
         assertEquals(0, jdbc.queryForObject("select count(*) from pagos", Integer.class));
         verifyNoInteractions(gestoPago);
     }
 
-    @Test void pagosSimultaneosNoGastanDosVecesElMismoSaldo() throws Exception {
-        jdbc.update("update cuentas set saldo = 250 where numero_cuenta = ?", numeroCuenta);
+    @Test void pagosSimultaneosNoUsanDosVecesElMismoCodigo() throws Exception {
+        String codigo = codigoNuevo();
         when(gestoPago.enviar(any(), any())).thenReturn(respuesta("01", "<RESPONSE>01</RESPONSE>"));
         int solicitudes = 8;
         ExecutorService hilos = Executors.newFixedThreadPool(solicitudes);
@@ -199,31 +197,32 @@ class PagosPostgresTest {
             for (int i = 0; i < solicitudes; i++) {
                 resultados.add(hilos.submit(() -> {
                     salida.await();
-                    return pagar(recarga("1234")).andReturn().getResponse().getStatus();
+                    return pagar(recarga(codigo)).andReturn().getResponse().getStatus();
                 }));
             }
             salida.countDown();
             int aprobados = 0;
-            int sinSaldo = 0;
+            int rechazados = 0;
             for (Future<Integer> resultado : resultados) {
                 int estado = resultado.get(60, TimeUnit.SECONDS);
                 if (estado == 200) aprobados++;
-                else if (estado == 422) sinSaldo++;
+                // 403: código ya usado; 423: tras 5 fallos la cuenta queda bloqueada.
+                else if (estado == 403 || estado == 423) rechazados++;
             }
-            assertEquals(2, aprobados, "Con 250 de saldo solo caben dos recargas de 100");
-            assertEquals(solicitudes - 2, sinSaldo);
+            assertEquals(1, aprobados, "Un mismo código OTP solo autoriza un pago");
+            assertEquals(solicitudes - 1, rechazados);
         } finally {
             hilos.shutdownNow();
         }
 
-        assertSaldo("50.00");
-        assertEquals(2, jdbc.queryForObject("select count(*) from pagos", Integer.class));
-        verify(gestoPago, times(2)).enviar(any(), any());
+        assertSaldo("400.00");
+        assertEquals(1, jdbc.queryForObject("select count(*) from pagos", Integer.class));
+        verify(gestoPago, times(1)).enviar(any(), any());
     }
 
     @Test void consultaDevuelveElEstadoSoloAlDuenoDelPago() throws Exception {
         when(gestoPago.enviar(any(), any())).thenReturn(respuesta("01", "<RESPONSE>01</RESPONSE>"));
-        pagar(recarga("1234")).andExpect(status().isOk());
+        pagar(recarga(codigoNuevo())).andExpect(status().isOk());
         String upc = jdbc.queryForObject("select upc from pagos", String.class);
 
         mvc.perform(post("/pagos/consulta").header("Authorization", token).contentType("application/json")
@@ -242,9 +241,13 @@ class PagosPostgresTest {
         return mvc.perform(post("/pagos").header("Authorization", token).contentType("application/json").content(cuerpo));
     }
 
-    private String recarga(String pin) {
+    private String recarga(String codigo) {
         return "{\"numeroCuenta\":\"" + numeroCuenta + "\",\"idProducto\":20,\"idServicio\":30,\"monto\":100.00,"
-            + "\"telefono\":\"5512345678\",\"pinAutorizacion\":\"" + pin + "\"}";
+            + "\"telefono\":\"5512345678\",\"codigoOtp\":\"" + codigo + "\"}";
+    }
+
+    private String codigoNuevo() {
+        return codigos.nuevoCodigo("ana1@example.com");
     }
 
     private void assertSaldo(String esperado) {

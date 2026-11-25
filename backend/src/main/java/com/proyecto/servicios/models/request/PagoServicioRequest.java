@@ -22,14 +22,14 @@ public record PagoServicioRequest(
         @Pattern(regexp = "[0-9]{10}", message = "debe contener exactamente 10 dígitos numéricos") String telefono,
         @Pattern(regexp = "[A-Za-z0-9]{1,100}", message = "debe ser alfanumérica de 1 a 100 caracteres")
         String referencia,
-        @NotBlank @Pattern(regexp = "[0-9]{4,6}", message = "debe contener de 4 a 6 dígitos") String pinAutorizacion) {
+        @NotBlank @Pattern(regexp = "[0-9]{6}", message = "debe tener 6 dígitos") String codigoOtp) {
 
     @JsonAnySetter
     public void rechazarCampo(String nombre, Object valor) {
         throw new IllegalArgumentException("Campo de pago no permitido: " + nombre);
     }
 
-    /** Evita que el PIN termine en los logs. */
+    /** Evita que el código OTP termine en los logs. */
     @Override
     public String toString() {
         return "PagoServicioRequest[numeroCuenta=" + numeroCuenta + ", idProducto=" + idProducto
