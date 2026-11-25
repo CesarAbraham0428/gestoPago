@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:toastification/toastification.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:frontend/authentication/domain/entities/desafio_verificacion.dart';
 import 'package:frontend/authentication/domain/entities/sesion.dart';
@@ -27,12 +28,20 @@ Future<void> montar(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
-    MaterialApp(
-      key: UniqueKey(), // fuerza a reconstruir el estado si se monta dos veces
-      theme: AppTheme.light(),
-      home: Scaffold(body: hijo),
+    ToastificationWrapper(
+      child: MaterialApp(
+        key: UniqueKey(), // fuerza a reconstruir el estado si se monta dos veces
+        theme: AppTheme.light(),
+        home: Scaffold(body: hijo),
+      ),
     ),
   );
+}
+
+/// Deja pasar el tiempo de un toast abierto para que no quede un Timer pendiente.
+Future<void> drenarToasts(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
 }
 
 const desafioPrueba = DesafioVerificacion(

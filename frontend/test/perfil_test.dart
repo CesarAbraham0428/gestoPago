@@ -243,10 +243,15 @@ void main() {
       final repo = PerfilFalso();
       final c = PerfilController(repo);
       await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 2400));
-      await tester.pumpAndSettle();
+      // El aviso se quita solo a los 4 s: se comprueba mientras está visible.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
       expect(find.text('Datos personales'), findsOneWidget);
       expect(find.text('Domicilio'), findsOneWidget);
       expect(find.text('Empleo'), findsOneWidget);
+      await drenarToasts(tester);
+      expect(find.text('Tus datos se guardaron.'), findsNothing);
       expect(find.text('Acme'), findsOneWidget);
 
       await tester.tap(find.text('Editar perfil'));
@@ -266,6 +271,7 @@ void main() {
       }
       expect(find.text('PELA950412AB1'), findsOneWidget);
       final alternativo = tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'Teléfono alternativo (opcional)'));
+      await drenarToasts(tester); // el aviso tapa el botón arriba a la derecha
       expect(alternativo.enabled, isNot(isFalse));
       await tester.tap(find.text('Guardar cambios'));
       await tester.pumpAndSettle();
@@ -294,6 +300,7 @@ void main() {
       await tester.tap(find.text('Editar perfil'));
       await tester.pumpAndSettle();
 
+      await drenarToasts(tester);
       // Un domicilio a medias sí se rechaza: calle de 2 letras y el resto vacío.
       await tester.enterText(find.widgetWithText(TextFormField, 'Calle'), 'Re');
       await tester.tap(find.text('Guardar cambios'));

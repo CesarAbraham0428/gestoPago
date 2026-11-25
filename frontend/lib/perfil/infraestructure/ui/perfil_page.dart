@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/ui/notificaciones.dart';
 import '../../../core/ui/ilustracion.dart';
 import '../../../core/ui/monograma.dart';
 import '../../../core/ui/tarjeta_debito.dart';
@@ -106,8 +107,9 @@ class _PerfilPageState extends State<PerfilPage> {
                   if (!mounted) return error;
                   if (error == null) {
                     setState(() => _editando = false);
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      const SnackBar(content: Text('Tus datos se guardaron.')),
+                    Notificaciones.exito(
+                      'Tus datos se guardaron.',
+                      detalle: 'Tu perfil ya está actualizado.',
                     );
                   }
                   return error;

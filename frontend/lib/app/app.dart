@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:toastification/toastification.dart';
 
 import '../authentication/infraestructure/ui/guardia_inactividad.dart';
 import '../core/config/app_config.dart';
@@ -56,23 +57,25 @@ class _GestoPagoAppState extends State<GestoPagoApp> {
   Widget build(BuildContext context) {
     return DependenciasScope(
       dependencias: widget.dependencias,
-      child: MaterialApp.router(
-        title: 'GestoPago',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light(),
-        routerConfig: _router,
-        builder: (context, child) => GuardiaInactividad(
-          sesion: widget.dependencias.sesion,
-          limite: AppConfig.inactividadMaxima,
-          child: child ?? const SizedBox.shrink(),
+      child: ToastificationWrapper(
+        child: MaterialApp.router(
+          title: 'GestoPago',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light(),
+          routerConfig: _router,
+          builder: (context, child) => GuardiaInactividad(
+            sesion: widget.dependencias.sesion,
+            limite: AppConfig.inactividadMaxima,
+            child: child ?? const SizedBox.shrink(),
+          ),
+          locale: const Locale('es', 'MX'),
+          supportedLocales: const [Locale('es', 'MX'), Locale('es')],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
         ),
-        locale: const Locale('es', 'MX'),
-        supportedLocales: const [Locale('es', 'MX'), Locale('es')],
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
       ),
     );
   }
