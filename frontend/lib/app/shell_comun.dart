@@ -57,16 +57,6 @@ const destinos = [
     descripcion: 'Tus recibos y pagos anteriores',
   ),
   DestinoNavegacion(
-    ruta: '/notificaciones',
-    etiqueta: 'Notificaciones',
-    etiquetaCorta: 'Avisos',
-    icono: Icons.notifications_none,
-    iconoActivo: Icons.notifications,
-    color: AppColors.indigo,
-    fondo: AppColors.indigoTenue,
-    descripcion: 'Avisos de tus pagos aprobados, rechazados o en revisión',
-  ),
-  DestinoNavegacion(
     ruta: '/perfil',
     etiqueta: 'Mi perfil',
     icono: Icons.person_outline,
@@ -87,23 +77,54 @@ const destinos = [
   ),
 ];
 
-/// Envuelve el icono de Notificaciones con la insignia de avisos sin leer; los
-/// demás destinos quedan igual.
-Widget conInsignia(
-  BuildContext context,
-  DestinoNavegacion destino,
-  Widget icono,
-) {
-  if (destino.ruta != '/notificaciones') return icono;
-  final bandeja = DependenciasScope.of(context).notificaciones;
-  return ListenableBuilder(
-    listenable: bandeja,
-    builder: (_, _) => Badge(
-      isLabelVisible: bandeja.noLeidas > 0,
-      label: Text(bandeja.noLeidas > 99 ? '99+' : '${bandeja.noLeidas}'),
-      child: icono,
-    ),
-  );
+/// Bandeja de avisos: no es un apartado del menú, se abre desde la campana del
+/// encabezado.
+const destinoNotificaciones = DestinoNavegacion(
+  ruta: '/notificaciones',
+  etiqueta: 'Notificaciones',
+  icono: Icons.notifications_none,
+  iconoActivo: Icons.notifications,
+  color: AppColors.indigo,
+  fondo: AppColors.indigoTenue,
+  descripcion: 'Avisos de tus pagos aprobados, rechazados o en revisión',
+);
+
+bool esNotificaciones(GoRouterState state) =>
+    state.uri.path == destinoNotificaciones.ruta;
+
+/// Destino que describe la pantalla activa (el menú o la bandeja de avisos).
+DestinoNavegacion destinoActual(GoRouterState state) =>
+    esNotificaciones(state) ? destinoNotificaciones : destinos[indiceDestino(state)];
+
+/// Campana del encabezado con el número de avisos sin leer; abre la bandeja.
+class CampanaNotificaciones extends StatelessWidget {
+  const CampanaNotificaciones({super.key, required this.activa});
+
+  /// Ya se está viendo la bandeja.
+  final bool activa;
+
+  @override
+  Widget build(BuildContext context) {
+    final bandeja = DependenciasScope.of(context).notificaciones;
+    return ListenableBuilder(
+      listenable: bandeja,
+      builder: (_, _) {
+        final n = bandeja.noLeidas;
+        return IconButton(
+          tooltip: n > 0 ? 'Notificaciones ($n sin leer)' : 'Notificaciones',
+          onPressed: () => context.go(destinoNotificaciones.ruta),
+          icon: Badge(
+            isLabelVisible: n > 0,
+            label: Text(n > 99 ? '99+' : '$n'),
+            child: Icon(
+              activa ? Icons.notifications : Icons.notifications_none,
+              color: activa ? destinoNotificaciones.color : null,
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 int indiceDestino(GoRouterState state) {
@@ -114,10 +135,14 @@ int indiceDestino(GoRouterState state) {
   return i < 0 ? 0 : i;
 }
 
-/// Una ruta de detalle tiene un segundo segmento: /catalogo/123-45.
-bool esDetalle(GoRouterState state) => state.uri.pathSegments.length > 1;
+/// Pantalla fuera de las secciones del menú: un detalle (segundo segmento,
+/// /catalogo/123-45) o la bandeja de notificaciones. Muestra flecha de regreso
+/// y oculta la barra inferior.
+bool esDetalle(GoRouterState state) =>
+    state.uri.pathSegments.length > 1 || esNotificaciones(state);
 
 String tituloPantalla(GoRouterState state) {
+  if (esNotificaciones(state)) return destinoNotificaciones.etiqueta;
   final base = destinos[indiceDestino(state)];
   if (!esDetalle(state)) return base.etiqueta;
   return base.ruta == '/catalogo' ? 'Producto' : 'Compra';
@@ -211,6 +236,7 @@ PreferredSizeWidget barraSuperior(
         : null,
     title: Text(tituloPantalla(state)),
     actions: [
+      CampanaNotificaciones(activa: esNotificaciones(state)),
       menu ?? MenuUsuario(sesion: sesion),
       const SizedBox(width: 4),
     ],

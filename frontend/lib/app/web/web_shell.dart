@@ -38,8 +38,8 @@ Widget construirShellWeb(
             destinations: [
               for (final d in destinos)
                 NavigationDestination(
-                  icon: conInsignia(context, d, Icon(d.icono)),
-                  selectedIcon: conInsignia(context, d, Icon(d.iconoActivo)),
+                  icon: Icon(d.icono),
+                  selectedIcon: Icon(d.iconoActivo),
                   label: d.etiqueta,
                 ),
             ],
@@ -102,7 +102,7 @@ class _MarcoAnchoState extends State<_MarcoAncho> {
             child: Column(
               children: [
                 _CabeceraContenido(
-                  destino: destinos[indiceDestino(widget.state)],
+                  destino: destinoActual(widget.state),
                   menuAbierto: _menuAbierto,
                   alAlternarMenu: () => setState(() => _menuAbierto = !_menuAbierto),
                 ),
@@ -174,6 +174,7 @@ class _CabeceraContenido extends StatelessWidget {
               ],
             ),
           ),
+          CampanaNotificaciones(activa: destino == destinoNotificaciones),
         ],
       ),
     );
@@ -188,7 +189,7 @@ class _BarraLateral extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context).textTheme;
-    final activo = indiceDestino(state);
+    final activo = esNotificaciones(state) ? -1 : indiceDestino(state);
     final datos = sesion.sesion;
     final conNombre = datos?.nombreCompleto.isNotEmpty == true;
     final nombre = conNombre ? datos!.nombreCompleto : (datos?.correo ?? '');
@@ -324,15 +325,11 @@ class _ItemMenu extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  conInsignia(
-                    context,
-                    destino,
-                    IconoEnRecuadro(
-                      icono: activo ? destino.iconoActivo : destino.icono,
-                      color: activo ? destino.color : claro,
-                      fondo: activo ? Colors.white : Colors.white.withValues(alpha: 0.10),
-                      tamano: 34,
-                    ),
+                  IconoEnRecuadro(
+                    icono: activo ? destino.iconoActivo : destino.icono,
+                    color: activo ? destino.color : claro,
+                    fondo: activo ? Colors.white : Colors.white.withValues(alpha: 0.10),
+                    tamano: 34,
                   ),
                   const SizedBox(width: 12),
                   Flexible(

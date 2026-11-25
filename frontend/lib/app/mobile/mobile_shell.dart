@@ -29,15 +29,15 @@ Widget construirShellMovil(
             children: [
               NavigationRail(
                 backgroundColor: AppColors.superficie,
-                selectedIndex: indiceDestino(state),
+                selectedIndex: esNotificaciones(state) ? null : indiceDestino(state),
                 onDestinationSelected: (i) => context.go(destinos[i].ruta),
                 labelType: NavigationRailLabelType.all,
                 indicatorColor: AppColors.marcaTenue,
                 destinations: [
                   for (final d in destinos)
                     NavigationRailDestination(
-                      icon: conInsignia(context, d, Icon(d.icono)),
-                      selectedIcon: conInsignia(context, d, Icon(d.iconoActivo)),
+                      icon: Icon(d.icono),
+                      selectedIcon: Icon(d.iconoActivo),
                       label: Text(d.etiqueta),
                     ),
                 ],
@@ -104,8 +104,8 @@ class _BarraInferior extends StatelessWidget {
             destinations: [
               for (final d in destinos)
                 NavigationDestination(
-                  icon: conInsignia(context, d, Icon(d.icono)),
-                  selectedIcon: conInsignia(context, d, Icon(d.iconoActivo)),
+                  icon: Icon(d.icono),
+                  selectedIcon: Icon(d.iconoActivo),
                   label: d.etiquetaCorta ?? d.etiqueta,
                   tooltip: d.etiqueta,
                 ),
