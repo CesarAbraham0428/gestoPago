@@ -76,8 +76,6 @@ class _Lienzo extends StatelessWidget {
   }
 }
 
-const _sinRegistrar = 'Sin registrar';
-
 /// "Mi perfil": datos personales, contacto, empleo y domicilio, con edición.
 class PerfilPage extends StatefulWidget {
   const PerfilPage({super.key, required this.controller});
@@ -119,12 +117,13 @@ class _PerfilPageState extends State<PerfilPage> {
           );
         }
         final d = p.domicilio;
+        void editar() => setState(() => _editando = true);
         return _Lienzo(
           children: [
             _Encabezado(
               perfil: p,
               accion: FilledButton.icon(
-                onPressed: () => setState(() => _editando = true),
+                onPressed: editar,
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 label: const Text('Editar perfil'),
               ),
@@ -135,11 +134,12 @@ class _PerfilPageState extends State<PerfilPage> {
               titulo: 'Datos personales',
               color: AppColors.indigo,
               fondo: AppColors.indigoTenue,
+              alAgregar: editar,
               datos: {
                 'Nombre completo': p.nombreCompleto,
                 'Fecha de nacimiento': formatoFecha(p.fechaNacimiento),
                 'Sexo': p.sexo,
-                'Estado civil': p.estadoCivil ?? _sinRegistrar,
+                'Estado civil': p.estadoCivil,
                 'Nacionalidad': p.nacionalidad,
                 'CURP': p.curp,
                 'RFC': p.rfc,
@@ -150,11 +150,12 @@ class _PerfilPageState extends State<PerfilPage> {
               titulo: 'Contacto',
               color: AppColors.turquesa,
               fondo: AppColors.turquesaTenue,
+              alAgregar: editar,
               datos: {
                 'Correo electrónico': p.correoElectronico,
                 'Teléfono móvil': formatoTelefono(p.telefonoMovil),
                 'Teléfono alternativo': p.telefonoAlternativo == null
-                    ? _sinRegistrar
+                    ? null
                     : formatoTelefono(p.telefonoAlternativo!),
               },
             ),
@@ -163,11 +164,12 @@ class _PerfilPageState extends State<PerfilPage> {
               titulo: 'Empleo',
               color: AppColors.azul,
               fondo: AppColors.azulTenue,
+              alAgregar: editar,
               datos: {
-                'Ocupación': p.ocupacion ?? _sinRegistrar,
-                'Empresa': p.empresa ?? _sinRegistrar,
+                'Ocupación': p.ocupacion,
+                'Empresa': p.empresa,
                 'Ingreso mensual': p.ingresoMensual == null
-                    ? _sinRegistrar
+                    ? null
                     : formatoMoneda(p.ingresoMensual!),
               },
             ),
@@ -176,13 +178,14 @@ class _PerfilPageState extends State<PerfilPage> {
               titulo: 'Domicilio',
               color: AppColors.ciruela,
               fondo: AppColors.ciruelaTenue,
+              alAgregar: editar,
               datos: {
-                'Calle y número': d?.lineaCalle ?? _sinRegistrar,
-                'Colonia': d?.colonia ?? _sinRegistrar,
-                'Código postal': d?.codigoPostal ?? _sinRegistrar,
-                'Municipio': d?.municipio ?? _sinRegistrar,
-                'Estado': d?.estado ?? _sinRegistrar,
-                'País': d?.pais ?? _sinRegistrar,
+                'Calle y número': d?.lineaCalle,
+                'Colonia': d?.colonia,
+                'Código postal': d?.codigoPostal,
+                'Municipio': d?.municipio,
+                'Estado': d?.estado,
+                'País': d?.pais,
               },
             ),
           ],
@@ -315,7 +318,9 @@ class _Encabezado extends StatelessWidget {
             ],
           );
         },
+    required this.alAgregar,
       ),
+  final VoidCallback alAgregar;
     );
   }
 }
@@ -333,7 +338,9 @@ class _Seccion extends StatelessWidget {
   final Color color;
   final Color fondo;
   final String titulo;
-  final Map<String, String> datos;
+
+  /// Un valor nulo o en blanco se muestra como campo pendiente.
+  final Map<String, String?> datos;
 
   @override
   Widget build(BuildContext context) {
@@ -370,7 +377,10 @@ class _Seccion extends StatelessWidget {
                             style: tema.bodySmall?.copyWith(color: AppColors.tintaSuave),
                           ),
                           const SizedBox(height: 2),
-                          SelectableText(e.value, style: tema.bodyLarge),
+                          if (e.value == null || e.value!.trim().isEmpty)
+                            _CampoPendiente(alTocar: alAgregar)
+                          else
+                            SelectableText(e.value!, style: tema.bodyLarge),
                         ],
                       ),
                     ),
@@ -379,6 +389,63 @@ class _Seccion extends StatelessWidget {
             },
           ),
         ],
+/// Marcador de un dato que el usuario no llenó: invita a completarlo.
+class _CampoPendiente extends StatelessWidget {
+  const _CampoPendiente({required this.alTocar});
+  final VoidCallback alTocar;
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context).textTheme;
+    return Semantics(
+      button: true,
+      label: 'Sin registrar. Toca para completar',
+      child: Material(
+        color: AppColors.papel,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: const BorderSide(color: AppColors.linea),
+        ),
+        child: InkWell(
+          onTap: alTocar,
+          customBorder: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.add_circle_outline,
+                  size: 18,
+                  color: AppColors.marca,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Sin registrar',
+                    style: tema.bodyMedium?.copyWith(
+                      color: AppColors.tintaSuave,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+                Text(
+                  'Completar',
+                  style: tema.labelMedium?.copyWith(
+                    color: AppColors.marca,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
       ),
     );
   }
