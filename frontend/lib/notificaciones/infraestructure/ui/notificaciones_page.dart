@@ -126,9 +126,6 @@ class _Contenido extends StatelessWidget {
         filas.add(_CargarMas(controller: c));
       }
     }
-    filas
-      ..add(const SizedBox(height: 16))
-      ..add(const _RecordatorioSeguridad());
 
     return RefreshIndicator(
       onRefresh: () => controller.recargar(silencioso: true),
@@ -495,22 +492,6 @@ class _CargarMas extends StatelessWidget {
                 ),
         ],
       ),
-    );
-  }
-}
-
-class _RecordatorioSeguridad extends StatelessWidget {
-  const _RecordatorioSeguridad();
-
-  @override
-  Widget build(BuildContext context) {
-    return const AvisoEstado(
-      tono: Tono.aviso,
-      icono: Icons.shield_outlined,
-      titulo: '¿No reconoces un movimiento?',
-      texto:
-          'Si ves un pago que no hiciste, cambia tu contraseña y comunícate con '
-          'soporte de inmediato. Nunca compartas tu código de la app autenticadora.',
     );
   }
 }
