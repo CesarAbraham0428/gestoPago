@@ -11,8 +11,8 @@ public class Domicilio extends Auditado {
     @Column(name="numero_exterior", nullable=false, length=50) private String numeroExterior;
     @Column(name="numero_interior", length=50) private String numeroInterior;
     @Column(nullable=false, length=100) private String colonia;
-    @Column(nullable=false, length=250) private String municipio;
-    @Column(nullable=false, length=250) private String estado;
+    @Column(nullable=false, length=50) private String municipio;
+    @Column(nullable=false, length=50) private String estado;
     @Column(name="codigo_postal", nullable=false, length=5) private String codigoPostal;
     @Column(nullable=false, length=100) private String pais;
 }
