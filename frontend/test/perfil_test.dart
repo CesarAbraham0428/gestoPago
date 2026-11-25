@@ -9,6 +9,8 @@ import 'package:frontend/app/web/web_shell.dart';
 import 'package:frontend/core/error/app_exception.dart';
 import 'package:frontend/core/format/formatters.dart';
 import 'package:frontend/core/network/api_client.dart';
+import 'package:frontend/core/theme/app_colors.dart';
+import 'package:frontend/core/ui/monograma.dart';
 import 'package:frontend/perfil/application/perfil_controller.dart';
 import 'package:frontend/perfil/domain/entities/perfil.dart';
 import 'package:frontend/perfil/infraestructure/adapters/api_perfil_repository.dart';
@@ -65,6 +67,11 @@ Perfil _perfilMinimo() => Perfil(
   nacionalidad: 'Mexicana',
   correoElectronico: 'ana@example.com',
   telefonoMovil: '5512345678',
+);
+
+/// Recuadros sombreados de los datos sin registrar (no llevan texto; se reconocen por su etiqueta accesible).
+final camposVacios = find.byWidgetPredicate(
+  (w) => w is Semantics && w.properties.label == 'Sin registrar. Toca para completar',
 );
 
 void main() {
@@ -223,10 +230,26 @@ void main() {
       expect(find.text('Domicilio'), findsOneWidget);
       expect(find.text('Empleo'), findsOneWidget);
       expect(find.text('Acme'), findsOneWidget);
+      // El banner saluda solo por el primer nombre.
+      expect(find.text('Hola,'), findsOneWidget);
+      expect(find.text('Ana'), findsNWidgets(2)); // banner y "Primer nombre"
+      expect(find.text('Nombre completo'), findsNothing);
+      expect(find.text('Apellido paterno'), findsOneWidget);
+      expect(find.text('ana@example.com'), findsOneWidget); // solo en Contacto, no en el banner
 
       await tester.tap(find.text('Editar perfil'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextFormField, 'Empresa (opcional)'), 'Nueva');
+      // Un campo editable sin datos se sombrea; con datos queda con el fondo normal.
+      final empresa = find.widgetWithText(TextFormField, 'Empresa (opcional)');
+      Color? relleno() => tester
+          .widget<InputDecorator>(find.descendant(of: empresa, matching: find.byType(InputDecorator)))
+          .decoration
+          .fillColor;
+      expect(relleno(), AppColors.superficie);
+      await tester.enterText(empresa, '');
+      await tester.pump();
+      expect(relleno(), isNot(AppColors.superficie));
+      await tester.enterText(empresa, 'Nueva');
       await tester.enterText(find.widgetWithText(TextFormField, 'Código postal'), '12');
       await tester.tap(find.text('Guardar cambios'));
       await tester.pumpAndSettle();
@@ -259,7 +282,7 @@ void main() {
       final c = PerfilController(repo);
       await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 3000));
       await tester.pumpAndSettle();
-      expect(find.text('Sin registrar'), findsWidgets);
+      expect(camposVacios, findsWidgets);
       expect(find.text('Estado civil'), findsOneWidget);
 
       await tester.tap(find.text('Editar perfil'));
@@ -326,7 +349,7 @@ void main() {
       await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 2400));
       await tester.pumpAndSettle();
       expect(find.text(formatoTelefono('5598765432')), findsOneWidget);
-      expect(find.text('Sin registrar'), findsNothing);
+      expect(camposVacios, findsNothing);
     });
 
     testWidgets('perfil: error al guardar se muestra y cancelar vuelve', (tester) async {
@@ -363,6 +386,9 @@ void main() {
       expect(find.text('1234 5678 9012 3456 78'), findsWidgets);
       expect(find.text('Activa'), findsOneWidget);
       expect(find.text('Inactiva'), findsOneWidget);
+      expect(find.text('Tus cuentas'), findsOneWidget);
+      expect(find.byTooltip('Actualizar saldos'), findsOneWidget);
+      expect(find.byType(Monograma), findsNothing); // sin el encabezado con nombre y correo
       expect(find.text(r'$900.00'), findsNothing); // el saldo arranca oculto
       await tester.tap(find.byTooltip('Mostrar saldo').first);
       await tester.pump();

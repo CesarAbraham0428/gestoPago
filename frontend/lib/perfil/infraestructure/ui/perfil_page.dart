@@ -4,7 +4,6 @@ import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/ui/notificaciones.dart';
 import '../../../core/ui/ilustracion.dart';
-import '../../../core/ui/monograma.dart';
 import '../../../core/ui/tarjeta_debito.dart';
 import '../../../core/ui/widgets_estado.dart';
 import '../../../pagos/domain/entities/cuenta.dart';
@@ -123,6 +122,11 @@ class _PerfilPageState extends State<PerfilPage> {
             _Encabezado(
               perfil: p,
               accion: FilledButton.icon(
+                // Sobre el banner verde el botón va en blanco.
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.marca,
+                ),
                 onPressed: editar,
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 label: const Text('Editar perfil'),
@@ -136,7 +140,12 @@ class _PerfilPageState extends State<PerfilPage> {
               fondo: AppColors.indigoTenue,
               alAgregar: editar,
               datos: {
-                'Nombre completo': p.nombreCompleto,
+                'Primer nombre': p.primerNombre,
+                // Opcional y de solo lectura: sin dato, no se muestra el recuadro de "completar".
+                if (p.segundoNombre?.trim().isNotEmpty ?? false)
+                  'Segundo nombre': p.segundoNombre,
+                'Apellido paterno': p.apellidoPaterno,
+                'Apellido materno': p.apellidoMaterno,
                 'Fecha de nacimiento': formatoFecha(p.fechaNacimiento),
                 'Sexo': p.sexo,
                 'Estado civil': p.estadoCivil,
@@ -207,15 +216,24 @@ class CuentasBancariasPage extends StatelessWidget {
       construir: (context, p) {
         return _Lienzo(
           children: [
-            _Encabezado(
-              perfil: p,
-              accion: IconButton(
-                tooltip: 'Actualizar saldos',
-                onPressed: controller.cargar,
-                icon: const Icon(Icons.refresh),
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      p.cuentas.length == 1 ? 'Tu cuenta' : 'Tus cuentas',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton.filledTonal(
+                    tooltip: 'Actualizar saldos',
+                    onPressed: controller.cargar,
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 20),
             if (p.cuentas.isEmpty)
               const VistaMensaje(
                 icono: Icons.account_balance_outlined,
@@ -262,49 +280,113 @@ class _Encabezado extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context).textTheme;
-    final nombre = Text(perfil.nombreCompleto, style: tema.titleLarge);
-    final correo = Text(
-      perfil.correoElectronico,
-      style: tema.bodyMedium?.copyWith(color: AppColors.tintaSuave),
+    final nombre = perfil.primerNombre;
+    final inicial = nombre.isEmpty ? '?' : nombre[0].toUpperCase();
+    final avatar = Container(
+      width: 64,
+      height: 64,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: 0.16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 2),
+      ),
+      child: Text(
+        inicial,
+        style: tema.headlineMedium?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
-    return _Tarjeta(
-      child: LayoutBuilder(
-        builder: (context, restricciones) {
-          // En pantallas angostas el nombre no cabe junto al botón: se apila y centra.
-          if (restricciones.maxWidth < 520) {
-            return Column(
-              children: [
-                Monograma(nombre: perfil.nombreCompleto, tamano: 72),
-                const SizedBox(height: 14),
-                DefaultTextStyle.merge(
-                  textAlign: TextAlign.center,
-                  child: nombre,
-                ),
-                const SizedBox(height: 4),
-                DefaultTextStyle.merge(
-                  textAlign: TextAlign.center,
-                  child: correo,
-                ),
-                const SizedBox(height: 18),
-                SizedBox(width: double.infinity, child: accion),
-              ],
-            );
-          }
-          return Row(
-            children: [
-              Monograma(nombre: perfil.nombreCompleto, tamano: 56),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [nombre, const SizedBox(height: 2), correo],
-                ),
-              ),
-              const SizedBox(width: 12),
-              accion,
-            ],
-          );
-        },
+    Widget textos(CrossAxisAlignment alineacion) => Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: alineacion,
+      children: [
+        Text(
+          'Hola,',
+          style: tema.bodyMedium?.copyWith(color: Colors.white70),
+        ),
+        Text(
+          nombre,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: tema.headlineSmall?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.marca, AppColors.bosque],
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Círculos decorativos de fondo.
+            const Positioned(
+              right: -30,
+              top: -50,
+              child: _Circulo(diametro: 150, opacidad: 0.07),
+            ),
+            const Positioned(
+              right: 90,
+              bottom: -60,
+              child: _Circulo(diametro: 110, opacidad: 0.06),
+            ),
+            LayoutBuilder(
+              builder: (context, restricciones) {
+                // En pantallas angostas el nombre no cabe junto al botón: se apila y centra.
+                if (restricciones.maxWidth < 520) {
+                  return Column(
+                    children: [
+                      avatar,
+                      const SizedBox(height: 12),
+                      textos(CrossAxisAlignment.center),
+                      const SizedBox(height: 18),
+                      SizedBox(width: double.infinity, child: accion),
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    avatar,
+                    const SizedBox(width: 18),
+                    Expanded(child: textos(CrossAxisAlignment.start)),
+                    const SizedBox(width: 12),
+                    accion,
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Circulo extends StatelessWidget {
+  const _Circulo({required this.diametro, required this.opacidad});
+  final double diametro;
+  final double opacidad;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: diametro,
+      height: diametro,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: opacidad),
       ),
     );
   }
@@ -396,7 +478,6 @@ class _CampoPendiente extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tema = Theme.of(context).textTheme;
     return Semantics(
       button: true,
       label: 'Sin registrar. Toca para completar',
@@ -411,35 +492,8 @@ class _CampoPendiente extends StatelessWidget {
           customBorder: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.add_circle_outline,
-                  size: 18,
-                  color: AppColors.marca,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Sin registrar',
-                    style: tema.bodyMedium?.copyWith(
-                      color: AppColors.tintaSuave,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
-                Text(
-                  'Completar',
-                  style: tema.labelMedium?.copyWith(
-                    color: AppColors.marca,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // Solo el recuadro sombreado; la etiqueta de Semantics sigue avisando a lectores de pantalla.
+          child: const SizedBox(height: 40, width: double.infinity),
         ),
       ),
     );

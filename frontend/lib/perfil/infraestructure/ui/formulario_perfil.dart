@@ -154,21 +154,32 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
     int max = 250,
     bool seguro = true,
   }) {
-    return TextFormField(
-      controller: _c[clave],
-      decoration: InputDecoration(labelText: etiqueta),
-      validator: validar,
-      // Errores en vivo, igual que en el registro.
-      autovalidateMode: AutovalidateMode.onUserInteraction,
-      keyboardType: digitos != null ? TextInputType.number : teclado,
-      inputFormatters: [
-        LengthLimitingTextInputFormatter(digitos ?? max),
-        if (digitos != null) FilteringTextInputFormatter.digitsOnly,
-        if (seguro) TextoSeguro.formato,
-      ],
-      enabled: !widget.guardando,
+    final controlador = _c[clave]!;
+    // Se vuelve a pintar al escribir: el sombreado desaparece en cuanto el campo tiene datos.
+    return ListenableBuilder(
+      listenable: controlador,
+      builder: (context, _) => TextFormField(
+        controller: controlador,
+        decoration: InputDecoration(
+          labelText: etiqueta,
+          fillColor: controlador.text.isEmpty ? _sinDatos : null,
+        ),
+        validator: validar,
+        // Errores en vivo, igual que en el registro.
+        autovalidateMode: AutovalidateMode.onUserInteraction,
+        keyboardType: digitos != null ? TextInputType.number : teclado,
+        inputFormatters: [
+          LengthLimitingTextInputFormatter(digitos ?? max),
+          if (digitos != null) FilteringTextInputFormatter.digitsOnly,
+          if (seguro) TextoSeguro.formato,
+        ],
+        enabled: !widget.guardando,
+      ),
     );
   }
+
+  /// Sombreado suave de un campo editable que aún no tiene datos.
+  static final _sinDatos = AppColors.pendienteFondo.withValues(alpha: 0.55);
 
   @override
   Widget build(BuildContext context) {
@@ -201,8 +212,9 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
               _fijo('Sexo', p.sexo),
               DropdownButtonFormField<String>(
                 initialValue: _estadoCivil,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Estado civil (opcional)',
+                  fillColor: _estadoCivil == null ? _sinDatos : null,
                 ),
                 items: [
                   for (final e in estadosCiviles)
