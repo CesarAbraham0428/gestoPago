@@ -1,4 +1,5 @@
 import '../../core/format/formatters.dart';
+import '../../core/validation/texto_seguro.dart';
 
 /// Validaciones previas al envío del registro. Replican las reglas de
 /// `ClienteRequest` de la API para evitar viajes inútiles; el servidor sigue
@@ -8,7 +9,7 @@ class ValidadoresRegistro {
 
   static const _obligatorio = 'Este campo es obligatorio.';
 
-  static final _letras = RegExp(r'^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]+$');
+  static final _letras = RegExp(r'^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+$');
   static final _curp = RegExp(
     r'^[A-Z][AEIOUX][A-Z]{2}[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])[HM]'
     r'(AS|BC|BS|CC|CL|CM|CS|CH|DF|DG|GT|GR|HG|JC|MC|MN|MS|NT|NL|OC|PL|QT|QR|SP|SL|SR|TC|TS|TL|VZ|YN|ZS|NE)'
@@ -21,16 +22,18 @@ class ValidadoresRegistro {
   static String? requerido(String? v, {int min = 1, int max = 250}) {
     final t = v?.trim() ?? '';
     if (t.isEmpty) return _obligatorio;
+    final inseguro = TextoSeguro.validar(v);
+    if (inseguro != null) return inseguro;
     if (t.length < min) return 'Mínimo $min caracteres.';
     return t.length > max ? 'Máximo $max caracteres.' : null;
   }
 
-  /// Nombre o apellido: solo letras y espacios, de [min] a 50 caracteres.
+  /// Nombre o apellido: solo letras (sin espacios), de [min] a 50 caracteres.
   /// Nombres y apellidos piden 3 por defecto.
   static String? nombre(String? v, {bool opcional = false, int min = 3}) {
     final t = v?.trim() ?? '';
     if (t.isEmpty) return opcional ? null : _obligatorio;
-    return t.length >= min && t.length <= 50 && _letras.hasMatch(t)
+    return t.length >= min && t.length <= 50 && _letras.hasMatch(v!)
         ? null
         : 'Solo letras, de $min a 50 caracteres.';
   }
@@ -65,7 +68,10 @@ class ValidadoresRegistro {
 
   /// Correo con la misma regla que la restricción `ck_clientes_correo` de la
   /// base de datos (el servidor además aplica `@Email` de Jakarta).
-  static final _correo = RegExp(r'^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$');
+  /// Más estricta que la de la base de datos: sin comillas, `;`, `=` ni demás símbolos.
+  static final _correo = RegExp(
+    r'^[A-Za-z0-9._-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$',
+  );
 
   static String? correo(String? v) {
     final t = (v ?? '').trim();

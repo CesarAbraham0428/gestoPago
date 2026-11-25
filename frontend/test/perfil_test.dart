@@ -303,6 +303,24 @@ void main() {
       await drenarToasts(tester);
     });
 
+    testWidgets('editar: errores en vivo y sin espacios ni símbolos', (tester) async {
+      final c = PerfilController(PerfilFalso(perfilPrueba()));
+      await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 2400));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Editar perfil'));
+      await tester.pumpAndSettle();
+
+      final calle = find.widgetWithText(TextFormField, 'Calle');
+      // Error de longitud al escribir, sin pulsar "Guardar".
+      await tester.enterText(calle, 'Re');
+      await tester.pump();
+      expect(find.text('Mínimo 3 caracteres.'), findsOneWidget);
+      // Espacios y símbolos de SQL no se pueden escribir.
+      await tester.enterText(calle, "Av Reforma'; DROP--");
+      await tester.pump();
+      expect(tester.widget<TextFormField>(calle).controller!.text, 'AvReformaDROP');
+    });
+
     testWidgets('perfil: el teléfono alternativo se muestra con formato', (tester) async {
       final c = PerfilController(PerfilFalso(perfilPrueba(telefonoAlternativo: '5598765432')));
       await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 2400));

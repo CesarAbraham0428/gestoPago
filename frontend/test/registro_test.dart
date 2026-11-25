@@ -12,6 +12,7 @@ import 'package:frontend/core/error/app_exception.dart';
 import 'package:frontend/core/error/mensajes_usuario.dart';
 import 'package:frontend/core/network/api_client.dart';
 import 'package:frontend/core/theme/app_theme.dart';
+import 'package:frontend/core/validation/texto_seguro.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -62,13 +63,26 @@ void main() {
       expect(ValidadoresRegistro.requerido('x' * 101, min: 3, max: 100), isNotNull);
     });
 
+    test('texto libre y correo rechazan espacios y símbolos de inyección SQL', () {
+      for (final malo in ["x'--", 'a;b', 'a b', 'a"b', '1=1', 'a(b)', 'a/*b']) {
+        expect(ValidadoresRegistro.requerido(malo), isNotNull, reason: malo);
+        expect(TextoSeguro.validar(malo), isNotNull, reason: malo);
+      }
+      expect(ValidadoresRegistro.requerido('Reforma10'), isNull);
+      expect(TextoSeguro.validar(''), isNull);
+      expect(ValidadoresRegistro.correo("a'or'1'='1@x.com"), isNotNull);
+      expect(ValidadoresRegistro.correo('a;b@x.com'), isNotNull);
+      expect(ValidadoresRegistro.correo('ana_perez-1@mail.example.com'), isNull);
+    });
+
     test('ingreso opcional acepta vacío pero no un monto inválido', () {
       expect(ValidadoresRegistro.ingreso('', opcional: true), isNull);
       expect(ValidadoresRegistro.ingreso('0', opcional: true), isNotNull);
     });
 
     test('nombre: letras, 2 a 50, opcional vacío', () {
-      expect(ValidadoresRegistro.nombre('María José'), isNull);
+      expect(ValidadoresRegistro.nombre('MaríaJosé'), isNull);
+      expect(ValidadoresRegistro.nombre('María José'), isNotNull); // sin espacios
       expect(ValidadoresRegistro.nombre(''), isNotNull);
       expect(ValidadoresRegistro.nombre('', opcional: true), isNull);
       expect(ValidadoresRegistro.nombre('A'), isNotNull);

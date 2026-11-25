@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/ui/widgets_estado.dart';
+import '../../../core/validation/texto_seguro.dart';
+import '../../../authentication/domain/validadores_registro.dart';
 import '../../domain/entities/perfil.dart';
 
 /// Formulario de edición del perfil. Nombre, fecha de nacimiento, sexo,
@@ -134,48 +136,36 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
     ),
   );
 
-  static String? _requerido(String? v) =>
-      (v == null || v.trim().isEmpty) ? 'Este campo es obligatorio.' : null;
-
-  static String? Function(String?) _digitos(int n, {bool opcional = false}) =>
-      (v) {
-        final t = v?.trim() ?? '';
-        if (t.isEmpty) return opcional ? null : 'Este campo es obligatorio.';
-        return RegExp('^\\d{$n}\$').hasMatch(t)
-            ? null
-            : 'Debe tener $n dígitos.';
-      };
+  /// Las mismas reglas del registro ([ValidadoresRegistro]); vacío es válido
+  /// en los campos opcionales de empleo y domicilio.
+  static String? Function(String?) _siHay(String? Function(String?) regla) =>
+      (v) => (v ?? '').trim().isEmpty ? null : regla(v);
 
   /// Campo de domicilio: obligatorio, salvo que el domicilio se esté omitiendo.
-  String? Function(String?) _dom({int min = 1, int max = 250}) => (v) {
-    if (_domicilioOmitido) return null;
-    final t = v?.trim() ?? '';
-    if (t.isEmpty) return 'Este campo es obligatorio.';
-    if (t.length < min) return 'Mínimo $min caracteres.';
-    return t.length > max ? 'Máximo $max caracteres.' : null;
-  };
+  String? Function(String?) _dom(String? Function(String?) regla) =>
+      (v) => _domicilioOmitido ? null : regla(v);
 
   Widget _campo(
     String clave,
     String etiqueta, {
-    String? Function(String?)? validar = _requerido,
+    required String? Function(String?) validar,
     TextInputType? teclado,
     int? digitos,
-    int? max,
+    int max = 250,
+    bool seguro = true,
   }) {
     return TextFormField(
       controller: _c[clave],
       decoration: InputDecoration(labelText: etiqueta),
       validator: validar,
+      // Errores en vivo, igual que en el registro.
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       keyboardType: digitos != null ? TextInputType.number : teclado,
-      inputFormatters: digitos != null
-          ? [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(digitos),
-            ]
-          : max != null
-          ? [LengthLimitingTextInputFormatter(max)]
-          : null,
+      inputFormatters: [
+        LengthLimitingTextInputFormatter(digitos ?? max),
+        if (digitos != null) FilteringTextInputFormatter.digitsOnly,
+        if (seguro) TextoSeguro.formato,
+      ],
       enabled: !widget.guardando,
     );
   }
@@ -236,7 +226,7 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
                 'telefonoAlternativo',
                 'Teléfono alternativo (opcional)',
                 digitos: 10,
-                validar: _digitos(10, opcional: true),
+                validar: (v) => ValidadoresRegistro.telefono(v, opcional: true),
               ),
             ],
           ),
@@ -246,21 +236,26 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
               _campo(
                 'ocupacion',
                 'Ocupación (opcional)',
-                validar: null,
+                validar: _siHay(
+                  (v) => ValidadoresRegistro.requerido(v, max: 50),
+                ),
                 max: 50,
               ),
-              _campo('empresa', 'Empresa (opcional)', validar: null, max: 50),
+              _campo(
+                'empresa',
+                'Empresa (opcional)',
+                validar: _siHay(
+                  (v) => ValidadoresRegistro.requerido(v, max: 50),
+                ),
+                max: 50,
+              ),
               _campo(
                 'ingresoMensual',
                 'Ingreso mensual (opcional)',
                 teclado: const TextInputType.numberWithOptions(decimal: true),
-                validar: (v) {
-                  if ((v ?? '').trim().isEmpty) return null;
-                  final m = parseMonto(v!);
-                  return m == null || m <= 0
-                      ? 'Escribe un monto mayor a cero.'
-                      : null;
-                },
+                validar: (v) => ValidadoresRegistro.ingreso(v, opcional: true),
+                max: 17,
+                seguro: false, // lleva punto decimal; `ingreso` rechaza todo lo no numérico
               ),
             ],
           ),
@@ -270,34 +265,55 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
               _campo(
                 'calle',
                 'Calle',
-                validar: _dom(min: 3, max: 100),
+                validar: _dom(
+                  (v) => ValidadoresRegistro.requerido(v, min: 3, max: 100),
+                ),
                 max: 100,
               ),
               _campo(
                 'numeroExterior',
                 'Número exterior',
-                validar: _dom(max: 50),
+                validar: _dom((v) => ValidadoresRegistro.requerido(v, max: 50)),
+                max: 50,
               ),
               _campo(
                 'numeroInterior',
                 'Número interior (opcional)',
-                validar: null,
+                validar: TextoSeguro.validar,
+                max: 50,
               ),
               _campo(
                 'colonia',
                 'Colonia',
-                validar: _dom(min: 3, max: 100),
+                validar: _dom(
+                  (v) => ValidadoresRegistro.requerido(v, min: 3, max: 100),
+                ),
                 max: 100,
               ),
               _campo(
                 'codigoPostal',
                 'Código postal',
                 digitos: 5,
-                validar: (v) => _domicilioOmitido ? null : _digitos(5)(v),
+                validar: _dom(ValidadoresRegistro.codigoPostal),
               ),
-              _campo('municipio', 'Municipio o alcaldía', validar: _dom()),
-              _campo('estado', 'Estado', validar: _dom()),
-              _campo('pais', 'País', validar: _dom(max: 100)),
+              _campo(
+                'municipio',
+                'Municipio o alcaldía',
+                validar: _dom(ValidadoresRegistro.requerido),
+              ),
+              _campo(
+                'estado',
+                'Estado',
+                validar: _dom(ValidadoresRegistro.requerido),
+              ),
+              _campo(
+                'pais',
+                'País',
+                validar: _dom(
+                  (v) => ValidadoresRegistro.requerido(v, max: 100),
+                ),
+                max: 100,
+              ),
             ],
           ),
           if (_error != null) ...[

@@ -6,6 +6,7 @@ import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/ui/marco_acceso.dart';
 import '../../../core/ui/widgets_estado.dart';
+import '../../../core/validation/texto_seguro.dart';
 import '../../../perfil/domain/entities/perfil.dart' show estadosCiviles;
 import '../../domain/ports/registro_gateway.dart';
 import '../../domain/validadores_registro.dart';
@@ -509,8 +510,7 @@ class _RegistroPageState extends State<RegistroPage> {
       _campo(
         'segundoNombre',
         'Segundo nombre (opcional)',
-        validator: (v) =>
-            ValidadoresRegistro.nombre(v, opcional: true, min: 3),
+        validator: (v) => ValidadoresRegistro.nombre(v, opcional: true, min: 3),
         max: 50,
         capitalizar: TextCapitalization.words,
       ),
@@ -630,6 +630,8 @@ class _RegistroPageState extends State<RegistroPage> {
         'Ingreso mensual (MXN)',
         validator: ValidadoresRegistro.ingreso,
         max: 17,
+        seguro:
+            false, // lleva punto decimal; `ingreso` rechaza todo lo no numérico
         teclado: const TextInputType.numberWithOptions(decimal: true),
         prefijo: r'$ ',
       ),
@@ -653,7 +655,12 @@ class _RegistroPageState extends State<RegistroPage> {
         validator: (v) => ValidadoresRegistro.requerido(v, max: 50),
         max: 50,
       ),
-      _campo('numeroInterior', 'Número interior (opcional)', max: 50),
+      _campo(
+        'numeroInterior',
+        'Número interior (opcional)',
+        validator: TextoSeguro.validar,
+        max: 50,
+      ),
     ]),
     _fila(
       flex: [3, 2],
@@ -710,6 +717,7 @@ class _RegistroPageState extends State<RegistroPage> {
         validator: ValidadoresRegistro.correo,
         max: 100,
         unico: true,
+        seguro: false, // lleva @ y puntos; `correo` rechaza símbolos peligrosos
         teclado: TextInputType.emailAddress,
         hints: [AutofillHints.email],
       ),
@@ -802,6 +810,7 @@ class _RegistroPageState extends State<RegistroPage> {
     bool soloDigitos = false,
     bool mayusculas = false,
     bool unico = false,
+    bool seguro = true,
     List<String> hints = const [],
     String? prefijo,
   }) => TextFormField(
@@ -816,6 +825,7 @@ class _RegistroPageState extends State<RegistroPage> {
     autofillHints: hints,
     inputFormatters: [
       LengthLimitingTextInputFormatter(max),
+      if (seguro) TextoSeguro.formato,
       if (soloDigitos) FilteringTextInputFormatter.digitsOnly,
       if (mayusculas)
         TextInputFormatter.withFunction(
