@@ -7,6 +7,8 @@ import 'package:frontend/authentication/domain/entities/evento_sesion.dart';
 import 'package:frontend/authentication/domain/entities/sesion.dart';
 import 'package:frontend/authentication/domain/ports/almacen_sesion.dart';
 import 'package:frontend/authentication/domain/ports/autenticacion_gateway.dart';
+import 'package:frontend/clientes/domain/entities/cliente_admin.dart';
+import 'package:frontend/clientes/domain/ports/clientes_repository.dart';
 import 'package:frontend/core/theme/app_theme.dart';
 import 'package:frontend/pagos/domain/entities/comprobante.dart';
 import 'package:frontend/pagos/domain/entities/compra_historial.dart';
@@ -257,6 +259,81 @@ Perfil perfilPrueba({String empresa = 'Acme', String? telefonoAlternativo}) => P
     Cuenta(id: 1, numeroCuenta: '123456789012345678', saldo: 900, activa: true),
     Cuenta(id: 2, numeroCuenta: '876543210987654321', saldo: 50, activa: false),
   ],
+);
+
+/// Clientes de prueba: [admin] decide si el usuario autenticado es administrador.
+class ClientesFalso implements ClientesRepository {
+  ClientesFalso({this.admin = false, List<ClienteAdmin>? clientes})
+    : clientes = clientes ?? [];
+  bool admin;
+  List<ClienteAdmin> clientes;
+  Object? errorRol;
+  Object? errorListar;
+  Object? errorCambiar;
+  int listados = 0;
+  final List<({String rfc, bool activo})> cambios = [];
+
+  @override
+  Future<bool> esAdministrador() async {
+    if (errorRol != null) throw errorRol!; // ignore: only_throw_errors
+    return admin;
+  }
+
+  @override
+  Future<List<ClienteAdmin>> listar() async {
+    listados++;
+    if (errorListar != null) throw errorListar!; // ignore: only_throw_errors
+    return List.of(clientes);
+  }
+
+  @override
+  Future<void> cambiarEstado({required String rfc, required bool activo}) async {
+    if (errorCambiar != null) throw errorCambiar!; // ignore: only_throw_errors
+    cambios.add((rfc: rfc, activo: activo));
+    clientes = [
+      for (final c in clientes)
+        c.perfil.rfc == rfc
+            ? ClienteAdmin(
+                id: c.id,
+                perfil: c.perfil,
+                activo: activo,
+                esAdministrador: c.esAdministrador,
+                fechaAlta: c.fechaAlta,
+              )
+            : c,
+    ];
+  }
+}
+
+ClienteAdmin clientePrueba(
+  int id,
+  String nombre,
+  String apellido, {
+  bool activo = true,
+}) => ClienteAdmin(
+  id: id,
+  activo: activo,
+  fechaAlta: DateTime(2026, 1, 10),
+  perfil: Perfil(
+    primerNombre: nombre,
+    apellidoPaterno: apellido,
+    apellidoMaterno: 'Ruiz',
+    fechaNacimiento: DateTime(1990, 1, 1),
+    curp: 'CURP$id',
+    rfc: 'RFC$id',
+    sexo: 'Femenino',
+    nacionalidad: 'Mexicana',
+    correoElectronico: '${nombre.toLowerCase()}@example.com',
+    telefonoMovil: '5512345678',
+    cuentas: [
+      Cuenta(
+        id: id,
+        numeroCuenta: '00000000000000000$id',
+        saldo: 100,
+        activa: activo,
+      ),
+    ],
+  ),
 );
 
 /// Catálogos de prueba: unas pocas opciones de cada lista.

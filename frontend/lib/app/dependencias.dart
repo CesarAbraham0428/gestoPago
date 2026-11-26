@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fetch_client/fetch_client.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
@@ -12,6 +14,9 @@ import '../authentication/infraestructure/adapters/api_autenticacion_gateway.dar
 import '../authentication/infraestructure/adapters/api_registro_gateway.dart';
 import '../core/catalogos/api_catalogos_repository.dart';
 import '../core/catalogos/catalogos.dart';
+import '../clientes/application/clientes_controller.dart';
+import '../clientes/domain/ports/clientes_repository.dart';
+import '../clientes/infraestructure/adapters/api_clientes_repository.dart';
 import '../core/config/app_config.dart';
 import '../core/network/api_client.dart';
 import '../pagos/application/historial_controller.dart';
@@ -45,6 +50,7 @@ class Dependencias {
     required this.pagos,
     required this.realizarCompra,
     required this.perfil,
+    required this.clientes,
     required this.notificaciones,
   });
 
@@ -57,6 +63,7 @@ class Dependencias {
   final PagosRepository pagos;
   final RealizarCompra realizarCompra;
   final PerfilController perfil;
+  final ClientesController clientes;
   final NotificacionesController notificaciones;
 
   /// Construye el grafo con los adaptadores HTTP y de almacenamiento reales.
@@ -71,6 +78,7 @@ class Dependencias {
     PagosRepository? pagosRepositorio,
     CuentasRepository? cuentasRepositorio,
     PerfilRepository? perfilRepositorio,
+    ClientesRepository? clientesRepositorio,
     NotificacionesRepository? notificacionesRepositorio,
     http.Client? clienteEventos,
   }) {
@@ -94,6 +102,7 @@ class Dependencias {
     );
     final historial = HistorialController(pagos);
     final perfil = PerfilController(perfilRepositorio ?? ApiPerfilRepository(api));
+    final clientes = ClientesController(clientesRepositorio ?? ApiClientesRepository(api));
 
     final notificaciones = NotificacionesController(
       notificacionesRepositorio ?? ApiNotificacionesRepository(api),
@@ -102,14 +111,18 @@ class Dependencias {
     // Cada aviso en tiempo real también sale como toast; la bandeja lo conserva.
     notificaciones.nuevas.listen(_mostrarToast);
 
-    // Al cerrar sesión se descartan los datos del usuario anterior.
+    // Al cerrar sesión se descartan los datos del usuario anterior; al abrirla se
+    // consulta su rol para saber si el menú ofrece la sección de clientes.
     var estabaAutenticado = false;
     sesion.addListener(() {
       if (estabaAutenticado && !sesion.autenticado) {
         catalogo.limpiar();
         historial.limpiar();
         perfil.limpiar();
+        clientes.limpiar();
         notificaciones.limpiar();
+      } else if (!estabaAutenticado && sesion.autenticado) {
+        unawaited(clientes.detectarRol());
       }
       estabaAutenticado = sesion.autenticado;
     });
@@ -124,6 +137,7 @@ class Dependencias {
       pagos: pagos,
       realizarCompra: RealizarCompra(pagos),
       perfil: perfil,
+      clientes: clientes,
       notificaciones: notificaciones,
     );
   }

@@ -23,8 +23,11 @@ class DestinoNavegacion {
     required this.fondo,
     required this.descripcion,
     this.etiquetaCorta,
+    this.soloAdministrador = false,
   });
 
+  /// Solo se ofrece en el menú a los administradores.
+  final bool soloAdministrador;
   final String ruta;
   final String etiqueta;
 
@@ -75,7 +78,28 @@ const destinos = [
     fondo: AppColors.coralTenue,
     descripcion: 'Saldo y estado de tu cuenta',
   ),
+  // Debe ir al final: para los demás usuarios el menú se queda con los anteriores.
+  DestinoNavegacion(
+    ruta: '/clientes',
+    etiqueta: 'Clientes',
+    icono: Icons.groups_outlined,
+    iconoActivo: Icons.groups,
+    color: AppColors.indigo,
+    fondo: AppColors.indigoTenue,
+    descripcion: 'Consulta y administra las cuentas de los clientes',
+    soloAdministrador: true,
+  ),
 ];
+
+/// Destinos del menú para este usuario.
+List<DestinoNavegacion> destinosVisibles({required bool esAdministrador}) => [
+  for (final d in destinos)
+    if (esAdministrador || !d.soloAdministrador) d,
+];
+
+/// Índice del destino activo dentro de [visibles] (sin salirse si la ruta aún no se ofrece).
+int indiceVisible(GoRouterState state, List<DestinoNavegacion> visibles) =>
+    indiceDestino(state).clamp(0, visibles.length - 1);
 
 /// Bandeja de avisos: no es un apartado del menú, se abre desde la campana del
 /// encabezado.
@@ -145,7 +169,11 @@ String tituloPantalla(GoRouterState state) {
   if (esNotificaciones(state)) return destinoNotificaciones.etiqueta;
   final base = destinos[indiceDestino(state)];
   if (!esDetalle(state)) return base.etiqueta;
-  return base.ruta == '/catalogo' ? 'Producto' : 'Compra';
+  return switch (base.ruta) {
+    '/catalogo' => 'Producto',
+    '/clientes' => 'Cliente',
+    _ => 'Compra',
+  };
 }
 
 Future<void> confirmarCierreDeSesion(

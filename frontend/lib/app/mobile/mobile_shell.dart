@@ -14,53 +14,71 @@ Widget construirShellMovil(
   GoRouterState state,
   Widget contenido,
 ) {
-  final sesion = DependenciasScope.of(context).sesion;
+  final deps = DependenciasScope.of(context);
+  final sesion = deps.sesion;
   final ancho = Breakpoints.esAncho(context, Breakpoints.barraLateral);
 
-  return Scaffold(
-    appBar: barraSuperior(
-      context,
-      state,
-      sesion,
-      menu: MenuCuentaMovil(sesion: sesion),
-    ),
-    body: ancho
-        ? Row(
-            children: [
-              NavigationRail(
-                backgroundColor: AppColors.superficie,
-                selectedIndex: esNotificaciones(state) ? null : indiceDestino(state),
-                onDestinationSelected: (i) => context.go(destinos[i].ruta),
-                labelType: NavigationRailLabelType.all,
-                indicatorColor: AppColors.marcaTenue,
-                destinations: [
-                  for (final d in destinos)
-                    NavigationRailDestination(
-                      icon: Icon(d.icono),
-                      selectedIcon: Icon(d.iconoActivo),
-                      label: Text(d.etiqueta),
-                    ),
+  // El menú cambia cuando se sabe si el usuario es administrador.
+  return ListenableBuilder(
+    listenable: deps.clientes,
+    builder: (context, _) {
+      final visibles = destinosVisibles(
+        esAdministrador: deps.clientes.esAdministrador == true,
+      );
+      return Scaffold(
+        appBar: barraSuperior(
+          context,
+          state,
+          sesion,
+          menu: MenuCuentaMovil(sesion: sesion),
+        ),
+        body: ancho
+            ? Row(
+                children: [
+                  NavigationRail(
+                    backgroundColor: AppColors.superficie,
+                    selectedIndex: esNotificaciones(state)
+                        ? null
+                        : indiceVisible(state, visibles),
+                    onDestinationSelected: (i) => context.go(visibles[i].ruta),
+                    labelType: NavigationRailLabelType.all,
+                    indicatorColor: AppColors.marcaTenue,
+                    destinations: [
+                      for (final d in visibles)
+                        NavigationRailDestination(
+                          icon: Icon(d.icono),
+                          selectedIcon: Icon(d.iconoActivo),
+                          label: Text(d.etiqueta),
+                        ),
+                    ],
+                  ),
+                  const VerticalDivider(width: 1),
+                  Expanded(child: contenido),
                 ],
+              )
+            : contenido,
+        bottomNavigationBar: ancho || esDetalle(state)
+            ? null
+            : _BarraInferior(
+                destinosMenu: visibles,
+                seleccionado: indiceVisible(state, visibles),
+                alSeleccionar: (i) => context.go(visibles[i].ruta),
               ),
-              const VerticalDivider(width: 1),
-              Expanded(child: contenido),
-            ],
-          )
-        : contenido,
-    bottomNavigationBar: ancho || esDetalle(state)
-        ? null
-        : _BarraInferior(
-            seleccionado: indiceDestino(state),
-            alSeleccionar: (i) => context.go(destinos[i].ruta),
-          ),
+      );
+    },
   );
 }
 
 /// Barra inferior con un fondo verde muy leve, filete superior y etiquetas de
 /// una sola línea para que todas queden centradas bajo su icono.
 class _BarraInferior extends StatelessWidget {
-  const _BarraInferior({required this.seleccionado, required this.alSeleccionar});
+  const _BarraInferior({
+    required this.destinosMenu,
+    required this.seleccionado,
+    required this.alSeleccionar,
+  });
 
+  final List<DestinoNavegacion> destinosMenu;
   final int seleccionado;
   final ValueChanged<int> alSeleccionar;
 
@@ -102,7 +120,7 @@ class _BarraInferior extends StatelessWidget {
             selectedIndex: seleccionado,
             onDestinationSelected: alSeleccionar,
             destinations: [
-              for (final d in destinos)
+              for (final d in destinosMenu)
                 NavigationDestination(
                   icon: Icon(d.icono),
                   selectedIcon: Icon(d.iconoActivo),

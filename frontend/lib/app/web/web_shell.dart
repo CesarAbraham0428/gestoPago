@@ -16,33 +16,48 @@ Widget construirShellWeb(
   GoRouterState state,
   Widget contenido,
 ) {
-  final sesion = DependenciasScope.of(context).sesion;
+  final deps = DependenciasScope.of(context);
+  final sesion = deps.sesion;
   final conBarraLateral = Breakpoints.esAncho(
     context,
     Breakpoints.barraLateral,
   );
 
-  if (conBarraLateral) {
-    return _MarcoAncho(state: state, sesion: sesion, contenido: contenido);
-  }
+  // El menú cambia cuando se sabe si el usuario es administrador.
+  return ListenableBuilder(
+    listenable: deps.clientes,
+    builder: (context, _) {
+      final visibles = destinosVisibles(
+        esAdministrador: deps.clientes.esAdministrador == true,
+      );
+      if (conBarraLateral) {
+        return _MarcoAncho(
+          state: state,
+          sesion: sesion,
+          contenido: contenido,
+          destinosMenu: visibles,
+        );
+      }
 
-  return Scaffold(
-    appBar: barraSuperior(context, state, sesion),
-    body: contenido,
-    bottomNavigationBar: esDetalle(state)
-        ? null
-        : NavigationBar(
-            selectedIndex: indiceDestino(state),
-            onDestinationSelected: (i) => context.go(destinos[i].ruta),
-            destinations: [
-              for (final d in destinos)
-                NavigationDestination(
-                  icon: Icon(d.icono),
-                  selectedIcon: Icon(d.iconoActivo),
-                  label: d.etiqueta,
-                ),
-            ],
-          ),
+      return Scaffold(
+        appBar: barraSuperior(context, state, sesion),
+        body: contenido,
+        bottomNavigationBar: esDetalle(state)
+            ? null
+            : NavigationBar(
+                selectedIndex: indiceVisible(state, visibles),
+                onDestinationSelected: (i) => context.go(visibles[i].ruta),
+                destinations: [
+                  for (final d in visibles)
+                    NavigationDestination(
+                      icon: Icon(d.icono),
+                      selectedIcon: Icon(d.iconoActivo),
+                      label: d.etiqueta,
+                    ),
+                ],
+              ),
+      );
+    },
   );
 }
 
@@ -54,11 +69,13 @@ class _MarcoAncho extends StatefulWidget {
     required this.state,
     required this.sesion,
     required this.contenido,
+    required this.destinosMenu,
   });
 
   final GoRouterState state;
   final SesionController sesion;
   final Widget contenido;
+  final List<DestinoNavegacion> destinosMenu;
 
   @override
   State<_MarcoAncho> createState() => _MarcoAnchoState();
@@ -89,7 +106,11 @@ class _MarcoAnchoState extends State<_MarcoAncho> {
                   maintainSize: true,
                   child: Row(
                     children: [
-                      _BarraLateral(state: widget.state, sesion: widget.sesion),
+                      _BarraLateral(
+                        state: widget.state,
+                        sesion: widget.sesion,
+                        destinosMenu: widget.destinosMenu,
+                      ),
                       const VerticalDivider(width: 1),
                     ],
                   ),
@@ -186,14 +207,19 @@ class _CabeceraContenido extends StatelessWidget {
 }
 
 class _BarraLateral extends StatelessWidget {
-  const _BarraLateral({required this.state, required this.sesion});
+  const _BarraLateral({
+    required this.state,
+    required this.sesion,
+    required this.destinosMenu,
+  });
   final GoRouterState state;
   final SesionController sesion;
+  final List<DestinoNavegacion> destinosMenu;
 
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context).textTheme;
-    final activo = esNotificaciones(state) ? -1 : indiceDestino(state);
+    final activo = esNotificaciones(state) ? -1 : indiceVisible(state, destinosMenu);
     return Container(
       width: 248,
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
@@ -225,11 +251,11 @@ class _BarraLateral extends StatelessWidget {
               ),
             ),
           ),
-          for (var i = 0; i < destinos.length; i++)
+          for (var i = 0; i < destinosMenu.length; i++)
             _ItemMenu(
-              destino: destinos[i],
+              destino: destinosMenu[i],
               activo: i == activo,
-              alTocar: () => context.go(destinos[i].ruta),
+              alTocar: () => context.go(destinosMenu[i].ruta),
             ),
           const Spacer(),
           // Rojo claro sobre fondo rojo translúcido: contrasta con el verde sin romper la paleta.

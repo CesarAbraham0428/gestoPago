@@ -452,6 +452,7 @@ void main() {
       final deps = Dependencias.crear(
         autenticacion: GatewayFalso(),
         almacenSesion: AlmacenFalso()..guardada = sesionPrueba(),
+        clientesRepositorio: ClientesFalso(),
         catalogoRepositorio: CatalogoFalso(() async => []),
         pagosRepositorio: PagosFalso(),
         cuentasRepositorio: CuentasFalso(() async => []),

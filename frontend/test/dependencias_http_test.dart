@@ -25,6 +25,7 @@ void main() {
       apiBaseUrl: 'http://127.0.0.1:${servidor.port}',
       almacenSesion: AlmacenFalso()..guardada = sesionPrueba(),
       autenticacion: GatewayFalso(),
+      clientesRepositorio: ClientesFalso(),
     );
     await deps.sesion.restaurar();
     expect(deps.sesion.autenticado, isTrue);

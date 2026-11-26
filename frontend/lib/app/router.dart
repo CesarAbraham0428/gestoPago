@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../authentication/infraestructure/ui/login_page.dart';
 import '../authentication/infraestructure/ui/registro_page.dart';
+import '../clientes/infraestructure/ui/clientes_page.dart';
 import '../notificaciones/infraestructure/ui/notificaciones_page.dart';
 import '../pagos/infraestructure/ui/historial_page.dart';
 import '../pagos/infraestructure/ui/panel_compra.dart';
@@ -16,12 +17,17 @@ import 'shell_comun.dart';
 GoRouter crearRouter(Dependencias deps, ConstructorShell shell) {
   return GoRouter(
     initialLocation: '/catalogo',
-    refreshListenable: deps.sesion,
+    refreshListenable: Listenable.merge([deps.sesion, deps.clientes]),
     redirect: (context, state) {
       final enAcceso =
           state.uri.path == '/login' || state.uri.path == '/registro';
       if (!deps.sesion.autenticado) return enAcceso ? null : '/login';
       if (enAcceso || state.uri.path == '/') return '/catalogo';
+      // Solo se expulsa a quien se sabe que no es administrador; mientras se consulta el rol, se deja pasar.
+      if (state.uri.path.startsWith('/clientes') &&
+          deps.clientes.esAdministrador == false) {
+        return '/catalogo';
+      }
       return null;
     },
     routes: [
@@ -81,6 +87,17 @@ GoRouter crearRouter(Dependencias deps, ConstructorShell shell) {
             builder: (context, state) =>
                 CuentasBancariasPage(controller: deps.perfil),
           ),
+          GoRoute(
+            path: '/clientes',
+            builder: (context, state) => _clientes(deps, null),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (context, state) =>
+                    _clientes(deps, int.tryParse(state.pathParameters['id']!)),
+              ),
+            ],
+          ),
         ],
       ),
     ],
@@ -102,6 +119,17 @@ Widget _catalogo(Dependencias deps, String? clave) {
         alConfirmarCompra: deps.historial.recargar,
         alVerHistorial: () => context.go('/compras'),
       ),
+    ),
+  );
+}
+
+Widget _clientes(Dependencias deps, int? id) {
+  return Builder(
+    builder: (context) => ClientesPage(
+      controller: deps.clientes,
+      idSeleccionado: id,
+      alSeleccionar: (i) => context.go('/clientes/$i'),
+      alVolver: () => context.go('/clientes'),
     ),
   );
 }

@@ -36,6 +36,7 @@ void main() {
     final deps = Dependencias.crear(
       autenticacion: GatewayFalso(),
       almacenSesion: AlmacenFalso()..guardada = sesion,
+      clientesRepositorio: ClientesFalso(),
       catalogoRepositorio: CatalogoFalso(() async => productos),
       pagosRepositorio: pagos,
       cuentasRepositorio: CuentasFalso(
