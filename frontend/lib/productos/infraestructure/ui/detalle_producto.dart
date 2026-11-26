@@ -28,7 +28,7 @@ class DetalleProducto extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Monograma(nombre: producto.servicio, tamano: 56),
+            Monograma(nombre: producto.servicio, idServicio: producto.idServicio, tamano: 56),
             const SizedBox(width: 16),
             Expanded(
               child: Column(

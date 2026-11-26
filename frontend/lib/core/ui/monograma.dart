@@ -1,13 +1,24 @@
 import 'package:flutter/material.dart';
 
-/// El catálogo de GestoPago no incluye imágenes. Cada servicio se identifica
-/// con sus iniciales sobre un color estable derivado del nombre, de modo que
-/// "Telcel" se ve igual en el catálogo, el detalle y el historial.
+/// Identifica un servicio con su logo de GestoPago (por `idServicio`) o, si no
+/// se conoce el id o el logo no existe, con sus iniciales sobre un color
+/// estable derivado del nombre, de modo que "Telcel" se ve igual en todas
+/// partes.
 class Monograma extends StatelessWidget {
-  const Monograma({super.key, required this.nombre, this.tamano = 44});
+  const Monograma({
+    super.key,
+    required this.nombre,
+    this.tamano = 44,
+    this.idServicio,
+  });
 
   final String nombre;
   final double tamano;
+  final int? idServicio;
+
+  /// Logos públicos de GestoPago: no requieren token.
+  static String urlLogo(int idServicio) =>
+      'https://gestopago.portalventas.net/sistema/images/gestopago/servicios/$idServicio.png';
 
   static const _fondos = [
     Color(0xFF1F4E5F),
@@ -42,25 +53,51 @@ class Monograma extends StatelessWidget {
     return _fondos[hash % _fondos.length];
   }
 
+  Widget _iniciales() => Container(
+    width: tamano,
+    height: tamano,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: colorDe(nombre),
+      borderRadius: BorderRadius.circular(tamano * 0.2),
+    ),
+    child: Text(
+      iniciales(nombre),
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: tamano * 0.36,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.2,
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
+    final id = idServicio;
+    if (id == null) return ExcludeSemantics(child: _iniciales());
     return ExcludeSemantics(
-      child: Container(
-        width: tamano,
-        height: tamano,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: colorDe(nombre),
-          borderRadius: BorderRadius.circular(tamano * 0.2),
-        ),
-        child: Text(
-          iniciales(nombre),
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: tamano * 0.36,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.2,
-          ),
+      child: SizedBox.square(
+        dimension: tamano,
+        child: Image.network(
+          urlLogo(id),
+          // Con <img> en web, sin clave puede quedarse el logo anterior.
+          key: ValueKey(id),
+          fit: BoxFit.contain,
+          // El servidor no envía CORS: en web se pinta con <img> para que cargue.
+          webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+          frameBuilder: (_, imagen, frame, sincrono) =>
+              frame == null && !sincrono
+              ? _iniciales()
+              : Container(
+                  padding: EdgeInsets.all(tamano * 0.1),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(tamano * 0.2),
+                  ),
+                  child: imagen,
+                ),
+          errorBuilder: (_, _, _) => _iniciales(),
         ),
       ),
     );

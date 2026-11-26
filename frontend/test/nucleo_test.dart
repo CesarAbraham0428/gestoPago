@@ -471,5 +471,24 @@ void main() {
       );
       expect(color(), a);
     });
+
+    testWidgets('con idServicio pide el logo y, si no carga, deja las iniciales', (
+      tester,
+    ) async {
+      expect(
+        Monograma.urlLogo(79),
+        'https://gestopago.portalventas.net/sistema/images/gestopago/servicios/79.png',
+      );
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: Monograma(nombre: 'Telcel', idServicio: 79),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // En pruebas la red responde con error: queda el respaldo.
+      expect(find.byType(Image), findsOneWidget);
+      expect(find.text('TE'), findsOneWidget);
+    });
   });
 }
