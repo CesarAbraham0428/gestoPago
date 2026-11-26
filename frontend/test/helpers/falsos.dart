@@ -1,3 +1,4 @@
+import 'package:frontend/core/catalogos/catalogos.dart';
 import 'package:flutter/material.dart';
 import 'package:toastification/toastification.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -257,3 +258,21 @@ Perfil perfilPrueba({String empresa = 'Acme', String? telefonoAlternativo}) => P
     Cuenta(id: 2, numeroCuenta: '876543210987654321', saldo: 50, activa: false),
   ],
 );
+
+/// Catálogos de prueba: unas pocas opciones de cada lista.
+class CatalogosFalso implements CatalogosRepository {
+  CatalogosFalso({this.falla = false});
+  final bool falla;
+  int consultas = 0;
+
+  @override
+  Future<Catalogos> obtener() async {
+    consultas++;
+    if (falla) throw Exception('sin red');
+    return const Catalogos(
+      paises: ['Argentina', 'Canadá', 'México'],
+      nacionalidades: ['Argentina', 'Canadiense', 'Mexicana'],
+      ocupaciones: ['Contabilidad', 'Estudiante', 'Ingeniería'],
+    );
+  }
+}

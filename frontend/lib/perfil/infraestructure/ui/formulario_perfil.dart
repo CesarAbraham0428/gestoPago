@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/catalogos/catalogos.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/ui/selector_catalogo.dart';
 import '../../../core/ui/widgets_estado.dart';
 import '../../../core/validation/texto_seguro.dart';
 import '../../../authentication/domain/validadores_registro.dart';
@@ -17,12 +19,14 @@ class FormularioPerfil extends StatefulWidget {
   const FormularioPerfil({
     super.key,
     required this.perfil,
+    required this.catalogos,
     required this.guardando,
     required this.alGuardar,
     required this.alCancelar,
   });
 
   final Perfil perfil;
+  final Catalogos catalogos;
   final bool guardando;
   final Future<String?> Function(Map<String, Object?> editado) alGuardar;
   final VoidCallback alCancelar;
@@ -54,7 +58,7 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
       'municipio': d?.municipio ?? '',
       'estado': d?.estado ?? '',
       'codigoPostal': d?.codigoPostal ?? '',
-      'pais': d?.pais ?? 'México',
+      'pais': d?.pais ?? paisPorOmision,
     }.map((k, v) => MapEntry(k, TextEditingController(text: v)));
     _estadoCivil = p.estadoCivil;
   }
@@ -245,13 +249,13 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
           _Grupo(
             titulo: 'Empleo',
             campos: [
-              _campo(
-                'ocupacion',
-                'Ocupación (opcional)',
-                validar: _siHay(
-                  (v) => ValidadoresRegistro.requerido(v, max: 50),
-                ),
-                max: 50,
+              SelectorCatalogo(
+                key: const ValueKey('perfil-ocupacion'),
+                controlador: _c['ocupacion']!,
+                etiqueta: 'Ocupación (opcional)',
+                opciones: widget.catalogos.ocupaciones,
+                habilitado: !widget.guardando,
+                opcional: true,
               ),
               _campo(
                 'empresa',
@@ -318,13 +322,15 @@ class _FormularioPerfilState extends State<FormularioPerfil> {
                 'Estado',
                 validar: _dom(ValidadoresRegistro.requerido),
               ),
-              _campo(
-                'pais',
-                'País',
+              SelectorCatalogo(
+                key: const ValueKey('perfil-pais'),
+                controlador: _c['pais']!,
+                etiqueta: 'País',
+                opciones: widget.catalogos.paises,
+                habilitado: !widget.guardando,
                 validar: _dom(
-                  (v) => ValidadoresRegistro.requerido(v, max: 100),
+                  (v) => v == null ? 'Selecciona una opción.' : null,
                 ),
-                max: 100,
               ),
             ],
           ),

@@ -294,7 +294,11 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light(),
-          home: RegistroPage(registro: registro, alVolver: () => volvio++),
+          home: RegistroPage(
+            registro: registro,
+            catalogos: CatalogosFalso(),
+            alVolver: () => volvio++,
+          ),
         ),
       );
     }
@@ -345,7 +349,7 @@ void main() {
 
     Future<void> paso2(WidgetTester t) async {
       await escribir(t, 'empresa', 'Acme SA');
-      await escribir(t, 'ocupacion', 'Contadora');
+      await elegir(t, 'ocupacion', 'Contabilidad');
       await escribir(t, 'ingresoMensual', '15000.50');
       await boton(t, 'Continuar');
     }

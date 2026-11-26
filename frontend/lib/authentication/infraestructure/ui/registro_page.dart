@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/catalogos/catalogos.dart';
 import '../../../core/error/app_exception.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/ui/marco_acceso.dart';
+import '../../../core/ui/selector_catalogo.dart';
 import '../../../core/ui/widgets_estado.dart';
 import '../../../core/validation/texto_seguro.dart';
 import '../../../perfil/domain/entities/perfil.dart' show estadosCiviles;
@@ -77,10 +79,12 @@ class RegistroPage extends StatefulWidget {
   const RegistroPage({
     super.key,
     required this.registro,
+    required this.catalogos,
     required this.alVolver,
   });
 
   final RegistroGateway registro;
+  final CatalogosRepository catalogos;
 
   /// Regresa al login (desde el enlace o al terminar el registro).
   final VoidCallback alVolver;
@@ -161,12 +165,17 @@ class _RegistroPageState extends State<RegistroPage> {
   bool _creada = false;
   double _altoMinimo = 0;
   String? _error;
+  Catalogos _listas = const Catalogos();
 
   @override
   void initState() {
     super.initState();
-    _c['nacionalidad']!.text = 'Mexicana';
-    _c['pais']!.text = 'México';
+    // Sin listas (servidor sin respuesta) solo se ofrecen los valores por omisión; registrar fallaría igual.
+    widget.catalogos.obtener().then((c) {
+      if (mounted) setState(() => _listas = c);
+    }, onError: (_) {});
+    _c['nacionalidad']!.text = nacionalidadPorOmision;
+    _c['pais']!.text = paisPorOmision;
   }
 
   @override
@@ -298,7 +307,7 @@ class _RegistroPageState extends State<RegistroPage> {
     for (final k in campos) {
       _c[k]!.clear();
     }
-    if (_paso == _pasoDomicilio) _c['pais']!.text = 'México';
+    if (_paso == _pasoDomicilio) _c['pais']!.text = paisPorOmision;
     _claves[_paso].currentState?.reset();
     setState(() {
       _paso++;
@@ -560,11 +569,12 @@ class _RegistroPageState extends State<RegistroPage> {
         (v) => setState(() => _estadoCivil = v),
         opcional: true,
       ),
-      _campo(
-        'nacionalidad',
-        'Nacionalidad',
-        validator: (v) => ValidadoresRegistro.requerido(v, max: 100),
-        max: 100,
+      SelectorCatalogo(
+        key: const ValueKey('reg-nacionalidad'),
+        controlador: _c['nacionalidad']!,
+        etiqueta: 'Nacionalidad',
+        opciones: _listas.nacionalidades,
+        habilitado: !_enviando,
       ),
     ]),
     _fila([
@@ -617,13 +627,12 @@ class _RegistroPageState extends State<RegistroPage> {
       hints: [AutofillHints.organizationName],
     ),
     _fila([
-      _campo(
-        'ocupacion',
-        'Ocupación o puesto',
-        validator: (v) => ValidadoresRegistro.requerido(v, max: 50),
-        max: 50,
-        capitalizar: TextCapitalization.sentences,
-        hints: [AutofillHints.jobTitle],
+      SelectorCatalogo(
+        key: const ValueKey('reg-ocupacion'),
+        controlador: _c['ocupacion']!,
+        etiqueta: 'Ocupación',
+        opciones: _listas.ocupaciones,
+        habilitado: !_enviando,
       ),
       _campo(
         'ingresoMensual',
@@ -699,12 +708,12 @@ class _RegistroPageState extends State<RegistroPage> {
         capitalizar: TextCapitalization.words,
         hints: [AutofillHints.addressState],
       ),
-      _campo(
-        'pais',
-        'País',
-        validator: (v) => ValidadoresRegistro.requerido(v, max: 100),
-        max: 100,
-        hints: [AutofillHints.countryName],
+      SelectorCatalogo(
+        key: const ValueKey('reg-pais'),
+        controlador: _c['pais']!,
+        etiqueta: 'País',
+        opciones: _listas.paises,
+        habilitado: !_enviando,
       ),
     ]),
   ]);

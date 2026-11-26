@@ -10,6 +10,8 @@ import '../authentication/domain/ports/registro_gateway.dart';
 import '../authentication/infraestructure/adapters/almacen_sesion_seguro.dart';
 import '../authentication/infraestructure/adapters/api_autenticacion_gateway.dart';
 import '../authentication/infraestructure/adapters/api_registro_gateway.dart';
+import '../core/catalogos/api_catalogos_repository.dart';
+import '../core/catalogos/catalogos.dart';
 import '../core/config/app_config.dart';
 import '../core/network/api_client.dart';
 import '../pagos/application/historial_controller.dart';
@@ -36,6 +38,7 @@ class Dependencias {
   Dependencias._({
     required this.sesion,
     required this.registro,
+    required this.catalogos,
     required this.catalogo,
     required this.historial,
     required this.cuentas,
@@ -47,6 +50,7 @@ class Dependencias {
 
   final SesionController sesion;
   final RegistroGateway registro;
+  final CatalogosRepository catalogos;
   final CatalogoController catalogo;
   final HistorialController historial;
   final CuentasRepository cuentas;
@@ -61,6 +65,7 @@ class Dependencias {
     String? apiBaseUrl,
     AutenticacionGateway? autenticacion,
     RegistroGateway? registroGateway,
+    CatalogosRepository? catalogosRepositorio,
     AlmacenSesion? almacenSesion,
     CatalogoRepository? catalogoRepositorio,
     PagosRepository? pagosRepositorio,
@@ -112,6 +117,7 @@ class Dependencias {
     return Dependencias._(
       sesion: sesion,
       registro: registroGateway ?? ApiRegistroGateway(api),
+      catalogos: catalogosRepositorio ?? ApiCatalogosRepository(api),
       catalogo: catalogo,
       historial: historial,
       cuentas: cuentasRepositorio ?? ApiCuentasRepository(api),

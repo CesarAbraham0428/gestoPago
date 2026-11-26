@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/catalogos/catalogos.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/ui/notificaciones.dart';
@@ -77,8 +78,9 @@ class _Lienzo extends StatelessWidget {
 
 /// "Mi perfil": datos personales, contacto, empleo y domicilio, con edición.
 class PerfilPage extends StatefulWidget {
-  const PerfilPage({super.key, required this.controller});
+  const PerfilPage({super.key, required this.controller, required this.catalogos});
   final PerfilController controller;
+  final CatalogosRepository catalogos;
 
   @override
   State<PerfilPage> createState() => _PerfilPageState();
@@ -86,6 +88,16 @@ class PerfilPage extends StatefulWidget {
 
 class _PerfilPageState extends State<PerfilPage> {
   bool _editando = false;
+  Catalogos _listas = const Catalogos();
+
+  @override
+  void initState() {
+    super.initState();
+    // Sin listas solo se ofrece el valor guardado; el servidor valida igual al guardar.
+    widget.catalogos.obtener().then((c) {
+      if (mounted) setState(() => _listas = c);
+    }, onError: (_) {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +109,7 @@ class _PerfilPageState extends State<PerfilPage> {
             children: [
               FormularioPerfil(
                 perfil: p,
+                catalogos: _listas,
                 guardando: widget.controller.guardando,
                 alCancelar: () => setState(() => _editando = false),
                 alGuardar: (editado) async {

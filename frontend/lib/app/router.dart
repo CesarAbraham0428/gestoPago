@@ -36,6 +36,7 @@ GoRouter crearRouter(Dependencias deps, ConstructorShell shell) {
         path: '/registro',
         builder: (context, state) => RegistroPage(
           registro: deps.registro,
+          catalogos: deps.catalogos,
           alVolver: () => context.go('/login'),
         ),
       ),
@@ -73,7 +74,7 @@ GoRouter crearRouter(Dependencias deps, ConstructorShell shell) {
           ),
           GoRoute(
             path: '/perfil',
-            builder: (context, state) => PerfilPage(controller: deps.perfil),
+            builder: (context, state) => PerfilPage(controller: deps.perfil, catalogos: deps.catalogos),
           ),
           GoRoute(
             path: '/cuentas',

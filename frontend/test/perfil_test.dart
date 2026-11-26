@@ -224,7 +224,7 @@ void main() {
     testWidgets('perfil: ver, editar y guardar', (tester) async {
       final repo = PerfilFalso();
       final c = PerfilController(repo);
-      await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 2400));
+      await montar(tester, PerfilPage(controller: c, catalogos: CatalogosFalso()), tamano: const Size(1000, 2400));
       await tester.pumpAndSettle();
       expect(find.text('Datos personales'), findsOneWidget);
       expect(find.text('Domicilio'), findsOneWidget);
@@ -280,7 +280,7 @@ void main() {
     testWidgets('perfil sin empleo ni domicilio: se ve vacío y se agregan al editar', (tester) async {
       final repo = PerfilFalso(_perfilMinimo());
       final c = PerfilController(repo);
-      await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 3000));
+      await montar(tester, PerfilPage(controller: c, catalogos: CatalogosFalso()), tamano: const Size(1000, 3000));
       await tester.pumpAndSettle();
       expect(camposVacios, findsWidgets);
       expect(find.text('Estado civil'), findsOneWidget);
@@ -314,12 +314,15 @@ void main() {
       await escribir('Código postal', '06000');
       await escribir('Municipio o alcaldía', 'Cuauhtémoc');
       await escribir('Estado', 'CDMX');
-      await escribir('Ocupación (opcional)', 'Contadora');
+      await tester.tap(find.byKey(const ValueKey('perfil-ocupacion')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Contabilidad').last);
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Guardar cambios'));
       await tester.pumpAndSettle();
 
       final cambios = repo.cambiosRecibidos.single;
-      expect(cambios['ocupacion'], 'Contadora');
+      expect(cambios['ocupacion'], 'Contabilidad');
       expect(cambios.containsKey('empresa'), isFalse);
       expect((cambios['domicilio']! as Map)['calle'], 'Reforma');
       expect((cambios['domicilio']! as Map)['pais'], 'México');
@@ -328,7 +331,7 @@ void main() {
 
     testWidgets('editar: errores en vivo y sin espacios ni símbolos', (tester) async {
       final c = PerfilController(PerfilFalso(perfilPrueba()));
-      await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 2400));
+      await montar(tester, PerfilPage(controller: c, catalogos: CatalogosFalso()), tamano: const Size(1000, 2400));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Editar perfil'));
       await tester.pumpAndSettle();
@@ -346,7 +349,7 @@ void main() {
 
     testWidgets('perfil: el teléfono alternativo se muestra con formato', (tester) async {
       final c = PerfilController(PerfilFalso(perfilPrueba(telefonoAlternativo: '5598765432')));
-      await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 2400));
+      await montar(tester, PerfilPage(controller: c, catalogos: CatalogosFalso()), tamano: const Size(1000, 2400));
       await tester.pumpAndSettle();
       expect(find.text(formatoTelefono('5598765432')), findsOneWidget);
       expect(camposVacios, findsNothing);
@@ -355,7 +358,7 @@ void main() {
     testWidgets('perfil: error al guardar se muestra y cancelar vuelve', (tester) async {
       final repo = PerfilFalso()..errorActualizar = const ApiException(409, 'Correo en uso');
       final c = PerfilController(repo);
-      await montar(tester, PerfilPage(controller: c), tamano: const Size(1000, 2400));
+      await montar(tester, PerfilPage(controller: c, catalogos: CatalogosFalso()), tamano: const Size(1000, 2400));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Editar perfil'));
       await tester.pumpAndSettle();
@@ -370,7 +373,7 @@ void main() {
 
     testWidgets('perfil: error de carga con reintento', (tester) async {
       final repo = PerfilFalso()..errorObtener = const ConexionException('Sin red');
-      await montar(tester, PerfilPage(controller: PerfilController(repo)));
+      await montar(tester, PerfilPage(controller: PerfilController(repo), catalogos: CatalogosFalso()));
       await tester.pumpAndSettle();
       expect(find.text('Sin red'), findsOneWidget);
       repo.errorObtener = null;
