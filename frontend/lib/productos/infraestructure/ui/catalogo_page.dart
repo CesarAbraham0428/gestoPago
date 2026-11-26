@@ -28,7 +28,8 @@ class CatalogoPage extends StatefulWidget {
   final VoidCallback alVolver;
 
   /// Acción de compra del producto, aportada por el módulo de pagos.
-  final Widget Function(BuildContext context, Producto producto) construirAccionCompra;
+  final Widget Function(BuildContext context, Producto producto)
+  construirAccionCompra;
 
   @override
   State<CatalogoPage> createState() => _CatalogoPageState();
@@ -144,72 +145,166 @@ class _PanelLista extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final ancho = Breakpoints.esAncho(context, 700);
+    final buscador = TextField(
+      controller: busqueda,
+      onChanged: controller.buscar,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: 'Buscar por servicio o producto',
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: busqueda.text.isEmpty
+            ? null
+            : IconButton(
+                tooltip: 'Borrar búsqueda',
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  busqueda.clear();
+                  controller.buscar('');
+                },
+              ),
+      ),
+    );
+    final soloDisponibles = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: TextField(
-            controller: busqueda,
-            onChanged: controller.buscar,
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              hintText: 'Buscar por servicio o producto',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: busqueda.text.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'Borrar búsqueda',
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        busqueda.clear();
-                        controller.buscar('');
-                      },
-                    ),
-            ),
+        Flexible(
+          child: Text(
+            'Solo disponibles',
+            style: tema.bodySmall,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _Filtros(controller: controller),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  controller.estado == EstadoCatalogo.listo
-                      ? '${controller.visibles.length} de ${controller.total} productos'
-                      : '',
-                  style: tema.bodySmall,
-                ),
-              ),
-              Flexible(
-                child: Text(
-                  'Solo los que puedo comprar',
-                  style: tema.bodySmall,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Switch(
-                value: controller.soloDisponibles,
-                onChanged: controller.alternarSoloDisponibles,
-              ),
-            ],
-          ),
-        ),
-        const Divider(),
-        Expanded(
-          child: _Contenido(controller: controller, alSeleccionar: alSeleccionar),
+        Switch(
+          value: controller.soloDisponibles,
+          onChanged: controller.alternarSoloDisponibles,
         ),
       ],
     );
+    final conteo = Text(
+      controller.estado == EstadoCatalogo.listo
+          ? '${controller.visibles.length} de ${controller.total} productos'
+          : '',
+      style: tema.bodySmall,
+    );
+
+    // El encabezado se desplaza con las cards para dejarles toda la pantalla.
+    final encabezado = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ancho
+              ? Row(
+                  children: [
+                    Expanded(child: buscador),
+                    const SizedBox(width: 12),
+                    soloDisponibles,
+                  ],
+                )
+              : buscador,
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: _Filtros(controller: controller)),
+              if (ancho) ...[const SizedBox(width: 12), conteo],
+            ],
+          ),
+          if (!ancho)
+            Row(
+              children: [
+                Expanded(child: conteo),
+                Flexible(child: soloDisponibles),
+              ],
+            ),
+        ],
+      ),
+    );
+
+    return RefreshIndicator(
+      onRefresh: () => controller.cargar(forzar: true),
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(child: encabezado),
+          ..._contenido(context),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _contenido(BuildContext context) {
+    Widget relleno(Widget hijo) =>
+        SliverFillRemaining(hasScrollBody: false, child: hijo);
+    switch (controller.estado) {
+      case EstadoCatalogo.inicial:
+      case EstadoCatalogo.cargando:
+        return [relleno(const VistaCargando(mensaje: 'Cargando catálogo'))];
+      case EstadoCatalogo.error:
+        return [
+          relleno(
+            VistaMensaje(
+              icono: Icons.cloud_off_outlined,
+              color: AppColors.coral,
+              fondo: AppColors.coralTenue,
+              titulo: 'No pudimos cargar el catálogo',
+              detalle:
+                  controller.error ??
+                  'Revisa tu conexión e inténtalo de nuevo.',
+              accion: () => controller.cargar(forzar: true),
+            ),
+          ),
+        ];
+      case EstadoCatalogo.listo:
+        break;
+    }
+    final productos = controller.visibles;
+    if (productos.isEmpty) {
+      return [
+        relleno(
+          VistaMensaje(
+            icono: Icons.search_off,
+            titulo: 'Sin resultados',
+            detalle: 'Prueba con otro nombre o quita los filtros.',
+            etiquetaAccion: 'Quitar filtros',
+            accion: () {
+              controller.buscar('');
+              controller.filtrarTipo(null);
+            },
+          ),
+        ),
+      ];
+    }
+
+    // Con la letra del sistema grande la card necesita más alto.
+    final alto =
+        264 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        sliver: SliverGrid.builder(
+          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 280,
+            mainAxisExtent: alto,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+          ),
+          itemCount: productos.length,
+          // La clave evita que al filtrar una card conserve el logo del
+          // producto que antes ocupaba su posición.
+          itemBuilder: (context, i) => _TarjetaProducto(
+            key: ValueKey(productos[i].clave),
+            producto: productos[i],
+            alTocar: () => alSeleccionar(productos[i].clave),
+          ),
+        ),
+      ),
+    ];
   }
 }
 
-/// Un chip por cada tipo de servicio que existe en el catálogo cargado. En
-/// pantallas anchas se reparten en varias líneas; en angostas se desplazan.
+/// Un chip por cada tipo de servicio que existe en el catálogo cargado, en una
+/// sola línea que se desplaza en horizontal.
 class _Filtros extends StatelessWidget {
   const _Filtros({required this.controller});
   final CatalogoController controller;
@@ -229,12 +324,6 @@ class _Filtros extends StatelessWidget {
           alTocar: () => controller.filtrarTipo(tipo),
         ),
     ];
-    if (Breakpoints.esAncho(context, 600)) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: Wrap(runSpacing: 8, children: chips),
-      );
-    }
     return SizedBox(
       height: 44,
       child: ListView(scrollDirection: Axis.horizontal, children: chips),
@@ -267,79 +356,34 @@ class _FiltroTipo extends StatelessWidget {
   }
 }
 
-class _Contenido extends StatelessWidget {
-  const _Contenido({required this.controller, required this.alSeleccionar});
-
-  final CatalogoController controller;
-  final ValueChanged<String> alSeleccionar;
-
-  @override
-  Widget build(BuildContext context) {
-    switch (controller.estado) {
-      case EstadoCatalogo.inicial:
-      case EstadoCatalogo.cargando:
-        return const VistaCargando(mensaje: 'Cargando catálogo');
-      case EstadoCatalogo.error:
-        return VistaMensaje(
-          icono: Icons.cloud_off_outlined,
-          color: AppColors.coral,
-          fondo: AppColors.coralTenue,
-          titulo: 'No pudimos cargar el catálogo',
-          detalle: controller.error ?? 'Revisa tu conexión e inténtalo de nuevo.',
-          accion: () => controller.cargar(forzar: true),
-        );
-      case EstadoCatalogo.listo:
-        break;
-    }
-    final productos = controller.visibles;
-    if (productos.isEmpty) {
-      return VistaMensaje(
-        icono: Icons.search_off,
-        titulo: 'Sin resultados',
-        detalle: 'Prueba con otro nombre o quita los filtros.',
-        etiquetaAccion: 'Quitar filtros',
-        accion: () {
-          controller.buscar('');
-          controller.filtrarTipo(null);
-        },
-      );
-    }
-
-    // Con la letra del sistema grande la card necesita más alto.
-    final alto = 216 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
-    return RefreshIndicator(
-      onRefresh: () => controller.cargar(forzar: true),
-      child: GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 280,
-          mainAxisExtent: alto,
-          mainAxisSpacing: 14,
-          crossAxisSpacing: 14,
-        ),
-        itemCount: productos.length,
-        itemBuilder: (context, i) => _TarjetaProducto(
-          producto: productos[i],
-          alTocar: () => alSeleccionar(productos[i].clave),
-        ),
-      ),
-    );
-  }
-}
-
-/// Card del producto: banda con el color de la marca y sus iniciales, estado
+/// Card del producto: banda con el color de la marca y su logo, estado
 /// de disponibilidad, nombre, tipo de compra y precio.
-class _TarjetaProducto extends StatelessWidget {
-  const _TarjetaProducto({required this.producto, required this.alTocar});
+class _TarjetaProducto extends StatefulWidget {
+  const _TarjetaProducto({
+    super.key,
+    required this.producto,
+    required this.alTocar,
+  });
 
   final Producto producto;
   final VoidCallback alTocar;
 
+  @override
+  State<_TarjetaProducto> createState() => _TarjetaProductoState();
+}
+
+class _TarjetaProductoState extends State<_TarjetaProducto> {
+  var _encima = false;
+
+  Producto get producto => widget.producto;
+
   String get _subtitulo => switch (producto.tipoCompra) {
-    TipoCompra.recarga => producto.esCanjeable ? 'Código canjeable' : 'Recarga de saldo',
-    TipoCompra.pagoServicio => producto.comision > 0
-        ? 'Pago de servicio · comisión ${formatoMoneda(producto.comision)}'
-        : 'Pago de servicio · sin comisión',
+    TipoCompra.recarga =>
+      producto.esCanjeable ? 'Código canjeable' : 'Recarga de saldo',
+    TipoCompra.pagoServicio =>
+      producto.comision > 0
+          ? 'Pago de servicio · comisión ${formatoMoneda(producto.comision)}'
+          : 'Pago de servicio · sin comisión',
     TipoCompra.noDisponible => 'Solo consulta',
   };
 
@@ -358,106 +402,141 @@ class _TarjetaProducto extends StatelessWidget {
       button: true,
       child: Opacity(
         opacity: disponible ? 1 : 0.7,
-        child: Material(
-          color: AppColors.superficie,
-          elevation: 1,
-          shadowColor: Colors.black26,
-          borderRadius: BorderRadius.circular(18),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: alTocar,
-            hoverColor: color.withValues(alpha: 0.06),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  height: 68,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [color, Color.lerp(color, Colors.black, 0.35)!],
+        child: AnimatedSlide(
+          offset: Offset(0, _encima ? -0.015 : 0),
+          duration: const Duration(milliseconds: 160),
+          child: Material(
+            color: AppColors.superficie,
+            elevation: _encima ? 8 : 1,
+            shadowColor: color.withValues(alpha: 0.35),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: BorderSide(
+                color: _encima
+                    ? color.withValues(alpha: 0.4)
+                    : AppColors.lineaSuave,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: widget.alTocar,
+              onHover: (v) => setState(() => _encima = v),
+              hoverColor: color.withValues(alpha: 0.04),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    height: 116,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color.lerp(color, Colors.white, 0.86)!,
+                          Color.lerp(color, Colors.white, 0.72)!,
+                        ],
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      children: [
+                        // Círculos decorativos con el color de la marca.
+                        Positioned(
+                          right: -24,
+                          bottom: -36,
+                          child: _Circulo(color: color, tamano: 110),
                         ),
-                        child: Text(
-                          Monograma.iniciales(producto.servicio),
-                          style: TextStyle(
-                            color: color,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
+                        Positioned(
+                          right: 60,
+                          top: -30,
+                          child: _Circulo(color: color, tamano: 60),
+                        ),
+                        Positioned(
+                          left: 14,
+                          top: 18,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: color.withValues(alpha: 0.25),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Monograma(
+                              nombre: producto.servicio,
+                              idServicio: producto.idServicio,
+                              tamano: 80,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerRight,
+                        Positioned(
+                          right: 10,
+                          top: 10,
                           child: _PildoraEstado(disponible: disponible),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          producto.servicio,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: tema.bodySmall,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          producto.nombre,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: tema.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _subtitulo,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: tema.bodySmall,
-                        ),
-                        const Spacer(),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _precio,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: tema.titleLarge?.copyWith(
-                                  fontFeatures: cifrasTabulares,
-                                  color: disponible ? AppColors.marcaOscura : AppColors.tintaSuave,
-                                ),
-                              ),
-                            ),
-                            if (disponible)
-                              const Icon(Icons.arrow_forward, size: 20, color: AppColors.marca),
-                          ],
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            producto.servicio,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: tema.bodySmall,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            producto.nombre,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: tema.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _subtitulo,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: tema.bodySmall,
+                          ),
+                          const Spacer(),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _precio,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: tema.titleLarge?.copyWith(
+                                    fontFeatures: cifrasTabulares,
+                                    color: disponible
+                                        ? AppColors.marcaOscura
+                                        : AppColors.tintaSuave,
+                                  ),
+                                ),
+                              ),
+                              if (disponible)
+                                const Icon(
+                                  Icons.arrow_forward,
+                                  size: 20,
+                                  color: AppColors.marca,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -482,18 +561,42 @@ class _PildoraEstado extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(disponible ? Icons.check_circle : Icons.block, size: 13, color: tono),
+          Icon(
+            disponible ? Icons.check_circle : Icons.block,
+            size: 13,
+            color: tono,
+          ),
           const SizedBox(width: 4),
           Flexible(
             child: Text(
               disponible ? 'Disponible' : 'No disponible',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: tono),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: tono,
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _Circulo extends StatelessWidget {
+  const _Circulo({required this.color, required this.tamano});
+  final Color color;
+  final double tamano;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: tamano,
+    height: tamano,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: color.withValues(alpha: 0.12),
+    ),
+  );
 }

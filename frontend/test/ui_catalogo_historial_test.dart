@@ -85,11 +85,19 @@ void main() {
     ) async {
       await abrir(tester, tamano: const Size(1300, 900));
       await tester.pumpAndSettle();
-      for (final etiqueta in ['Todo', 'Telcel', 'Pago de servicios', 'Servicios de prepago']) {
+      for (final etiqueta in [
+        'Todo',
+        'Telcel',
+        'Pago de servicios',
+        'Servicios de prepago',
+      ]) {
         expect(chip(etiqueta), findsOneWidget);
       }
       expect(find.byType(ChoiceChip), findsNWidgets(4));
-      expect(chip('Otros'), findsNothing); // solo hay "Otros" entre los no disponibles
+      expect(
+        chip('Otros'),
+        findsNothing,
+      ); // solo hay "Otros" entre los no disponibles
 
       await tester.tap(find.byType(Switch));
       await tester.pumpAndSettle();
@@ -108,7 +116,7 @@ void main() {
       expect(a.dy, b.dy); // misma fila
       expect(a.dx, lessThan(b.dx));
 
-      await abrir(tester, tamano: const Size(300, 900));
+      await abrir(tester, tamano: const Size(300, 1200));
       await tester.pumpAndSettle();
       final c = tester.getTopLeft(find.text('Gift card'));
       final d = tester.getTopLeft(find.text('Recarga 50'));
@@ -117,7 +125,9 @@ void main() {
     });
 
     testWidgets('de la lista al detalle y de regreso', (tester) async {
-      final controller = CatalogoController(CatalogoFalso(() async => productos));
+      final controller = CatalogoController(
+        CatalogoFalso(() async => productos),
+      );
       String? clave;
       await montar(
         tester,
@@ -256,7 +266,8 @@ void main() {
       await abrir(tester, tamano: const Size(1300, 900));
       await tester.pumpAndSettle();
       expect(find.text('Buscar por servicio o producto'), findsOneWidget);
-      expect(tester.getSize(find.byType(TextField)).width, greaterThan(1100));
+      // El buscador comparte la fila solo con el interruptor de disponibles.
+      expect(tester.getSize(find.byType(TextField)).width, greaterThan(950));
       expect(find.text('COMPRAR 2-1'), findsNothing);
 
       await abrir(tester, clave: '2-1', tamano: const Size(1300, 900));
@@ -486,8 +497,13 @@ void main() {
       ) async {
         final pagos = PagosFalso()
           ..alHistorial = (n) async {
-            if (n == 0) return pagina([compra('OTRO0000000001')], n: 0, total: 2);
-            return pagina([compra(upc, producto: 'Pago antiguo')], n: 1, total: 2);
+            if (n == 0)
+              return pagina([compra('OTRO0000000001')], n: 0, total: 2);
+            return pagina(
+              [compra(upc, producto: 'Pago antiguo')],
+              n: 1,
+              total: 2,
+            );
           }
           ..alConsultar = existe;
         await abrir(tester, pagos);
