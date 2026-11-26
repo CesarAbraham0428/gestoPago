@@ -210,7 +210,15 @@ class PerfilFalso implements PerfilRepository {
   Perfil perfil;
   Object? errorObtener;
   Object? errorActualizar;
+  Object? errorPassword;
   final List<Map<String, Object?>> cambiosRecibidos = [];
+  final List<(String, String)> passwordsRecibidas = [];
+
+  @override
+  Future<void> cambiarPassword({required String actual, required String nueva}) async {
+    passwordsRecibidas.add((actual, nueva));
+    if (errorPassword != null) throw errorPassword!; // ignore: only_throw_errors
+  }
 
   @override
   Future<Perfil> obtener() async {

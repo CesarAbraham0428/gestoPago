@@ -65,6 +65,25 @@ class PerfilController extends ChangeNotifier {
     return error;
   }
 
+  /// Devuelve null si se cambió o el mensaje de error. Al éxito el servidor cierra
+  /// la sesión: quien llama debe llevar al usuario a iniciar sesión de nuevo.
+  Future<String?> cambiarPassword({required String actual, required String nueva}) async {
+    if (_guardando) return null;
+    _guardando = true;
+    notifyListeners();
+    String? error;
+    try {
+      await _repositorio.cambiarPassword(actual: actual, nueva: nueva);
+    } on AppException catch (e) {
+      error = e.message;
+    } on Object {
+      error = 'No pudimos cambiar tu contraseña.';
+    }
+    _guardando = false;
+    notifyListeners();
+    return error;
+  }
+
   void limpiar() {
     _estado = EstadoPerfil.inicial;
     _perfil = null;

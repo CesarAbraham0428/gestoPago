@@ -80,7 +80,13 @@ GoRouter crearRouter(Dependencias deps, ConstructorShell shell) {
           ),
           GoRoute(
             path: '/perfil',
-            builder: (context, state) => PerfilPage(controller: deps.perfil, catalogos: deps.catalogos),
+            builder: (context, state) => PerfilPage(
+              controller: deps.perfil,
+              catalogos: deps.catalogos,
+              alCambiarPassword: () => deps.sesion.cerrarSesion(
+                aviso: 'Contraseña actualizada. Inicia sesión con la nueva.',
+              ),
+            ),
           ),
           GoRoute(
             path: '/cuentas',

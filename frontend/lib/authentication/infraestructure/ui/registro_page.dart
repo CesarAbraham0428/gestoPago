@@ -6,6 +6,7 @@ import '../../../core/error/app_exception.dart';
 import '../../../core/format/formatters.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/ui/marco_acceso.dart';
+import '../../../core/ui/requisito_password.dart';
 import '../../../core/ui/selector_catalogo.dart';
 import '../../../core/ui/widgets_estado.dart';
 import '../../../core/validation/texto_seguro.dart';
@@ -795,7 +796,7 @@ class _RegistroPageState extends State<RegistroPage> {
           children: [
             for (final (texto, cumple)
                 in ValidadoresRegistro.requisitosPassword(_c['password']!.text))
-              _Requisito(texto: texto, cumple: cumple),
+              RequisitoPassword(texto: texto, cumple: cumple),
           ],
         ),
       ),
@@ -1007,32 +1008,6 @@ class _Circulo extends StatelessWidget {
         size: 15,
         color: lleno ? Colors.white : AppColors.tintaSuave,
       ),
-    );
-  }
-}
-
-class _Requisito extends StatelessWidget {
-  const _Requisito({required this.texto, required this.cumple});
-  final String texto;
-  final bool cumple;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = cumple ? AppColors.exito : AppColors.tintaSuave;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          cumple ? Icons.check_circle : Icons.radio_button_unchecked,
-          size: 15,
-          color: color,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          texto,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
-        ),
-      ],
     );
   }
 }

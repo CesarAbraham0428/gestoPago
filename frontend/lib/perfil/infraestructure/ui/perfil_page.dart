@@ -10,6 +10,7 @@ import '../../../core/ui/widgets_estado.dart';
 import '../../../pagos/domain/entities/cuenta.dart';
 import '../../application/perfil_controller.dart';
 import '../../domain/entities/perfil.dart';
+import 'dialogo_password.dart';
 import 'formulario_perfil.dart';
 
 /// Carga el perfil al abrirse y muestra cargando / error / [construir].
@@ -78,9 +79,17 @@ class _Lienzo extends StatelessWidget {
 
 /// "Mi perfil": datos personales, contacto, empleo y domicilio, con edición.
 class PerfilPage extends StatefulWidget {
-  const PerfilPage({super.key, required this.controller, required this.catalogos});
+  const PerfilPage({
+    super.key,
+    required this.controller,
+    required this.catalogos,
+    this.alCambiarPassword,
+  });
   final PerfilController controller;
   final CatalogosRepository catalogos;
+
+  /// Se invoca tras cambiar la contraseña: el servidor cierra la sesión.
+  final Future<void> Function()? alCambiarPassword;
 
   @override
   State<PerfilPage> createState() => _PerfilPageState();
@@ -97,6 +106,18 @@ class _PerfilPageState extends State<PerfilPage> {
     widget.catalogos.obtener().then((c) {
       if (mounted) setState(() => _listas = c);
     }, onError: (_) {});
+  }
+
+  Future<void> _cambiarPassword() async {
+    final cambiada = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => DialogoPassword(
+        alConfirmar: (actual, nueva) =>
+            widget.controller.cambiarPassword(actual: actual, nueva: nueva),
+      ),
+    );
+    if (cambiada == true) await widget.alCambiarPassword?.call();
   }
 
   @override
@@ -209,6 +230,38 @@ class _PerfilPageState extends State<PerfilPage> {
                 'Estado': d?.estado,
                 'País': d?.pais,
               },
+            ),
+            _Tarjeta(
+              child: Row(
+                children: [
+                  const IconoEnRecuadro(
+                    icono: Icons.lock_outline,
+                    color: AppColors.coral,
+                    fondo: AppColors.coralTenue,
+                    tamano: 36,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Contraseña', style: Theme.of(context).textTheme.titleMedium),
+                        Text(
+                          'Al cambiarla tendrás que iniciar sesión de nuevo.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.tintaSuave,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton(
+                    onPressed: _cambiarPassword,
+                    child: const Text('Cambiar contraseña'),
+                  ),
+                ],
+              ),
             ),
           ],
         );

@@ -57,8 +57,15 @@ class ApiClient {
     bool authenticated = true,
   }) => _send('POST', path, body: body, timeout: timeout, authenticated: authenticated);
 
-  Future<ApiResponse> put(String path, {Object? body}) =>
-      _send('PUT', path, body: body, timeout: const Duration(seconds: 20));
+  /// [cerrarSesionEn401] en falso evita cerrar la sesión cuando el 401 es un dato
+  /// mal escrito (p. ej. la contraseña actual) y no un token inválido.
+  Future<ApiResponse> put(String path, {Object? body, bool cerrarSesionEn401 = true}) => _send(
+    'PUT',
+    path,
+    body: body,
+    timeout: const Duration(seconds: 20),
+    cerrarSesionEn401: cerrarSesionEn401,
+  );
 
   Future<ApiResponse> patch(String path, {Object? body}) =>
       _send('PATCH', path, body: body, timeout: const Duration(seconds: 20));
@@ -70,6 +77,7 @@ class ApiClient {
     Object? body,
     required Duration timeout,
     bool authenticated = true,
+    bool cerrarSesionEn401 = true,
   }) async {
     final uri = Uri.parse('$baseUrl$path').replace(queryParameters: query);
     final headers = <String, String>{
@@ -96,7 +104,7 @@ class ApiClient {
     final mensajeServidor = _mensajeDe(decoded);
 
     if (response.statusCode >= 400) {
-      throw _error(response, mensajeServidor, authenticated: authenticated);
+      throw _error(response, mensajeServidor, authenticated: authenticated && cerrarSesionEn401);
     }
     if (decoded is! Map<String, dynamic>) {
       throw const ConexionException(MensajesUsuario.respuestaInvalida);

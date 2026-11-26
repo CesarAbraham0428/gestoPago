@@ -10,4 +10,7 @@ abstract interface class PerfilRepository {
     required String rfc,
     required Map<String, Object?> cambios,
   });
+
+  /// Cambia la contraseña del usuario autenticado. El servidor cierra su sesión.
+  Future<void> cambiarPassword({required String actual, required String nueva});
 }

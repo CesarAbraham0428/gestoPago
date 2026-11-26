@@ -12,6 +12,8 @@ import '../../domain/ports/perfil_repository.dart';
 ///   -> datos: {datos:[ClienteResponse con domicilio y cuentas]}
 /// PATCH /clientes {identificacion:{rfc}, cambios:{...solo campos cambiados}}
 ///   -> datos: ClienteResponse
+/// PUT   /usuarios/me/password {passwordActual, passwordNueva}
+///   -> 200 y cierra la sesión · 401 si la contraseña actual no coincide
 ///
 /// Se filtra por el clienteId de /usuarios/me porque a un administrador la
 /// consulta le devuelve todos los clientes.
@@ -51,6 +53,16 @@ class ApiPerfilRepository implements PerfilRepository {
       },
     );
     return perfilDesdeJson(respuesta.dataAsMap);
+  }
+
+  @override
+  Future<void> cambiarPassword({required String actual, required String nueva}) async {
+    // El 401 de aquí es "contraseña actual incorrecta": no debe cerrar la sesión.
+    await _api.put(
+      '/usuarios/me/password',
+      body: {'passwordActual': actual, 'passwordNueva': nueva},
+      cerrarSesionEn401: false,
+    );
   }
 
   static AppException _invalida() =>

@@ -183,6 +183,98 @@ void main() {
     });
   });
 
+  group('cambio de contraseña', () {
+    test('adaptador: PUT con ambas contraseñas', () async {
+      late http.Request enviada;
+      final api = ApiClient(
+        baseUrl: 'http://api',
+        tokenReader: () => 'jwt',
+        client: MockClient((r) async {
+          enviada = r;
+          return http.Response(jsonEncode({'mensaje': 'ok', 'datos': null}), 200);
+        }),
+      );
+      await ApiPerfilRepository(api).cambiarPassword(actual: 'Vieja1!ab', nueva: 'Nueva1!ab');
+      expect(enviada.method, 'PUT');
+      expect(enviada.url.path, '/usuarios/me/password');
+      expect(jsonDecode(enviada.body), {'passwordActual': 'Vieja1!ab', 'passwordNueva': 'Nueva1!ab'});
+    });
+
+    test('adaptador: un 401 (contraseña actual mala) no cierra la sesión', () async {
+      var cerradas = 0;
+      final api = ApiClient(
+        baseUrl: 'http://api',
+        tokenReader: () => 'jwt',
+        onUnauthorized: (_) => cerradas++,
+        client: MockClient((r) async => http.Response(jsonEncode({'mensaje': 'Credenciales inválidas'}), 401)),
+      );
+      await expectLater(
+        ApiPerfilRepository(api).cambiarPassword(actual: 'x', nueva: 'Nueva1!ab'),
+        throwsA(isA<ApiException>()),
+      );
+      expect(cerradas, 0);
+    });
+
+    test('controlador: éxito, error del servidor y error inesperado', () async {
+      final repo = PerfilFalso();
+      final c = PerfilController(repo);
+      expect(await c.cambiarPassword(actual: 'a', nueva: 'b'), isNull);
+      expect(repo.passwordsRecibidas, [('a', 'b')]);
+      repo.errorPassword = const ApiException(401, 'Credenciales inválidas.');
+      expect(await c.cambiarPassword(actual: 'a', nueva: 'b'), 'Credenciales inválidas.');
+      repo.errorPassword = StateError('x');
+      expect(await c.cambiarPassword(actual: 'a', nueva: 'b'), 'No pudimos cambiar tu contraseña.');
+      expect(c.guardando, isFalse);
+    });
+
+    testWidgets('pantalla: valida como el registro, muestra el error y cierra sesión al éxito', (tester) async {
+      final repo = PerfilFalso();
+      var sesionesCerradas = 0;
+      await montar(
+        tester,
+        PerfilPage(
+          controller: PerfilController(repo),
+          catalogos: CatalogosFalso(),
+          alCambiarPassword: () async => sesionesCerradas++,
+        ),
+        tamano: const Size(1000, 2400),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Cambiar contraseña'));
+      await tester.pumpAndSettle();
+
+      // Vacío y con una contraseña que no cumple: no se envía nada.
+      await tester.tap(find.widgetWithText(FilledButton, 'Cambiar contraseña'));
+      await tester.pumpAndSettle();
+      expect(repo.passwordsRecibidas, isEmpty);
+      await tester.enterText(find.byKey(const ValueKey('pw-actual')), 'Vieja1!ab');
+      await tester.enterText(find.byKey(const ValueKey('pw-nueva')), 'abc');
+      await tester.enterText(find.byKey(const ValueKey('pw-confirmacion')), 'abd');
+      await tester.tap(find.widgetWithText(FilledButton, 'Cambiar contraseña'));
+      await tester.pumpAndSettle();
+      expect(find.text('La contraseña no cumple todos los requisitos.'), findsOneWidget);
+      expect(find.text('Las contraseñas no coinciden.'), findsOneWidget);
+      expect(repo.passwordsRecibidas, isEmpty);
+
+      // Válidas, pero el servidor rechaza la actual: el diálogo sigue abierto con el mensaje.
+      await tester.enterText(find.byKey(const ValueKey('pw-nueva')), 'Nueva1!abc');
+      await tester.enterText(find.byKey(const ValueKey('pw-confirmacion')), 'Nueva1!abc');
+      repo.errorPassword = const ApiException(401, 'Credenciales inválidas.');
+      await tester.tap(find.widgetWithText(FilledButton, 'Cambiar contraseña'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('pw-error')), findsOneWidget);
+      expect(sesionesCerradas, 0);
+
+      // Ahora sí: se envía y se pide cerrar la sesión.
+      repo.errorPassword = null;
+      await tester.tap(find.widgetWithText(FilledButton, 'Cambiar contraseña'));
+      await tester.pumpAndSettle();
+      expect(repo.passwordsRecibidas.last, ('Vieja1!ab', 'Nueva1!abc'));
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(sesionesCerradas, 1);
+    });
+  });
+
   group('caso de uso', () {
     test('cargar, guardar solo cambios y errores', () async {
       final repo = PerfilFalso();
