@@ -71,6 +71,36 @@ public class LimitadorVentanaFija {
         return registrarLocal(clave, maximo, ventana);
     }
 
+    /**
+     * Dice si la clave ya llegó al máximo en la ventana actual SIN contar una solicitud más; sirve para bloquear
+     * después de N fallos que se anotan aparte con {@link #registrar}.
+     */
+    public Resultado consultar(String clave, int maximo, Duration ventana) {
+        try {
+            String valor = redis.opsForValue().get(clave);
+            if (valor != null) {
+                if (Long.parseLong(valor) < maximo) {
+                    return Resultado.PERMITIDO;
+                }
+                Long restante = redis.getExpire(clave, TimeUnit.SECONDS);
+                if (restante == null || restante < 0) {
+                    redis.expire(clave, ventana); // contador sin vencimiento: bloquearía para siempre
+                    restante = ventana.toSeconds();
+                }
+                return new Resultado(true, Math.max(1, restante));
+            }
+        } catch (DataAccessException e) {
+            avisarRespaldo(e);
+        }
+        // Sin dato en Redis: puede que los fallos se hayan contado en memoria mientras Redis no respondía.
+        long ahora = reloj.getAsLong();
+        Contador contador = local.get(clave);
+        if (contador == null || ahora >= contador.vence || contador.cuenta < maximo) {
+            return Resultado.PERMITIDO;
+        }
+        return new Resultado(true, Math.max(1, (contador.vence - ahora + 999) / 1000));
+    }
+
     private Resultado resultadoRedis(String clave, long solicitudes, int maximo, Duration ventana) {
         if (solicitudes == 1) {
             redis.expire(clave, ventana);

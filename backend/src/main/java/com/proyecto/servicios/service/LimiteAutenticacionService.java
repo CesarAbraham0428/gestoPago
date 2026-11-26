@@ -1,5 +1,6 @@
 package com.proyecto.servicios.service;
 
+import com.proyecto.servicios.service.exception.AutenticacionException;
 import com.proyecto.servicios.service.exception.NegocioException;
 import com.proyecto.servicios.utils.LimitadorVentanaFija;
 import com.proyecto.servicios.utils.LimitadorVentanaFija.Resultado;
@@ -17,10 +18,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class LimiteAutenticacionService {
 
-    private static final Duration VENTANA_LOGIN = Duration.ofMinutes(15);
+    private static final Duration VENTANA_LOGIN = Duration.ofMinutes(1);
     private static final Duration VENTANA_REGISTRO = Duration.ofHours(1);
     private static final Duration VENTANA_DISPONIBILIDAD = Duration.ofMinutes(15);
-    private static final String MENSAJE = "Demasiados intentos; espera unos minutos antes de intentar de nuevo";
+    private static final String MENSAJE = "Demasiados intentos; espera antes de intentar de nuevo";
 
     private final LimitadorVentanaFija limitador;
     private final int maximoPorCorreo;
@@ -29,8 +30,8 @@ public class LimiteAutenticacionService {
     private final int maximoDisponibilidadPorIp;
 
     public LimiteAutenticacionService(LimitadorVentanaFija limitador,
-            @Value("${gestopago.app.limites.login-por-correo:10}") int maximoPorCorreo,
-            @Value("${gestopago.app.limites.login-por-ip:40}") int maximoPorIp,
+            @Value("${gestopago.app.limites.login-por-correo:5}") int maximoPorCorreo,
+            @Value("${gestopago.app.limites.login-por-ip:5}") int maximoPorIp,
             @Value("${gestopago.app.limites.registro-por-ip:10}") int maximoRegistrosPorIp,
             @Value("${gestopago.app.limites.disponibilidad-por-ip:60}") int maximoDisponibilidadPorIp) {
         this.limitador = limitador;
@@ -40,14 +41,38 @@ public class LimiteAutenticacionService {
         this.maximoDisponibilidadPorIp = maximoDisponibilidadPorIp;
     }
 
-    /** Para /auth/login (por IP y correo) y /auth/verificar (solo por IP, pasando correo null). */
+    /**
+     * Antes de /auth/login (por IP y correo) y /auth/verificar (solo por IP, pasando correo null): rechaza con 429 si
+     * ya hubo {@code maximo} fallos en la ventana. No cuenta la solicitud; los fallos se anotan con
+     * {@link #registrarFalloDeLogin}, así que un acceso correcto no suma.
+     */
     public void verificarInicioDeSesion(String ip, String correo) {
-        // Se cuentan ambos límites aunque el primero ya se haya superado.
-        Resultado porIp = limitador.registrar("limite:login:ip:" + ip, maximoPorIp, VENTANA_LOGIN);
-        Resultado porCorreo = correo == null ? Resultado.PERMITIDO
-                : limitador.registrar("limite:login:correo:" + correo.strip().toLowerCase(Locale.ROOT),
-                        maximoPorCorreo, VENTANA_LOGIN);
-        rechazarSiExcedido(porIp, porCorreo);
+        rechazarSiExcedido(limitador.consultar(claveIp(ip), maximoPorIp, VENTANA_LOGIN),
+                correo == null ? Resultado.PERMITIDO
+                        : limitador.consultar(claveCorreo(correo), maximoPorCorreo, VENTANA_LOGIN));
+    }
+
+    /** Anota un fallo si {@code causa} es contraseña o código incorrectos; cualquier otro error no cuenta. */
+    public void registrarFalloDeLogin(String ip, String correo, RuntimeException causa) {
+        // Una cuenta inactiva, un 409 o un 429 no son intentos de adivinar credenciales.
+        boolean credencialesIncorrectas = causa instanceof AutenticacionException a
+                && a.getTipo() == AutenticacionException.Tipo.CREDENCIALES_INVALIDAS
+                || causa instanceof NegocioException n && n.getStatus() == HttpStatus.UNAUTHORIZED;
+        if (!credencialesIncorrectas) {
+            return;
+        }
+        limitador.registrar(claveIp(ip), maximoPorIp, VENTANA_LOGIN);
+        if (correo != null) {
+            limitador.registrar(claveCorreo(correo), maximoPorCorreo, VENTANA_LOGIN);
+        }
+    }
+
+    private static String claveIp(String ip) {
+        return "limite:login:ip:" + ip;
+    }
+
+    private static String claveCorreo(String correo) {
+        return "limite:login:correo:" + correo.strip().toLowerCase(Locale.ROOT);
     }
 
     public void verificarRegistro(String ip) {

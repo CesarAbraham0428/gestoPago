@@ -12,6 +12,7 @@ import com.proyecto.servicios.utils.DireccionCliente;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.util.function.Supplier;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,16 +41,27 @@ public class AutenticacionController {
     @PostMapping("/login")
     public GenericResponse<DesafioResponse> iniciarSesion(@Valid @RequestBody LoginRequest request,
             HttpServletRequest http) {
-        limite.verificarInicioDeSesion(DireccionCliente.de(http), request.correo());
-        return GenericResponse.exito("Ingresa el código de tu app autenticadora", service.iniciarSesion(request));
+        return GenericResponse.exito("Ingresa el código de tu app autenticadora",
+                limitado(DireccionCliente.de(http), request.correo(), () -> service.iniciarSesion(request)));
     }
 
     /** Paso 2: código del segundo factor. 409 si ya hay otra sesión y no se confirmó cerrarla. */
     @PostMapping("/verificar")
     public GenericResponse<AuthResponse> verificar(@Valid @RequestBody VerificacionCodigoRequest request,
             HttpServletRequest http) {
-        limite.verificarInicioDeSesion(DireccionCliente.de(http), null);
-        return GenericResponse.exito("Sesión iniciada", service.verificarCodigo(request));
+        return GenericResponse.exito("Sesión iniciada",
+                limitado(DireccionCliente.de(http), null, () -> service.verificarCodigo(request)));
+    }
+
+    /** Bloquea si ya hubo demasiados fallos y, si este intento falla por credenciales, lo anota. */
+    private <T> T limitado(String ip, String correo, Supplier<T> intento) {
+        limite.verificarInicioDeSesion(ip, correo);
+        try {
+            return intento.get();
+        } catch (RuntimeException e) {
+            limite.registrarFalloDeLogin(ip, correo, e);
+            throw e;
+        }
     }
 
     @PostMapping("/logout")

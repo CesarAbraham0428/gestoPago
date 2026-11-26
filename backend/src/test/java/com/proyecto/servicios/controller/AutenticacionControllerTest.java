@@ -14,6 +14,7 @@ import com.proyecto.servicios.models.response.DesafioResponse;
 import com.proyecto.servicios.service.AutenticacionService;
 import com.proyecto.servicios.service.LimiteAutenticacionService;
 import com.proyecto.servicios.service.NotificadorSesiones;
+import com.proyecto.servicios.service.exception.AutenticacionException;
 import com.proyecto.servicios.service.exception.NegocioException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,6 +81,16 @@ class AutenticacionControllerTest {
                 .content("{\"correo\":\"ana@example.com\",\"password\":\"Segura123!\"}"))
                 .andExpect(status().isTooManyRequests());
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void unLoginConCredencialesIncorrectasSeAnotaComoFallo() throws Exception {
+        var error = new AutenticacionException(AutenticacionException.Tipo.CREDENCIALES_INVALIDAS);
+        when(service.iniciarSesion(any())).thenThrow(error);
+        mvc.perform(post("/auth/login").contentType("application/json")
+                .content("{\"correo\":\"ana@example.com\",\"password\":\"Segura123!\"}"))
+                .andExpect(status().isUnauthorized());
+        verify(limite).registrarFalloDeLogin(any(), eq("ana@example.com"), eq(error));
     }
 
     @Test

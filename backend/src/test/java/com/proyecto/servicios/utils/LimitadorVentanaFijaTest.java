@@ -81,6 +81,44 @@ class LimitadorVentanaFijaTest {
     }
 
     @Test
+    void consultarBloqueaAlLlegarAlMaximoSinContarYInformaLaEspera() {
+        when(valores.get("k")).thenReturn("4", "5");
+        when(redis.getExpire("k", TimeUnit.SECONDS)).thenReturn(42L);
+
+        assertFalse(limitador.consultar("k", 5, VENTANA).excedido());
+        Resultado bloqueado = limitador.consultar("k", 5, VENTANA);
+
+        assertTrue(bloqueado.excedido());
+        assertEquals(42, bloqueado.reintentarEnSegundos());
+        verify(valores, never()).increment("k");
+    }
+
+    @Test
+    void consultarSinContadorPermiteYUnContadorSinVencimientoSeRepara() {
+        assertFalse(limitador.consultar("nueva", 5, VENTANA).excedido());
+
+        when(valores.get("k")).thenReturn("9");
+        when(redis.getExpire("k", TimeUnit.SECONDS)).thenReturn(-1L);
+
+        assertEquals(60, limitador.consultar("k", 5, VENTANA).reintentarEnSegundos());
+        verify(redis).expire("k", VENTANA);
+    }
+
+    @Test
+    void consultarUsaLaCuentaEnMemoriaSiRedisFalla() {
+        when(valores.increment("k")).thenThrow(new RedisConnectionFailureException("caído"));
+        when(valores.get("k")).thenThrow(new RedisConnectionFailureException("caído"));
+
+        limitador.registrar("k", 2, VENTANA);
+        assertFalse(limitador.consultar("k", 2, VENTANA).excedido());
+        limitador.registrar("k", 2, VENTANA);
+
+        assertTrue(limitador.consultar("k", 2, VENTANA).excedido());
+        reloj.addAndGet(VENTANA.toMillis() + 1);
+        assertFalse(limitador.consultar("k", 2, VENTANA).excedido(), "la ventana vencida desbloquea");
+    }
+
+    @Test
     void siRedisDevuelveNuloSeCuentaEnMemoria() {
         when(valores.increment("k")).thenReturn(null);
 
