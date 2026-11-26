@@ -74,7 +74,10 @@ class _PanelCompraState extends State<PanelCompra> {
   @override
   void initState() {
     super.initState();
-    _monto.addListener(() => setState(() {}));
+    // El botón de compra depende de que todos los datos sean válidos.
+    for (final c in [_telefono, _referencia, _monto]) {
+      c.addListener(() => setState(() {}));
+    }
     _cargarCuentas();
   }
 
@@ -131,6 +134,14 @@ class _PanelCompraState extends State<PanelCompra> {
     final monto = _montoIngresado;
     return monto == null ? null : monto + _p.comision;
   }
+
+  /// Datos que pide este producto, con las mismas reglas que muestran los campos.
+  bool get _datosValidos =>
+      _montoIngresado != null &&
+      (!_pideCelular || ValidadoresCompra.telefono(_telefono.text) == null) &&
+      (!_pideServicio ||
+          (ValidadoresCompra.referencia(_referencia.text) == null &&
+              ValidadoresCompra.monto(_monto.text) == null));
 
   /// Mensaje si la cuenta elegida no alcanza para el total; null si alcanza o aún no hay total.
   String? get _errorSaldo {
@@ -298,6 +309,7 @@ class _PanelCompraState extends State<PanelCompra> {
                 labelText: 'Número de celular',
                 helperText: '10 dígitos',
               ),
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               validator: ValidadoresCompra.telefono,
             ),
           if (_pideServicio) ...[
@@ -314,6 +326,7 @@ class _PanelCompraState extends State<PanelCompra> {
                     ? _p.tipoReferencia
                     : 'La encuentras en tu recibo',
               ),
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               validator: ValidadoresCompra.referencia,
             ),
             const SizedBox(height: 16),
@@ -330,6 +343,7 @@ class _PanelCompraState extends State<PanelCompra> {
                 labelText: 'Monto a pagar',
                 prefixText: r'$ ',
               ),
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               validator: ValidadoresCompra.monto,
             ),
           ],
@@ -361,7 +375,7 @@ class _PanelCompraState extends State<PanelCompra> {
             ),
           ] else
             FilledButton.icon(
-              onPressed: errorSaldo == null ? _revisar : null,
+              onPressed: errorSaldo == null && _datosValidos ? _revisar : null,
               icon: const Icon(Icons.shopping_cart_checkout),
               label: const Text('Realizar compra'),
             ),

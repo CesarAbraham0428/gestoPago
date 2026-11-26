@@ -203,6 +203,7 @@ void main() {
         find.widgetWithText(TextFormField, 'Número de celular'),
         '5512345678',
       );
+      await tester.pump(); // habilita el botón
       await tester.ensureVisible(find.text('Realizar compra'));
       await tester.tap(find.text('Realizar compra'));
       await tester.pumpAndSettle();

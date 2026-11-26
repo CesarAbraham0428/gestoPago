@@ -71,8 +71,13 @@ void main() {
 
   Finder campo(String etiqueta) => find.widgetWithText(TextFormField, etiqueta);
 
-  Future<void> ponerCelular(WidgetTester tester) =>
-      tester.enterText(campo('Número de celular'), '5512345678');
+  Future<void> ponerCelular(WidgetTester tester) async {
+    await tester.enterText(campo('Número de celular'), '5512345678');
+    await tester.pump(); // el botón se habilita en el siguiente cuadro
+  }
+
+  bool compraHabilitada(WidgetTester tester) =>
+      tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Realizar compra')).onPressed != null;
 
   Future<void> revisar(WidgetTester tester) async {
     await tester.tap(find.text('Realizar compra'));
@@ -144,9 +149,14 @@ void main() {
       expect(find.textContaining('Pagas desde'), findsOneWidget);
       expect(find.textContaining('50.00'), findsWidgets);
 
-      await tester.tap(find.text('Realizar compra'));
+      // Sin celular válido no se puede comprar; el error aparece al escribir.
+      expect(compraHabilitada(tester), isFalse);
+      await tester.enterText(campo('Número de celular'), '54');
       await tester.pump();
-      expect(find.text('Escribe el número de celular.'), findsOneWidget);
+      expect(find.text('Debe tener 10 dígitos, sin espacios ni guiones.'), findsOneWidget);
+      expect(compraHabilitada(tester), isFalse);
+      await ponerCelular(tester);
+      expect(compraHabilitada(tester), isTrue);
     });
 
     testWidgets('varias cuentas: elegir otra y saldo insuficiente', (tester) async {
@@ -537,6 +547,18 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Número de servicio'), findsOneWidget); // texto de ayuda
       expect(find.text('—'), findsOneWidget);
+
+      // Hasta tener referencia y monto válidos no se habilita la compra.
+      expect(compraHabilitada(tester), isFalse);
+      await tester.enterText(campo('Referencia'), 'REF123');
+      await tester.pump();
+      expect(compraHabilitada(tester), isFalse);
+      await tester.enterText(campo('Monto a pagar'), '12.345');
+      await tester.pump();
+      expect(compraHabilitada(tester), isFalse);
+      await tester.enterText(campo('Monto a pagar'), '12.5');
+      await tester.pump();
+      expect(compraHabilitada(tester), isTrue);
 
       await llenar(tester, monto: '5000');
       await revisar(tester);
