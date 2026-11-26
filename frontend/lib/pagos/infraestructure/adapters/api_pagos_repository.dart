@@ -123,6 +123,7 @@ class ApiPagosRepository implements PagosRepository {
       upc: upc,
       producto: j['producto'] as String?,
       servicio: j['servicio'] as String?,
+      idServicio: (j['idServicio'] as num?)?.toInt(),
       monto: monto,
       comision: comision,
       total: _numero(j['total']) ?? monto + comision,

@@ -12,6 +12,7 @@ class EstadoVisual {
     required this.titulo,
     required this.iconoGrande,
     required this.colores,
+    this.motivo,
   });
 
   final String texto;
@@ -22,6 +23,9 @@ class EstadoVisual {
   final String titulo;
   final IconData iconoGrande;
   final List<Color> colores;
+
+  /// Explicación para el usuario cuando el pago no quedó aprobado.
+  final String? motivo;
 }
 
 EstadoVisual estadoVisual(CategoriaPago categoria) => switch (categoria) {
@@ -34,10 +38,13 @@ EstadoVisual estadoVisual(CategoriaPago categoria) => switch (categoria) {
     colores: [AppColors.marca, AppColors.marcaOscura],
   ),
   CategoriaPago.enProceso => const EstadoVisual(
-    texto: 'En proceso',
+    texto: 'Pendiente',
     tono: Tono.pendiente,
     icono: Icons.schedule,
-    titulo: 'Pago en proceso',
+    titulo: 'Pago pendiente',
+    motivo:
+        'Estamos esperando la confirmación del proveedor del servicio. '
+        'Si no se completa, te devolvemos el importe a tu saldo.',
     iconoGrande: Icons.hourglass_top,
     colores: [AppColors.pendiente, Color(0xFF5C3A00)],
   ),
@@ -48,5 +55,9 @@ EstadoVisual estadoVisual(CategoriaPago categoria) => switch (categoria) {
     titulo: 'Pago rechazado',
     iconoGrande: Icons.block,
     colores: [AppColors.rechazo, Color(0xFF7A1B13)],
+    // Todo rechazo pasa por devolverSaldo en el backend: el cargo siempre se revierte.
+    motivo:
+        'El proveedor del servicio no pudo procesar el pago, por lo que no se '
+        'realizó ningún cargo. El importe ya está de vuelta en tu saldo.',
   ),
 };

@@ -26,29 +26,66 @@ class DetalleProducto extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Monograma(nombre: producto.servicio, idServicio: producto.idServicio, tamano: 56),
-            const SizedBox(width: 16),
+            // Marco con borde y sombra: el logo (fondo blanco) no se pierde sobre el papel.
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.superficie,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppColors.lineaSuave),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1415201B),
+                    blurRadius: 16,
+                    offset: Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Monograma(
+                  nombre: producto.servicio,
+                  idServicio: producto.idServicio,
+                  tamano: 92,
+                ),
+              ),
+            ),
+            const SizedBox(width: 20),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(producto.servicio, style: tema.bodySmall),
-                  const SizedBox(height: 2),
-                  Text(producto.nombre, style: tema.titleLarge),
-                  const SizedBox(height: 8),
-                  producto.disponibleParaCompra
-                      ? const EtiquetaEstado(
-                          texto: 'Disponible para compra',
-                          tono: Tono.exito,
-                          icono: Icons.check_circle_outline,
-                        )
-                      : const EtiquetaEstado(
-                          texto: 'No disponible para compra',
-                          tono: Tono.neutro,
-                          icono: Icons.block,
-                        ),
+                  Text(
+                    producto.servicio.toUpperCase(),
+                    style: tema.labelMedium?.copyWith(
+                      color: AppColors.tintaSuave,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    producto.nombre,
+                    style: tema.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // Junto al logo grande, en pantallas angostas la etiqueta se reduce en vez de desbordar.
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: producto.disponibleParaCompra
+                        ? const EtiquetaEstado(
+                            texto: 'Disponible para compra',
+                            tono: Tono.exito,
+                            icono: Icons.check_circle_outline,
+                          )
+                        : const EtiquetaEstado(
+                            texto: 'No disponible para compra',
+                            tono: Tono.neutro,
+                            icono: Icons.block,
+                          ),
+                  ),
                 ],
               ),
             ),
@@ -74,7 +111,11 @@ class DetalleProducto extends StatelessWidget {
                       children: [
                         const Padding(
                           padding: EdgeInsets.only(top: 2),
-                          child: Icon(Icons.info_outline, size: 16, color: AppColors.aviso),
+                          child: Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: AppColors.aviso,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(child: Text(linea, style: tema.bodySmall)),
@@ -104,7 +145,9 @@ class DetalleProducto extends StatelessWidget {
               : 'La recarga se aplica al número de celular que indiques.',
         );
       case TipoCompra.pagoServicio:
-        lineas.add('Indica la referencia de tu recibo y el monto exacto a pagar.');
+        lineas.add(
+          'Indica la referencia de tu recibo y el monto exacto a pagar.',
+        );
         if (producto.comision > 0) {
           lineas.add('La comisión se suma al importe de tu pago.');
         }
@@ -124,53 +167,84 @@ class _Precio extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context).textTheme;
-    final (etiqueta, valor, nota) = switch (producto.tipoCompra) {
+    final (
+      String etiqueta,
+      String valor,
+      String? nota,
+    ) = switch (producto.tipoCompra) {
       TipoCompra.recarga => (
         'Precio',
         formatoMoneda(producto.montoFijo!),
-        'Monto fijo',
+        null,
       ),
       TipoCompra.pagoServicio => (
         'Comisión',
-        producto.comision > 0 ? formatoMoneda(producto.comision) : 'Sin comisión',
+        producto.comision > 0
+            ? formatoMoneda(producto.comision)
+            : 'Sin comisión',
         'Tú indicas el monto a pagar',
       ),
-      TipoCompra.noDisponible => ('Precio', '—', 'Este producto no se puede pagar'),
+      TipoCompra.noDisponible => (
+        'Precio',
+        '—',
+        'Este producto no se puede pagar',
+      ),
     };
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
       decoration: BoxDecoration(
-        color: AppColors.marcaTenue,
-        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.marca, AppColors.marcaOscura],
+        ),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(right: 14, bottom: 4),
-            child: Icon(Icons.sell_outlined, color: AppColors.marca, size: 28),
-          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(etiqueta, style: tema.bodySmall),
+                Text(
+                  etiqueta,
+                  style: tema.bodyMedium?.copyWith(
+                    color: const Color(0xCCFFFFFF),
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   valor,
                   style: tema.headlineMedium?.copyWith(
+                    fontSize: 36,
+                    fontWeight: FontWeight.w800,
                     fontFeatures: cifrasTabulares,
-                    color: AppColors.marcaOscura,
+                    color: Colors.white,
                   ),
                 ),
+                if (nota != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    nota,
+                    style: tema.bodySmall?.copyWith(
+                      color: const Color(0xCCFFFFFF),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          Flexible(
-            child: Text(
-              nota,
-              style: tema.bodySmall?.copyWith(color: AppColors.marcaOscura),
-              textAlign: TextAlign.right,
+          Container(
+            width: 52,
+            height: 52,
+            decoration: const BoxDecoration(
+              color: Color(0x22FFFFFF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.sell_outlined,
+              color: Colors.white,
+              size: 26,
             ),
           ),
         ],

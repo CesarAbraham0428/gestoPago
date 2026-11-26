@@ -24,6 +24,7 @@ class DatosRecibo {
     required this.monto,
     required this.comision,
     required this.total,
+    this.idServicio,
     this.destinoEtiqueta,
     this.destino,
     this.cuenta,
@@ -42,6 +43,7 @@ class DatosRecibo {
   final double monto;
   final double comision;
   final double total;
+  final int? idServicio;
   final String? destinoEtiqueta;
   final String? destino;
   final String? cuenta;
@@ -66,6 +68,7 @@ class DatosRecibo {
       monto: c.monto,
       comision: c.comision,
       total: c.total,
+      idServicio: s.producto.idServicio,
       destinoEtiqueta: esRecarga ? 'Celular' : 'Referencia de pago',
       destino: esRecarga
           ? formatoTelefono(s.telefono!)
@@ -89,6 +92,7 @@ class DatosRecibo {
       monto: h.monto,
       comision: h.comision,
       total: h.total,
+      idServicio: h.idServicio,
       destinoEtiqueta: esRecarga
           ? 'Celular'
           : (h.referencia != null ? 'Referencia de pago' : null),
@@ -138,6 +142,7 @@ class Recibo extends StatelessWidget {
                       children: [
                         Monograma(
                           nombre: datos.servicio ?? datos.titulo,
+                          idServicio: datos.idServicio,
                           tamano: 44,
                         ),
                         const SizedBox(width: 12),
@@ -153,6 +158,15 @@ class Recibo extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (estadoVisual(categoriaDeEstado(datos.estado)).motivo
+                        case final motivo?) ...[
+                      const SizedBox(height: 16),
+                      _Motivo(
+                        texto: motivo,
+                        tono: estadoVisual(categoriaDeEstado(datos.estado))
+                            .tono,
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     const _Perforacion(),
                     const SizedBox(height: 8),
@@ -332,6 +346,38 @@ class _Seccion extends StatelessWidget {
           padding: padding,
           child: child,
         ),
+      ),
+    );
+  }
+}
+
+/// Por qué el pago no quedó aprobado, en el color de su estado.
+class _Motivo extends StatelessWidget {
+  const _Motivo({required this.texto, required this.tono});
+  final String texto;
+  final Tono tono;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: tono.fondo,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 18, color: tono.texto),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              texto,
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: tono.texto),
+            ),
+          ),
+        ],
       ),
     );
   }

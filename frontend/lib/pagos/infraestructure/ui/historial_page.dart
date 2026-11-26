@@ -259,7 +259,7 @@ class _Filtros extends StatelessWidget {
   static const _etiquetas = {
     FiltroPagos.todos: 'Todos',
     FiltroPagos.aprobados: 'Aprobados',
-    FiltroPagos.enProceso: 'En proceso',
+    FiltroPagos.enProceso: 'Pendientes',
     FiltroPagos.rechazados: 'Rechazados',
   };
 
@@ -444,6 +444,7 @@ class _FilaCompra extends StatelessWidget {
   Widget build(BuildContext context) {
     final tema = Theme.of(context).textTheme;
     final visual = estadoVisual(compra.categoria);
+    final rechazado = compra.categoria == CategoriaPago.rechazado;
     return Semantics(
       button: true,
       selected: seleccionada,
@@ -451,10 +452,8 @@ class _FilaCompra extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 10),
         child: Material(
           color: seleccionada ? AppColors.marcaTenue : AppColors.superficie,
-          elevation: seleccionada ? 0 : 1.5,
-          shadowColor: Colors.black38,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
             side: BorderSide(
               color: seleccionada ? AppColors.marca : AppColors.lineaSuave,
               width: seleccionada ? 1.5 : 1,
@@ -463,73 +462,75 @@ class _FilaCompra extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: alTocar,
-            child: Stack(
-              children: [
-                // Franja con el color del estado: se distingue de un vistazo.
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: 5,
-                  child: ColoredBox(color: visual.tono.texto),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
-                  child: Row(
-                    children: [
-                      Monograma(
-                        nombre: compra.servicio ?? compra.titulo,
-                        tamano: 48,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              compra.titulo,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: tema.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Text(
-                                  formatoFechaHora(compra.fecha),
-                                  style: tema.bodySmall,
-                                ),
-                                EtiquetaEstado(
-                                  texto: visual.texto,
-                                  tono: visual.tono,
-                                  icono: visual.icono,
-                                ),
-                              ],
-                            ),
-                          ],
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: AppColors.superficie,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.lineaSuave),
+                    ),
+                    child: Monograma(
+                      nombre: compra.servicio ?? compra.titulo,
+                      idServicio: compra.idServicio,
+                      tamano: 48,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          compra.titulo,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: tema.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
+                        const SizedBox(height: 4),
+                        Text(
+                          formatoFechaHora(compra.fecha),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: tema.bodySmall?.copyWith(
+                            color: AppColors.tintaSuave,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
                       Text(
                         formatoMoneda(compra.total),
                         style: tema.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                           fontFeatures: cifrasTabulares,
-                          decoration:
-                              compra.categoria == CategoriaPago.rechazado
+                          color: rechazado
+                              ? AppColors.tintaSuave
+                              : AppColors.tinta,
+                          decoration: rechazado
                               ? TextDecoration.lineThrough
                               : null,
                         ),
                       ),
+                      const SizedBox(height: 6),
+                      EtiquetaEstado(
+                        texto: visual.texto,
+                        tono: visual.tono,
+                        icono: visual.icono,
+                      ),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

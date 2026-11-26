@@ -392,16 +392,17 @@ void main() {
       expect(find.text('Aprobado'), findsOneWidget);
       expect(find.text('Rechazado'), findsOneWidget);
       expect(
-        find.text('En proceso'),
-        findsNWidgets(3),
-      ); // dos filas y el filtro
+        find.text('Pendiente'),
+        findsNWidgets(2),
+      ); // dos filas
+      expect(find.widgetWithText(ChoiceChip, 'Pendientes'), findsOneWidget);
 
       await filtrarPor(tester, 'Rechazados');
       await tester.pumpAndSettle();
       expect(find.text('Pago dos'), findsOneWidget);
       expect(find.text('Pago uno'), findsNothing);
 
-      await tester.tap(find.widgetWithText(ChoiceChip, 'En proceso'));
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Pendientes'));
       await tester.pumpAndSettle();
       expect(find.text('Pago tres'), findsOneWidget);
       expect(find.text('Pago cuatro'), findsOneWidget);
@@ -434,6 +435,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Pago rechazado'), findsOneWidget);
+      expect(find.textContaining('El proveedor del servicio no pudo'), findsOneWidget);
       expect(find.text('Compra confirmada'), findsNothing);
     });
 

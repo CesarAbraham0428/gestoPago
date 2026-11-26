@@ -344,7 +344,8 @@ void main() {
     testWidgets('recarga de saldo', (tester) async {
       await detalle(tester, producto('Recarga 50', 'Telcel', 1, leyenda: 'Vigencia 30 días'));
       expect(find.text('Disponible para compra'), findsOneWidget);
-      expect(find.text('Monto fijo'), findsOneWidget);
+      expect(find.text('Monto fijo'), findsNothing);
+      expect(find.text('Precio'), findsOneWidget);
       expect(find.textContaining('número de celular'), findsOneWidget);
       expect(find.text('Vigencia 30 días'), findsOneWidget);
       expect(find.text('ACCION'), findsOneWidget);

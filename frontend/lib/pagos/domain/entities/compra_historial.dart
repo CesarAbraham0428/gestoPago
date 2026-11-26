@@ -10,6 +10,7 @@ class CompraHistorial {
     required this.fecha,
     this.producto,
     this.servicio,
+    this.idServicio,
     this.referencia,
     this.telefono,
     this.idTx,
@@ -21,6 +22,7 @@ class CompraHistorial {
   final String upc;
   final String? producto;
   final String? servicio;
+  final int? idServicio;
   final double monto;
   final double comision;
   final double total;
