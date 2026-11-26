@@ -11,17 +11,33 @@ enum TipoCompra {
   noDisponible,
 }
 
-/// Agrupación para navegar el catálogo. La API no entrega nombres de
-/// categoría, así que se derivan de `tipoFront` e `idCatTipoServicio`.
-enum CategoriaProducto {
-  recargas('Recargas'),
-  tarjetas('Tarjetas y códigos'),
-  servicios('Pago de servicios'),
-  otros('Otros');
+/// Tipos de servicio que entrega la API en `idCatTipoServicio`
+/// (docs/pagosGestoPago.md §4.3). Son los que existen en la tabla `producto`.
+const _tiposServicio = {
+  1: 'Movistar',
+  2: 'Telcel',
+  3: 'AT&T / Iusacell',
+  4: 'Unefon',
+  5: 'Pago de servicios',
+  6: 'Nextel',
+  7: 'Impuestos y gobierno',
+  8: 'Productos financieros',
+  9: 'Productos por catálogo',
+  10: 'Servicios de prepago',
+  11: 'Entretenimiento',
+  12: 'Virgin',
+  13: 'Otras recargas',
+  14: 'Seguros',
+  15: 'Derechos de agua',
+  16: 'Juegos y sorteos',
+  17: 'MazTiempo',
+  18: 'Autopistas y transportes',
+  19: 'Internet de prepago',
+};
 
-  const CategoriaProducto(this.etiqueta);
-  final String etiqueta;
-}
+/// Tipo 0 agrupa los productos que llegan sin `idCatTipoServicio`.
+String etiquetaTipoServicio(int tipo) =>
+    tipo == 0 ? 'Otros' : _tiposServicio[tipo] ?? 'Tipo $tipo';
 
 class Producto {
   const Producto({
@@ -65,13 +81,8 @@ class Producto {
 
   bool get disponibleParaCompra => tipoCompra != TipoCompra.noDisponible;
 
-  CategoriaProducto get categoria {
-    if (!disponibleParaCompra) return CategoriaProducto.otros;
-    if (esCanjeable) return CategoriaProducto.tarjetas;
-    return tipoCompra == TipoCompra.recarga
-        ? CategoriaProducto.recargas
-        : CategoriaProducto.servicios;
-  }
+  /// Tipo de servicio para filtrar el catálogo (0 si la API no lo informa).
+  int get tipoServicio => idCatTipoServicio ?? 0;
 
   /// Monto que se cobra por el producto cuando es de precio fijo.
   double? get montoFijo => tipoCompra == TipoCompra.recarga ? precio : null;

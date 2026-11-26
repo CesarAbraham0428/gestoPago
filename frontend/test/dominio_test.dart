@@ -121,12 +121,12 @@ void main() {
   });
 
   group('Producto', () {
-    test('tipo de compra, categoría, monto fijo y comisión', () {
+    test('tipo de compra, tipo de servicio, monto fijo y comisión', () {
       final recarga = _producto();
       expect(recarga.clave, '7-9');
       expect(recarga.tipoCompra, TipoCompra.recarga);
-      expect(recarga.categoria, CategoriaProducto.recargas);
-      expect(recarga.categoria.etiqueta, 'Recargas');
+      expect(recarga.tipoServicio, 0);
+      expect(etiquetaTipoServicio(recarga.tipoServicio), 'Otros');
       expect(recarga.montoFijo, 50);
       expect(recarga.comision, 0);
       expect(recarga.disponibleParaCompra, isTrue);
@@ -134,12 +134,13 @@ void main() {
 
       final tarjeta = _producto(idCat: 10);
       expect(tarjeta.esCanjeable, isTrue);
-      expect(tarjeta.categoria, CategoriaProducto.tarjetas);
+      expect(etiquetaTipoServicio(tarjeta.tipoServicio), 'Servicios de prepago');
       expect(_producto(idCat: 11).esCanjeable, isTrue);
 
       final servicio = _producto(tipoFront: 2, precio: 8);
       expect(servicio.tipoCompra, TipoCompra.pagoServicio);
-      expect(servicio.categoria, CategoriaProducto.servicios);
+      expect(etiquetaTipoServicio(2), 'Telcel');
+      expect(etiquetaTipoServicio(99), 'Tipo 99');
       expect(servicio.montoFijo, isNull);
       expect(servicio.comision, 8);
       expect(_producto(tipoFront: 2, precio: null).comision, 0);
@@ -147,7 +148,6 @@ void main() {
       final sinPrecio = _producto(precio: null);
       expect(sinPrecio.tipoCompra, TipoCompra.noDisponible);
       expect(sinPrecio.disponibleParaCompra, isFalse);
-      expect(sinPrecio.categoria, CategoriaProducto.otros);
       expect(_producto(precio: 0).tipoCompra, TipoCompra.noDisponible);
       expect(_producto(tipoFront: 3).tipoCompra, TipoCompra.noDisponible);
     });

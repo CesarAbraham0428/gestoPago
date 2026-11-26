@@ -117,7 +117,7 @@ Cómo se interpreta cada producto (`productos/domain/entities/producto.dart`):
 | 2 | Pago de servicio | Comisión que se suma al monto que indica el usuario. |
 | Otros (p. ej. 4, consulta) | No disponible | — |
 
-Las categorías de la interfaz (Recargas, Tarjetas y códigos, Pago de servicios, Otros) se derivan de esa tabla porque la API no entrega nombres de categoría.
+Los filtros del catálogo (un chip por tipo) salen de `idCatTipoServicio` de los productos cargados; las etiquetas vienen de la tabla de `docs/pagosGestoPago.md` §4.3 porque la API no entrega nombres de categoría, y los productos sin ese dato van en "Otros".
 
 ### Cuentas
 

@@ -19,17 +19,18 @@ void main() {
 
   group('CatalogoPage', () {
     final productos = [
-      producto('Recarga 50', 'Telcel', 1),
+      producto('Recarga 50', 'Telcel', 1, cat: 2),
       producto('Gift card', 'Amazon', 2, cat: 10),
-      producto('Luz con comisión', 'CFE', 3, tipo: 2, precio: 8),
-      producto('Luz sin comisión', 'CFE', 4, tipo: 2, precio: 0),
-      producto('Solo consulta', 'Ñandú', 5, precio: null),
+      producto('Luz con comisión', 'CFE', 3, tipo: 2, precio: 8, cat: 5),
+      producto('Luz sin comisión', 'CFE', 4, tipo: 2, precio: 0, cat: 5),
+      producto('Consulta de saldo', 'Ñandú', 5, precio: null),
     ];
 
     Future<CatalogoController> abrir(
       WidgetTester tester, {
       String? clave,
       List<String>? seleccionados,
+      List<String>? volvio,
       Size tamano = const Size(500, 900),
       Future<List<Producto>> Function()? repo,
     }) async {
@@ -42,6 +43,7 @@ void main() {
           controller: controller,
           claveSeleccionada: clave,
           alSeleccionar: (c) => seleccionados?.add(c),
+          alVolver: () => volvio?.add('volver'),
           construirAccionCompra: (_, p) => Text('COMPRAR ${p.clave}'),
         ),
         tamano: tamano,
@@ -71,12 +73,79 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byType(Switch));
       await tester.pumpAndSettle();
-      expect(find.text('Solo consulta'), findsOneWidget);
-      expect(find.text('No disponible para compra'), findsOneWidget);
+      expect(find.text('Consulta de saldo'), findsOneWidget);
+      expect(find.text('No disponible'), findsOneWidget);
     });
 
-    testWidgets('búsqueda, borrar y filtros por categoría', (tester) async {
-      await abrir(tester);
+    // La fila de filtros se desplaza en horizontal en pantallas angostas.
+    Finder chip(String etiqueta) => find.widgetWithText(ChoiceChip, etiqueta);
+
+    testWidgets('los filtros salen de los tipos de servicio que existen', (
+      tester,
+    ) async {
+      await abrir(tester, tamano: const Size(1300, 900));
+      await tester.pumpAndSettle();
+      for (final etiqueta in ['Todo', 'Telcel', 'Pago de servicios', 'Servicios de prepago']) {
+        expect(chip(etiqueta), findsOneWidget);
+      }
+      expect(find.byType(ChoiceChip), findsNWidgets(4));
+      expect(chip('Otros'), findsNothing); // solo hay "Otros" entre los no disponibles
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+      expect(chip('Otros'), findsOneWidget);
+      expect(find.byType(ChoiceChip), findsNWidgets(5));
+    });
+
+    testWidgets('las cards se acomodan en cuadrícula según el ancho', (
+      tester,
+    ) async {
+      await abrir(tester, tamano: const Size(1300, 900));
+      await tester.pumpAndSettle();
+      // Se ordenan por servicio: Amazon antes que Telcel.
+      final a = tester.getTopLeft(find.text('Gift card'));
+      final b = tester.getTopLeft(find.text('Recarga 50'));
+      expect(a.dy, b.dy); // misma fila
+      expect(a.dx, lessThan(b.dx));
+
+      await abrir(tester, tamano: const Size(300, 900));
+      await tester.pumpAndSettle();
+      final c = tester.getTopLeft(find.text('Gift card'));
+      final d = tester.getTopLeft(find.text('Recarga 50'));
+      expect(c.dx, d.dx); // una columna
+      expect(c.dy, lessThan(d.dy));
+    });
+
+    testWidgets('de la lista al detalle y de regreso', (tester) async {
+      final controller = CatalogoController(CatalogoFalso(() async => productos));
+      String? clave;
+      await montar(
+        tester,
+        StatefulBuilder(
+          builder: (context, setState) => CatalogoPage(
+            controller: controller,
+            claveSeleccionada: clave,
+            alSeleccionar: (c) => setState(() => clave = c),
+            alVolver: () => setState(() => clave = null),
+            construirAccionCompra: (_, p) => Text('COMPRAR ${p.clave}'),
+          ),
+        ),
+        tamano: const Size(1300, 900),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gift card'));
+      await tester.pumpAndSettle();
+      expect(find.text('COMPRAR 2-1'), findsOneWidget);
+      expect(find.text('Buscar por servicio o producto'), findsNothing);
+
+      await tester.tap(find.text('Volver al catálogo'));
+      await tester.pumpAndSettle();
+      expect(find.text('Buscar por servicio o producto'), findsOneWidget);
+      expect(find.text('Gift card'), findsOneWidget);
+    });
+
+    testWidgets('búsqueda, borrar y filtros por tipo', (tester) async {
+      await abrir(tester, tamano: const Size(1300, 900));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), 'telcel');
@@ -86,10 +155,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('4 de 5 productos'), findsOneWidget);
 
-      await tester.tap(find.text('Recargas'));
+      await tester.tap(chip('Telcel'));
       await tester.pumpAndSettle();
       expect(find.text('1 de 5 productos'), findsOneWidget);
-      await tester.tap(find.text('Todo'));
+      await tester.tap(chip('Pago de servicios'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 de 5 productos'), findsOneWidget);
+      await tester.tap(chip('Todo'));
       await tester.pumpAndSettle();
       expect(find.text('4 de 5 productos'), findsOneWidget);
     });
@@ -154,6 +226,14 @@ void main() {
       expect(find.text('Buscar por servicio o producto'), findsNothing);
     });
 
+    testWidgets('el detalle ofrece volver al catálogo', (tester) async {
+      final volvio = <String>[];
+      await abrir(tester, clave: '1-1', volvio: volvio);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Volver al catálogo'));
+      expect(volvio, ['volver']);
+    });
+
     testWidgets('detalle de un producto inexistente', (tester) async {
       await abrir(tester, clave: '99-9');
       await tester.pumpAndSettle();
@@ -170,15 +250,19 @@ void main() {
       expect(find.text('COMPRAR 1-1'), findsOneWidget);
     });
 
-    testWidgets('pantalla ancha: lista y detalle lado a lado', (tester) async {
+    testWidgets('pantalla ancha: la lista ocupa todo y el detalle va aparte', (
+      tester,
+    ) async {
       await abrir(tester, tamano: const Size(1300, 900));
       await tester.pumpAndSettle();
-      expect(find.text('Elige un producto'), findsOneWidget);
+      expect(find.text('Buscar por servicio o producto'), findsOneWidget);
+      expect(tester.getSize(find.byType(TextField)).width, greaterThan(1100));
+      expect(find.text('COMPRAR 2-1'), findsNothing);
 
       await abrir(tester, clave: '2-1', tamano: const Size(1300, 900));
       await tester.pumpAndSettle();
       expect(find.text('COMPRAR 2-1'), findsOneWidget);
-      expect(find.text('Buscar por servicio o producto'), findsOneWidget);
+      expect(find.text('Buscar por servicio o producto'), findsNothing);
     });
   });
 

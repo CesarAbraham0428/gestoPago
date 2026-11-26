@@ -101,14 +101,14 @@ void main() {
     testWidgets('con sesión, / y /login llevan al catálogo', (tester) async {
       final deps = await crear(sesion: sesionPrueba());
       await abrir(tester, deps, construirShellWeb);
-      expect(find.text('Elige un producto'), findsOneWidget);
+      expect(find.text('Buscar por servicio o producto'), findsOneWidget);
 
       router(tester).go('/login');
       await tester.pumpAndSettle();
-      expect(find.text('Elige un producto'), findsOneWidget);
+      expect(find.text('Buscar por servicio o producto'), findsOneWidget);
       router(tester).go('/');
       await tester.pumpAndSettle();
-      expect(find.text('Elige un producto'), findsOneWidget);
+      expect(find.text('Buscar por servicio o producto'), findsOneWidget);
       await cerrar(tester, deps);
     });
   });

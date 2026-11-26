@@ -20,7 +20,7 @@ class Monograma extends StatelessWidget {
     Color(0xFF214E6B),
   ];
 
-  String get _iniciales {
+  static String iniciales(String nombre) {
     final partes = nombre
         .trim()
         .split(RegExp(r'\s+'))
@@ -34,7 +34,7 @@ class Monograma extends StatelessWidget {
     return (partes[0][0] + partes[1][0]).toUpperCase();
   }
 
-  Color get _fondo {
+  static Color colorDe(String nombre) {
     var hash = 0;
     for (final unidad in nombre.toLowerCase().codeUnits) {
       hash = (hash * 31 + unidad) & 0x7fffffff;
@@ -50,11 +50,11 @@ class Monograma extends StatelessWidget {
         height: tamano,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: _fondo,
+          color: colorDe(nombre),
           borderRadius: BorderRadius.circular(tamano * 0.2),
         ),
         child: Text(
-          _iniciales,
+          iniciales(nombre),
           style: TextStyle(
             color: Colors.white,
             fontSize: tamano * 0.36,

@@ -10,20 +10,22 @@ import '../../application/catalogo_controller.dart';
 import '../../domain/entities/producto.dart';
 import 'detalle_producto.dart';
 
-/// Catálogo de productos. En pantallas anchas muestra la lista y el detalle
-/// lado a lado; en pantallas angostas la lista abre el detalle como pantalla.
+/// Catálogo de productos: buscador y filtros arriba y una cuadrícula de cards
+/// que se adapta al ancho. Al elegir una card se abre el detalle del producto.
 class CatalogoPage extends StatefulWidget {
   const CatalogoPage({
     super.key,
     required this.controller,
     required this.claveSeleccionada,
     required this.alSeleccionar,
+    required this.alVolver,
     required this.construirAccionCompra,
   });
 
   final CatalogoController controller;
   final String? claveSeleccionada;
   final ValueChanged<String> alSeleccionar;
+  final VoidCallback alVolver;
 
   /// Acción de compra del producto, aportada por el módulo de pagos.
   final Widget Function(BuildContext context, Producto producto) construirAccionCompra;
@@ -49,77 +51,45 @@ class _CatalogoPageState extends State<CatalogoPage> {
 
   @override
   Widget build(BuildContext context) {
-    final ancho = Breakpoints.esAncho(context);
     return ListenableBuilder(
       listenable: widget.controller,
       builder: (context, _) {
-        final seleccionado = widget.claveSeleccionada == null
-            ? null
-            : widget.controller.porClave(widget.claveSeleccionada!);
-
-        if (!ancho && widget.claveSeleccionada != null) {
-          return _DetalleAngosto(
+        final clave = widget.claveSeleccionada;
+        if (clave != null) {
+          return _Detalle(
             controller: widget.controller,
-            producto: seleccionado,
+            producto: widget.controller.porClave(clave),
+            alVolver: widget.alVolver,
             construirAccionCompra: widget.construirAccionCompra,
           );
         }
-
-        final lista = _PanelLista(
+        return _PanelLista(
           controller: widget.controller,
           busqueda: _busqueda,
-          claveSeleccionada: widget.claveSeleccionada,
           alSeleccionar: widget.alSeleccionar,
-        );
-        if (!ancho) return lista;
-
-        return Row(
-          children: [
-            SizedBox(width: 420, child: lista),
-            const VerticalDivider(width: 1),
-            Expanded(
-              child: seleccionado == null
-                  ? const VistaMensaje(
-                      icono: Icons.touch_app_outlined,
-                      titulo: 'Elige un producto',
-                      detalle: 'Aquí verás su precio y podrás comprarlo.',
-                    )
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(32),
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 640),
-                          child: DetalleProducto(
-                            key: ValueKey(seleccionado.clave),
-                            producto: seleccionado,
-                            accionCompra: widget.construirAccionCompra(context, seleccionado),
-                          ),
-                        ),
-                      ),
-                    ),
-            ),
-          ],
         );
       },
     );
   }
 }
 
-class _DetalleAngosto extends StatelessWidget {
-  const _DetalleAngosto({
+class _Detalle extends StatelessWidget {
+  const _Detalle({
     required this.controller,
     required this.producto,
+    required this.alVolver,
     required this.construirAccionCompra,
   });
 
   final CatalogoController controller;
   final Producto? producto;
+  final VoidCallback alVolver;
   final Widget Function(BuildContext, Producto) construirAccionCompra;
 
   @override
   Widget build(BuildContext context) {
-    if (producto == null) {
+    final p = producto;
+    if (p == null) {
       return controller.estado == EstadoCatalogo.cargando ||
               controller.estado == EstadoCatalogo.inicial
           ? const VistaCargando()
@@ -135,10 +105,24 @@ class _DetalleAngosto extends StatelessWidget {
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
-          child: DetalleProducto(
-            key: ValueKey(producto!.clave),
-            producto: producto!,
-            accionCompra: construirAccionCompra(context, producto!),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: alVolver,
+                  icon: const Icon(Icons.arrow_back, size: 18),
+                  label: const Text('Volver al catálogo'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              DetalleProducto(
+                key: ValueKey(p.clave),
+                producto: p,
+                accionCompra: construirAccionCompra(context, p),
+              ),
+            ],
           ),
         ),
       ),
@@ -150,13 +134,11 @@ class _PanelLista extends StatelessWidget {
   const _PanelLista({
     required this.controller,
     required this.busqueda,
-    required this.claveSeleccionada,
     required this.alSeleccionar,
   });
 
   final CatalogoController controller;
   final TextEditingController busqueda;
-  final String? claveSeleccionada;
   final ValueChanged<String> alSeleccionar;
 
   @override
@@ -187,25 +169,9 @@ class _PanelLista extends StatelessWidget {
             ),
           ),
         ),
-        SizedBox(
-          height: 44,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              _FiltroCategoria(
-                etiqueta: 'Todo',
-                activo: controller.categoria == null,
-                alTocar: () => controller.filtrarCategoria(null),
-              ),
-              for (final categoria in controller.categoriasPresentes)
-                _FiltroCategoria(
-                  etiqueta: categoria.etiqueta,
-                  activo: controller.categoria == categoria,
-                  alTocar: () => controller.filtrarCategoria(categoria),
-                ),
-            ],
-          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _Filtros(controller: controller),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
@@ -234,18 +200,50 @@ class _PanelLista extends StatelessWidget {
           ),
         ),
         const Divider(),
-        Expanded(child: _Contenido(
-          controller: controller,
-          claveSeleccionada: claveSeleccionada,
-          alSeleccionar: alSeleccionar,
-        )),
+        Expanded(
+          child: _Contenido(controller: controller, alSeleccionar: alSeleccionar),
+        ),
       ],
     );
   }
 }
 
-class _FiltroCategoria extends StatelessWidget {
-  const _FiltroCategoria({
+/// Un chip por cada tipo de servicio que existe en el catálogo cargado. En
+/// pantallas anchas se reparten en varias líneas; en angostas se desplazan.
+class _Filtros extends StatelessWidget {
+  const _Filtros({required this.controller});
+  final CatalogoController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = [
+      _FiltroTipo(
+        etiqueta: 'Todo',
+        activo: controller.tipo == null,
+        alTocar: () => controller.filtrarTipo(null),
+      ),
+      for (final tipo in controller.tiposPresentes)
+        _FiltroTipo(
+          etiqueta: etiquetaTipoServicio(tipo),
+          activo: controller.tipo == tipo,
+          alTocar: () => controller.filtrarTipo(tipo),
+        ),
+    ];
+    if (Breakpoints.esAncho(context, 600)) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Wrap(runSpacing: 8, children: chips),
+      );
+    }
+    return SizedBox(
+      height: 44,
+      child: ListView(scrollDirection: Axis.horizontal, children: chips),
+    );
+  }
+}
+
+class _FiltroTipo extends StatelessWidget {
+  const _FiltroTipo({
     required this.etiqueta,
     required this.activo,
     required this.alTocar,
@@ -270,14 +268,9 @@ class _FiltroCategoria extends StatelessWidget {
 }
 
 class _Contenido extends StatelessWidget {
-  const _Contenido({
-    required this.controller,
-    required this.claveSeleccionada,
-    required this.alSeleccionar,
-  });
+  const _Contenido({required this.controller, required this.alSeleccionar});
 
   final CatalogoController controller;
-  final String? claveSeleccionada;
   final ValueChanged<String> alSeleccionar;
 
   @override
@@ -307,77 +300,39 @@ class _Contenido extends StatelessWidget {
         etiquetaAccion: 'Quitar filtros',
         accion: () {
           controller.buscar('');
-          controller.filtrarCategoria(null);
+          controller.filtrarTipo(null);
         },
       );
     }
 
-    // Lista plana con un encabezado por servicio; los productos ya vienen ordenados.
-    final filas = <Object>[];
-    String? servicioActual;
-    for (final p in productos) {
-      if (p.servicio != servicioActual) {
-        servicioActual = p.servicio;
-        filas.add(p.servicio);
-      }
-      filas.add(p);
-    }
-
+    // Con la letra del sistema grande la card necesita más alto.
+    final alto = 216 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
     return RefreshIndicator(
       onRefresh: () => controller.cargar(forzar: true),
-      child: ListView.builder(
-        itemCount: filas.length,
-        itemBuilder: (context, i) {
-          final fila = filas[i];
-          if (fila is String) return _EncabezadoServicio(nombre: fila);
-          final producto = fila as Producto;
-          return _FilaProducto(
-            producto: producto,
-            seleccionado: producto.clave == claveSeleccionada,
-            alTocar: () => alSeleccionar(producto.clave),
-          );
-        },
+      child: GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 280,
+          mainAxisExtent: alto,
+          mainAxisSpacing: 14,
+          crossAxisSpacing: 14,
+        ),
+        itemCount: productos.length,
+        itemBuilder: (context, i) => _TarjetaProducto(
+          producto: productos[i],
+          alTocar: () => alSeleccionar(productos[i].clave),
+        ),
       ),
     );
   }
 }
 
-class _EncabezadoServicio extends StatelessWidget {
-  const _EncabezadoServicio({required this.nombre});
-  final String nombre;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.papel,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Row(
-        children: [
-          Monograma(nombre: nombre, tamano: 28),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              nombre,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FilaProducto extends StatelessWidget {
-  const _FilaProducto({
-    required this.producto,
-    required this.seleccionado,
-    required this.alTocar,
-  });
+/// Card del producto: banda con el color de la marca y sus iniciales, estado
+/// de disponibilidad, nombre, tipo de compra y precio.
+class _TarjetaProducto extends StatelessWidget {
+  const _TarjetaProducto({required this.producto, required this.alTocar});
 
   final Producto producto;
-  final bool seleccionado;
   final VoidCallback alTocar;
 
   String get _subtitulo => switch (producto.tipoCompra) {
@@ -385,55 +340,159 @@ class _FilaProducto extends StatelessWidget {
     TipoCompra.pagoServicio => producto.comision > 0
         ? 'Pago de servicio · comisión ${formatoMoneda(producto.comision)}'
         : 'Pago de servicio · sin comisión',
-    TipoCompra.noDisponible => 'No disponible para compra',
+    TipoCompra.noDisponible => 'Solo consulta',
+  };
+
+  String get _precio => switch (producto.tipoCompra) {
+    TipoCompra.recarga => formatoMoneda(producto.montoFijo!),
+    TipoCompra.pagoServicio => 'Monto libre',
+    TipoCompra.noDisponible => '—',
   };
 
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context).textTheme;
     final disponible = producto.disponibleParaCompra;
+    final color = Monograma.colorDe(producto.servicio);
     return Semantics(
       button: true,
-      selected: seleccionado,
-      child: InkWell(
-        onTap: alTocar,
-        child: Container(
-          decoration: BoxDecoration(
-            color: seleccionado ? AppColors.marcaTenue : AppColors.superficie,
-            border: const Border(bottom: BorderSide(color: AppColors.lineaSuave)),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      producto.nombre,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: tema.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: disponible ? AppColors.tinta : AppColors.tintaSuave,
-                      ),
+      child: Opacity(
+        opacity: disponible ? 1 : 0.7,
+        child: Material(
+          color: AppColors.superficie,
+          elevation: 1,
+          shadowColor: Colors.black26,
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: alTocar,
+            hoverColor: color.withValues(alpha: 0.06),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  height: 68,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [color, Color.lerp(color, Colors.black, 0.35)!],
                     ),
-                    const SizedBox(height: 2),
-                    Text(_subtitulo, style: tema.bodySmall),
-                  ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          Monograma.iniciales(producto.servicio),
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: _PildoraEstado(disponible: disponible),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              if (producto.tipoCompra == TipoCompra.recarga)
-                Text(
-                  formatoMoneda(producto.montoFijo!),
-                  style: tema.titleMedium?.copyWith(fontFeatures: cifrasTabulares),
-                )
-              else if (disponible)
-                const Icon(Icons.chevron_right, color: AppColors.tintaSuave),
-            ],
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          producto.servicio,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: tema.bodySmall,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          producto.nombre,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: tema.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _subtitulo,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: tema.bodySmall,
+                        ),
+                        const Spacer(),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _precio,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: tema.titleLarge?.copyWith(
+                                  fontFeatures: cifrasTabulares,
+                                  color: disponible ? AppColors.marcaOscura : AppColors.tintaSuave,
+                                ),
+                              ),
+                            ),
+                            if (disponible)
+                              const Icon(Icons.arrow_forward, size: 20, color: AppColors.marca),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PildoraEstado extends StatelessWidget {
+  const _PildoraEstado({required this.disponible});
+  final bool disponible;
+
+  @override
+  Widget build(BuildContext context) {
+    final tono = disponible ? AppColors.exito : AppColors.tintaSuave;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(disponible ? Icons.check_circle : Icons.block, size: 13, color: tono),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              disponible ? 'Disponible' : 'No disponible',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: tono),
+            ),
+          ),
+        ],
       ),
     );
   }

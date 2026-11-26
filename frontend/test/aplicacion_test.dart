@@ -352,9 +352,9 @@ void main() {
 
   group('CatalogoController', () {
     final productos = [
-      _p('Recarga 50', 'Telcel', 1),
-      _p('Recarga 100', 'AT&T', 2),
-      _p('Luz', 'CFE', 3, tipo: 2, precio: 5),
+      _p('Recarga 50', 'Telcel', 1, cat: 2),
+      _p('Recarga 100', 'AT&T', 2, cat: 3),
+      _p('Luz', 'CFE', 3, tipo: 2, precio: 5, cat: 5),
       _p('Gift card', 'Amazon', 4, cat: 10),
       _p('Sin precio', 'Ñandú', 5, precio: null),
     ];
@@ -369,11 +369,7 @@ void main() {
       expect(c.soloDisponibles, isTrue);
       expect(c.porClave('1-1')?.nombre, 'Recarga 50');
       expect(c.porClave('9-9'), isNull);
-      expect(c.categoriasPresentes, [
-        CategoriaProducto.recargas,
-        CategoriaProducto.tarjetas,
-        CategoriaProducto.servicios,
-      ]);
+      expect(c.tiposPresentes, [2, 3, 5, 10]);
 
       await c.cargar(); // ya cargado: no vuelve a pedir
       expect(repo.llamadas, 1);
@@ -389,16 +385,17 @@ void main() {
       expect(c.visibles.single.servicio, 'Ñandú');
 
       c.buscar('');
-      c.filtrarCategoria(CategoriaProducto.otros);
-      expect(c.categoria, CategoriaProducto.otros);
+      c.filtrarTipo(0);
+      expect(c.tiposPresentes, [2, 3, 5, 10, 0]); // "Otros" al final
+      expect(c.tipo, 0);
       expect(c.visibles.single.nombre, 'Sin precio');
       c.alternarSoloDisponibles(true); // "otros" ya no existe: se limpia
-      expect(c.categoria, isNull);
+      expect(c.tipo, isNull);
 
-      c.filtrarCategoria(CategoriaProducto.recargas);
-      c.alternarSoloDisponibles(true); // la categoría sigue presente
-      expect(c.categoria, CategoriaProducto.recargas);
-      expect(c.visibles.length, 2);
+      c.filtrarTipo(2);
+      c.alternarSoloDisponibles(true); // el tipo sigue presente
+      expect(c.tipo, 2);
+      expect(c.visibles.single.nombre, 'Recarga 50');
     });
 
     test('errores y limpiar', () async {

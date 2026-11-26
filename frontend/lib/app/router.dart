@@ -93,6 +93,7 @@ Widget _catalogo(Dependencias deps, String? clave) {
       controller: deps.catalogo,
       claveSeleccionada: clave,
       alSeleccionar: (c) => context.go('/catalogo/$c'),
+      alVolver: () => context.go('/catalogo'),
       construirAccionCompra: (context, producto) => PanelCompra(
         producto: producto,
         cuentas: deps.cuentas,

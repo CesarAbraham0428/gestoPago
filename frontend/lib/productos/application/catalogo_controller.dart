@@ -16,7 +16,7 @@ class CatalogoController extends ChangeNotifier {
   List<Producto> _todos = const [];
   List<Producto> _visibles = const [];
   String _busqueda = '';
-  CategoriaProducto? _categoria;
+  int? _tipo;
   bool _soloDisponibles = true;
   String? _error;
 
@@ -24,17 +24,18 @@ class CatalogoController extends ChangeNotifier {
   String? get error => _error;
   List<Producto> get visibles => _visibles;
   String get busqueda => _busqueda;
-  CategoriaProducto? get categoria => _categoria;
+  int? get tipo => _tipo;
   bool get soloDisponibles => _soloDisponibles;
   int get total => _todos.length;
 
-  /// Categorías que tienen productos, en orden de presentación.
-  List<CategoriaProducto> get categoriasPresentes {
+  /// Tipos de servicio que tienen productos, en orden de id y "Otros" al final.
+  List<int> get tiposPresentes {
     final presentes = _todos
         .where((p) => !_soloDisponibles || p.disponibleParaCompra)
-        .map((p) => p.categoria)
+        .map((p) => p.tipoServicio)
         .toSet();
-    return CategoriaProducto.values.where(presentes.contains).toList();
+    return presentes.toList()
+      ..sort((a, b) => (a == 0 ? 1 << 30 : a).compareTo(b == 0 ? 1 << 30 : b));
   }
 
   Producto? porClave(String clave) {
@@ -70,17 +71,15 @@ class CatalogoController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void filtrarCategoria(CategoriaProducto? categoria) {
-    _categoria = categoria;
+  void filtrarTipo(int? tipo) {
+    _tipo = tipo;
     _aplicarFiltros();
     notifyListeners();
   }
 
   void alternarSoloDisponibles(bool valor) {
     _soloDisponibles = valor;
-    if (_categoria != null && !categoriasPresentes.contains(_categoria)) {
-      _categoria = null;
-    }
+    if (_tipo != null && !tiposPresentes.contains(_tipo)) _tipo = null;
     _aplicarFiltros();
     notifyListeners();
   }
@@ -91,7 +90,7 @@ class CatalogoController extends ChangeNotifier {
     _todos = const [];
     _visibles = const [];
     _busqueda = '';
-    _categoria = null;
+    _tipo = null;
     _error = null;
     notifyListeners();
   }
@@ -100,7 +99,7 @@ class CatalogoController extends ChangeNotifier {
     final consulta = _normalizar(_busqueda);
     final lista = _todos.where((p) {
       if (_soloDisponibles && !p.disponibleParaCompra) return false;
-      if (_categoria != null && p.categoria != _categoria) return false;
+      if (_tipo != null && p.tipoServicio != _tipo) return false;
       if (consulta.isEmpty) return true;
       return _normalizar('${p.nombre} ${p.servicio}').contains(consulta);
     }).toList();
