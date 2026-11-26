@@ -112,7 +112,7 @@ class Dependencias {
     notificaciones.nuevas.listen(_mostrarToast);
 
     // Al cerrar sesión se descartan los datos del usuario anterior; al abrirla se
-    // consulta su rol para saber si el menú ofrece la sección de clientes.
+    // consulta su rol (menú de clientes) y se precarga el historial de compras.
     var estabaAutenticado = false;
     sesion.addListener(() {
       if (estabaAutenticado && !sesion.autenticado) {
@@ -123,6 +123,8 @@ class Dependencias {
         notificaciones.limpiar();
       } else if (!estabaAutenticado && sesion.autenticado) {
         unawaited(clientes.detectarRol());
+        // Las compras se piden al iniciar sesión para que "Mis compras" abra con datos.
+        unawaited(historial.recargar());
       }
       estabaAutenticado = sesion.autenticado;
     });

@@ -333,6 +333,30 @@ void main() {
       expect(c.error, contains('historial'));
     });
 
+    test('recargar silencioso conserva la lista a la vista, sin estado de carga', () async {
+      final c = HistorialController(
+        _Pagos([
+          _pagina(0, 1, ['A']),
+          _pagina(0, 1, ['A', 'B']),
+          const ConexionException('Sin red'),
+        ]),
+      );
+      final estados = <EstadoHistorial>[];
+      c.addListener(() => estados.add(c.estado));
+      await c.recargar(silencioso: true); // aún sin datos: carga normal
+      expect(estados, [EstadoHistorial.cargando, EstadoHistorial.listo]);
+
+      estados.clear();
+      await c.recargar(silencioso: true);
+      expect(estados, everyElement(EstadoHistorial.listo));
+      expect(c.compras.map((e) => e.upc), ['A', 'B']);
+
+      await c.recargar(silencioso: true); // un fallo no borra lo que se ve
+      expect(c.estado, EstadoHistorial.listo);
+      expect(c.error, isNull);
+      expect(c.compras.length, 2);
+    });
+
     test('recargar se ignora si ya está cargando y limpiar reinicia', () async {
       final repo = _Pagos([
         _pagina(0, 1, ['A']),

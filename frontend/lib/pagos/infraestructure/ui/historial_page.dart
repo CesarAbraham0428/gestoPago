@@ -35,10 +35,11 @@ class _HistorialPageState extends State<HistorialPage> {
   @override
   void initState() {
     super.initState();
-    // Siempre se vuelve a consultar al entrar: un pago rechazado o pendiente no pasa por la compra.
+    // Siempre se vuelve a consultar al entrar (un pago rechazado o pendiente no pasa por la compra),
+    // pero en segundo plano: si ya hay compras cargadas se ven al instante.
     // Tras el primer cuadro: notificar durante el build rompería a los demás oyentes del controlador.
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => widget.controller.recargar(),
+      (_) => widget.controller.recargar(silencioso: true),
     );
   }
 

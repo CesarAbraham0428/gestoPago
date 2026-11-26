@@ -32,6 +32,7 @@ class HistorialController extends ChangeNotifier {
   int _pagina = -1;
   bool _hayMas = false;
   bool _cargandoMas = false;
+  bool _recargando = false;
   String? _error;
   String? _errorMas;
   FiltroPagos _filtro = FiltroPagos.todos;
@@ -132,11 +133,17 @@ class HistorialController extends ChangeNotifier {
   }
 
   /// Vuelve a la primera página. Se usa al abrir la pantalla y tras comprar.
-  Future<void> recargar() async {
-    if (_estado == EstadoHistorial.cargando) return;
-    _estado = EstadoHistorial.cargando;
-    _error = null;
-    notifyListeners();
+  /// Con [silencioso] y compras ya a la vista no se muestra el indicador de carga:
+  /// la lista se actualiza cuando llega la respuesta y un fallo la deja como estaba.
+  Future<void> recargar({bool silencioso = false}) async {
+    if (_recargando) return;
+    _recargando = true;
+    final enSegundoPlano = silencioso && _estado == EstadoHistorial.listo;
+    if (!enSegundoPlano) {
+      _estado = EstadoHistorial.cargando;
+      _error = null;
+      notifyListeners();
+    }
     try {
       final primera = await _pagos.historial(
         pagina: 0,
@@ -149,12 +156,17 @@ class HistorialController extends ChangeNotifier {
       _hayMas = primera.hayMas;
       _estado = EstadoHistorial.listo;
     } on AppException catch (e) {
-      _estado = EstadoHistorial.error;
-      _error = e.message;
+      if (!enSegundoPlano) {
+        _estado = EstadoHistorial.error;
+        _error = e.message;
+      }
     } on Object {
-      _estado = EstadoHistorial.error;
-      _error = 'No pudimos cargar tu historial.';
+      if (!enSegundoPlano) {
+        _estado = EstadoHistorial.error;
+        _error = 'No pudimos cargar tu historial.';
+      }
     }
+    _recargando = false;
     notifyListeners();
   }
 
@@ -185,6 +197,7 @@ class HistorialController extends ChangeNotifier {
     _compras.clear();
     _pagina = -1;
     _hayMas = false;
+    _recargando = false;
     _error = null;
     _errorMas = null;
     _filtro = FiltroPagos.todos;
