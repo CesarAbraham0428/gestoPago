@@ -31,6 +31,12 @@ public class AutorizacionService {
         }
     }
 
+    public void exigirAdministrador(Integer usuarioAutenticadoId) {
+        if (usuarioActivo(usuarioAutenticadoId).getCliente().getRol() != Rol.Administrador) {
+            throw accesoDenegado();
+        }
+    }
+
     private Usuario usuarioActivo(Integer usuarioAutenticadoId) {
         if (usuarioAutenticadoId == null) {
             throw new NegocioException(HttpStatus.UNAUTHORIZED, "Usuario no autenticado");

@@ -105,6 +105,19 @@ class ControladoresRutasTest {
     }
 
     @Test
+    void activarUsaLaIdentidadAutenticada() throws Exception {
+        ClienteService clientes = mock(ClienteService.class);
+
+        mvc(new ClienteController(clientes, mock(LimiteAutenticacionService.class)))
+                .perform(post("/clientes/activar").principal(usuario).contentType(JSON)
+                        .content("{\"rfc\":\"PERA900101AB1\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("mensaje").value("Cliente activado"));
+
+        verify(clientes).activar(any(), eq(7));
+    }
+
+    @Test
     void elHistorialRecibeLaPaginaEnElCuerpo() throws Exception {
         PagoService pagos = mock(PagoService.class);
         when(pagos.historial(anyInt(), anyInt(), anyInt()))

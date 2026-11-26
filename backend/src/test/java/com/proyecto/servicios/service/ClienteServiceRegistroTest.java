@@ -290,6 +290,38 @@ class ClienteServiceRegistroTest {
     }
 
     @Test
+    void activarExigeAdministradorYDevuelveAccesoYCuentasDespuesDelCliente() {
+        Cliente cliente = clienteActivo(false);
+        Usuario usuario = new Usuario();
+        usuario.setActivo(false);
+        Cuenta cuenta = new Cuenta();
+        cuenta.setEstaActiva(false);
+        when(clientes.findByRfcIgnoreCase("PERA900101AB1")).thenReturn(Optional.of(cliente));
+        when(clientes.bloquearPorId(7)).thenReturn(Optional.of(cliente));
+        when(usuarios.findByClienteId(7)).thenReturn(Optional.of(usuario));
+        when(cuentas.findByClienteIdOrderByIdAsc(7)).thenReturn(List.of(cuenta));
+
+        servicio().activar(new ClienteIdentificacionRequest("pera900101ab1", null), 9);
+
+        assertTrue(cliente.isActivo());
+        assertTrue(usuario.isActivo());
+        assertTrue(cuenta.isEstaActiva());
+        verify(autorizacion).exigirAdministrador(9);
+        verify(em, org.mockito.Mockito.times(2)).flush();
+        verify(em).clear();
+    }
+
+    @Test
+    void activarNoTocaNadaSiQuienPideNoEsAdministrador() {
+        org.mockito.Mockito.doThrow(new NegocioException(HttpStatus.FORBIDDEN, "no"))
+                .when(autorizacion).exigirAdministrador(9);
+
+        assertThrows(NegocioException.class,
+                () -> servicio().activar(new ClienteIdentificacionRequest("PERA900101AB1", null), 9));
+        verify(clientes, never()).bloquearPorId(any());
+    }
+
+    @Test
     void laIdentificacionPuedeSerPorCurpOPorAmbos() {
         Cliente cliente = new Cliente();
         cliente.setId(7);

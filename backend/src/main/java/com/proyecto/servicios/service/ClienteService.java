@@ -22,4 +22,7 @@ public interface ClienteService {
             Integer usuarioAutenticadoId);
 
     void desactivar(ClienteIdentificacionRequest request, Integer usuarioAutenticadoId);
+
+    /** Solo administradores: devuelve al cliente su acceso y sus cuentas tras una baja. */
+    void activar(ClienteIdentificacionRequest request, Integer usuarioAutenticadoId);
 }

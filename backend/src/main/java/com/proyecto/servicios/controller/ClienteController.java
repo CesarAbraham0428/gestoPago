@@ -74,4 +74,11 @@ public class ClienteController {
         service.desactivar(request, Integer.valueOf(authentication.getName()));
         return GenericResponse.exito("Cliente desactivado", null);
     }
+
+    @PostMapping("/activar")
+    public GenericResponse<Void> activar(@Valid @RequestBody ClienteIdentificacionRequest request,
+            Authentication authentication) {
+        service.activar(request, Integer.valueOf(authentication.getName()));
+        return GenericResponse.exito("Cliente activado", null);
+    }
 }

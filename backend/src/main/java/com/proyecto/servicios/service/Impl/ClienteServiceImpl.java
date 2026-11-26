@@ -221,6 +221,23 @@ public class ClienteServiceImpl implements ClienteService {
         em.clear();
     }
 
+    @Override
+    @Transactional
+    public void activar(ClienteIdentificacionRequest request, Integer usuarioAutenticadoId) {
+        validarEntrada(request);
+        autorizacion.exigirAdministrador(usuarioAutenticadoId);
+        Cliente cliente = bloquear(buscar(request).getId());
+        Integer id = cliente.getId();
+        cliente.setActivo(true);
+        // Los triggers solo propagan la baja: el alta devuelve a mano el acceso y las cuentas.
+        // El cliente se escribe antes porque usuario y cuenta activos exigen un cliente activo.
+        em.flush();
+        usuarios.findByClienteId(id).ifPresent(u -> u.setActivo(true));
+        cuentas.findByClienteIdOrderByIdAsc(id).forEach(c -> c.setEstaActiva(true));
+        em.flush();
+        em.clear();
+    }
+
     private ClienteResponse aplicarActualizacion(Cliente cliente, ClienteActualizacionRequest r) {
         Integer id = cliente.getId();
         validarEdad(r.fechaNacimiento());

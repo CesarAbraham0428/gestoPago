@@ -37,6 +37,16 @@ class AutorizacionServiceTest {
     }
 
     @Test
+    void soloUnAdministradorActivoPasaLaExigenciaDeAdministrador() {
+        when(usuarios.findById(7)).thenReturn(Optional.of(usuario(Rol.Administrador)));
+        assertDoesNotThrow(() -> service.exigirAdministrador(7));
+
+        when(usuarios.findById(8)).thenReturn(Optional.of(usuario(Rol.Cliente)));
+        var exception = assertThrows(NegocioException.class, () -> service.exigirAdministrador(8));
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
+    }
+
+    @Test
     void clienteInactivoNoObtienePermisosAunqueSuUsuarioEsteActivo() {
         Usuario usuario = usuario(Rol.Administrador);
         usuario.getCliente().setActivo(false);
