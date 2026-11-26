@@ -82,11 +82,11 @@ class ClienteControllerTest {
                  "apellidoMaterno":"Ruiz","fechaNacimiento":"1990-01-01","curp":"PERA900101MDFRZN01",
                  "rfc":"PERA900101AB1","sexo":"Femenino","nacionalidad":"Mexicana","estadoCivil":"Soltero",
                  "correoElectronico":"ana@example.com","telefonoMovil":"5512345678",
-                 "telefonoAlternativo":"5587654321","ocupacion":"Ingeniera","empresa":"Empresa",
+                 "telefonoAlternativo":"5587654321","ocupacion":"Ingeniería","empresa":"Empresa",
                  "ingresoMensual":12000.50,"rol":"Cliente","activo":true,
                  "fechaCreacion":"2026-10-01T12:00:00Z","fechaActualizacion":"2026-10-02T12:00:00Z",
                  "domicilio":{"id":8,"calle":"Reforma","numeroExterior":"10","colonia":"Centro",
-                     "municipio":"Cuauhtemoc","estado":"CDMX","codigoPostal":"06000","pais":"Mexico"},
+                     "municipio":"Cuauhtemoc","estado":"CDMX","codigoPostal":"06000","pais":"México"},
                  "cuentas":[{"id":10,"clienteId":7,"numeroCuenta":"000000000000000001","saldo":1250.75,
                      "estaActiva":true,"fechaCreacion":"2026-10-01T12:00:00Z",
                      "fechaActualizacion":"2026-10-02T12:00:00Z"}],
@@ -106,7 +106,7 @@ class ClienteControllerTest {
                 .andExpect(jsonPath("datos.datos[0].correoElectronico").value("ana@example.com"))
                 .andExpect(jsonPath("datos.datos[0].telefonoMovil").value("5512345678"))
                 .andExpect(jsonPath("datos.datos[0].telefonoAlternativo").value("5587654321"))
-                .andExpect(jsonPath("datos.datos[0].ocupacion").value("Ingeniera"))
+                .andExpect(jsonPath("datos.datos[0].ocupacion").value("Ingeniería"))
                 .andExpect(jsonPath("datos.datos[0].empresa").value("Empresa"))
                 .andExpect(jsonPath("datos.datos[0].ingresoMensual").value(12000.50))
                 .andExpect(jsonPath("datos.datos[0].fechaCreacion").isNotEmpty())

@@ -24,6 +24,7 @@ import com.proyecto.servicios.repositorys.sf.CuentaRepository;
 import com.proyecto.servicios.repositorys.sf.DomicilioRepository;
 import com.proyecto.servicios.repositorys.sf.UsuarioRepository;
 import com.proyecto.servicios.service.AutorizacionService;
+import com.proyecto.servicios.service.CatalogoService;
 import com.proyecto.servicios.service.ClienteService;
 import com.proyecto.servicios.service.exception.ClienteNoEncontradoException;
 import com.proyecto.servicios.service.exception.CorreoDuplicadoException;
@@ -43,6 +44,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -71,10 +73,12 @@ public class ClienteServiceImpl implements ClienteService {
     private final ObjectMapper mapper;
     private final Validator validator;
     private final AutorizacionService autorizacion;
+    private final CatalogoService catalogos;
 
     public ClienteServiceImpl(ClientesRepository clientes, DomicilioRepository domicilios,
             CuentaRepository cuentas, UsuarioRepository usuarios, PasswordEncoder encoder, EntityManager em,
-            ObjectMapper mapper, Validator validator, AutorizacionService autorizacion) {
+            ObjectMapper mapper, Validator validator, AutorizacionService autorizacion,
+            CatalogoService catalogos) {
         this.clientes = clientes;
         this.domicilios = domicilios;
         this.cuentas = cuentas;
@@ -84,6 +88,7 @@ public class ClienteServiceImpl implements ClienteService {
         this.mapper = mapper;
         this.validator = validator;
         this.autorizacion = autorizacion;
+        this.catalogos = catalogos;
     }
 
     @Override
@@ -303,12 +308,15 @@ public class ClienteServiceImpl implements ClienteService {
         c.setApellidoMaterno(r.apellidoMaterno().trim());
         c.setFechaNacimiento(r.fechaNacimiento());
         c.setSexo(r.sexo());
-        c.setNacionalidad(r.nacionalidad().trim());
+        c.setNacionalidad(delCatalogo(r.nacionalidad(), c.getNacionalidad(), catalogos::existeNacionalidad,
+                "una nacionalidad"));
         c.setEstadoCivil(r.estadoCivil());
         c.setCorreoElectronico(Texto.correo(r.correoElectronico()));
         c.setTelefonoMovil(r.telefonoMovil());
         c.setTelefonoAlternativo(r.telefonoAlternativo());
-        c.setOcupacion(Texto.opcional(r.ocupacion()));
+        String ocupacion = Texto.opcional(r.ocupacion());
+        c.setOcupacion(ocupacion == null ? null
+                : delCatalogo(ocupacion, c.getOcupacion(), catalogos::existeOcupacion, "una ocupación"));
         c.setEmpresa(Texto.opcional(r.empresa()));
         c.setIngresoMensual(r.ingresoMensual());
     }
@@ -328,7 +336,16 @@ public class ClienteServiceImpl implements ClienteService {
         d.setMunicipio(r.municipio().trim());
         d.setEstado(r.estado().trim());
         d.setCodigoPostal(r.codigoPostal());
-        d.setPais(r.pais().trim());
+        d.setPais(delCatalogo(r.pais(), d.getPais(), catalogos::existePais, "un país"));
+    }
+
+    /** Un valor ya guardado (aunque sea anterior al catálogo) se conserva; uno nuevo debe estar en el catálogo. */
+    private static String delCatalogo(String nuevo, String actual, Predicate<String> enCatalogo, String campo) {
+        String valor = nuevo.trim();
+        if (!valor.equals(actual) && !enCatalogo.test(valor)) {
+            throw new ValidacionException("Elige " + campo + " de la lista");
+        }
+        return valor;
     }
 
     private void validarEdad(LocalDate fecha) {

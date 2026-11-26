@@ -49,16 +49,16 @@ class ClientePatchTest {
             {"id":7,"primerNombre":"Ana","segundoNombre":"Maria","apellidoPaterno":"Perez",
              "apellidoMaterno":"Ruiz","fechaNacimiento":"1990-01-01","curp":"PERA900101MDFRZN01",
              "rfc":"PERA900101AB1","sexo":"Femenino","nacionalidad":"Mexicana","estadoCivil":"Soltero",
-             "correoElectronico":"ana@example.com","telefonoMovil":"5512345678","ocupacion":"Ingeniera",
+             "correoElectronico":"ana@example.com","telefonoMovil":"5512345678","ocupacion":"Ingeniería",
              "empresa":"Empresa","ingresoMensual":12000}
             """, Cliente.class);
         domicilio = mapper.readValue("""
             {"id":8,"calle":"Reforma","numeroExterior":"10","colonia":"Centro","municipio":"Cuauhtemoc",
-             "estado":"CDMX","codigoPostal":"06000","pais":"Mexico"}
+             "estado":"CDMX","codigoPostal":"06000","pais":"México"}
             """, Domicilio.class);
         domicilio.setCliente(cliente);
         service = new ClienteServiceImpl(clientes, domicilios, cuentas, usuarios,
-            encoder, em, mapper, factory.getValidator(), autorizacion);
+            encoder, em, mapper, factory.getValidator(), autorizacion, mock(CatalogoService.class, inv -> true));
     }
     @Test void modificaLasCuatroCategoriasYConservaCamposOmitidos() throws Exception {
         prepararLectura(); prepararRespuesta();
@@ -189,9 +189,9 @@ class ClientePatchTest {
         prepararRespuesta();
 
         var response = actualizar(mapper.readTree("""
-            {"ocupacion":"Contadora","empresa":"Acme","ingresoMensual":9000,
+            {"ocupacion":"Contabilidad","empresa":"Acme","ingresoMensual":9000,
              "domicilio":{"calle":"Reforma","numeroExterior":"10","numeroInterior":null,"colonia":"Centro",
-             "municipio":"Cuauhtemoc","estado":"CDMX","codigoPostal":"06000","pais":"Mexico"}}
+             "municipio":"Cuauhtemoc","estado":"CDMX","codigoPostal":"06000","pais":"México"}}
             """));
 
         var nuevo = org.mockito.ArgumentCaptor.forClass(Domicilio.class);
@@ -199,7 +199,7 @@ class ClientePatchTest {
         assertAll(
             () -> assertEquals("Reforma", nuevo.getValue().getCalle()),
             () -> assertSame(cliente, nuevo.getValue().getCliente()),
-            () -> assertEquals("Contadora", response.ocupacion()),
+            () -> assertEquals("Contabilidad", response.ocupacion()),
             () -> assertEquals("Acme", response.empresa()),
             () -> assertEquals("Reforma", response.domicilio().calle()));
     }

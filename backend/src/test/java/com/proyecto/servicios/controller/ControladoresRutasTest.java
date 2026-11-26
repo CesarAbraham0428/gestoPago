@@ -34,10 +34,10 @@ class ControladoresRutasTest {
             {"primerNombre":"Ana","segundoNombre":"Maria","apellidoPaterno":"Perez","apellidoMaterno":"Ruiz",
              "fechaNacimiento":"1990-01-01","curp":"PERA900101MDFRZN01","rfc":"PERA900101AB1",
              "sexo":"Femenino","nacionalidad":"Mexicana","estadoCivil":"Soltero",
-             "correoElectronico":"ana@example.com","telefonoMovil":"5512345678","ocupacion":"Ingeniera",
+             "correoElectronico":"ana@example.com","telefonoMovil":"5512345678","ocupacion":"Ingeniería",
              "empresa":"Empresa","ingresoMensual":12000,
              "domicilio":{"calle":"Reforma","numeroExterior":"10","colonia":"Centro","municipio":"Cuauhtemoc",
-                          "estado":"CDMX","codigoPostal":"06000","pais":"Mexico"},
+                          "estado":"CDMX","codigoPostal":"06000","pais":"México"},
              "password":"Segura#2026"}""";
     private final UsernamePasswordAuthenticationToken usuario =
             new UsernamePasswordAuthenticationToken("7", null, List.of());

@@ -15,7 +15,7 @@ class RespuestaPrivacidadTest {
         Cliente cliente = new Cliente();
         cliente.setId(1);
         cliente.setEmpresa("Empresa privada");
-        cliente.setOcupacion("Ingeniera");
+        cliente.setOcupacion("Ingeniería");
         cliente.setIngresoMensual(new BigDecimal("12000.00"));
         Cuenta cuenta = new Cuenta();
         cuenta.setId(2); cuenta.setCliente(cliente); cuenta.setNumeroCuenta("000000000000000001");

@@ -31,9 +31,9 @@ class ClienteValidationTest {
              "fechaNacimiento":"1990-01-01","curp":"PERA900101MDFRZN01","rfc":"PERA900101AB1",
              "sexo":"Femenino","nacionalidad":"Argentina","estadoCivil":"Soltero",
              "correoElectronico":"ana@example.com","telefonoMovil":"0123456789",
-             "ocupacion":"Ingeniera","empresa":"Empresa","ingresoMensual":12000.50,
+             "ocupacion":"Ingeniería","empresa":"Empresa","ingresoMensual":12000.50,
              "domicilio":{"calle":"Reforma","numeroExterior":"10","colonia":"Centro",
-             "municipio":"Cuauhtemoc","estado":"Ciudad de Mexico","codigoPostal":"06000","pais":"Mexico"},
+             "municipio":"Cuauhtemoc","estado":"Ciudad de Mexico","codigoPostal":"06000","pais":"México"},
              "password":"Segura123!"}
             """);
     }

@@ -90,6 +90,8 @@ public class SecurityConfiguration {
                         .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, POST_PUBLICOS.toArray(String[]::new)).permitAll()
+                        // Listas del formulario de registro (países, nacionalidades, ocupaciones): datos no sensibles.
+                        .requestMatchers(HttpMethod.GET, "/catalogos").permitAll()
                         // Sonda de salud de la plataforma (Render); solo devuelve {"status":"UP"} sin detalles.
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers("/error", "/swagger-ui/**", "/v3/api-docs/**").permitAll()

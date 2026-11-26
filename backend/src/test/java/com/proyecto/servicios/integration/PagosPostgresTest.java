@@ -58,7 +58,7 @@ class PagosPostgresTest {
     @Import({ConfigDB.class, FlywayConfig.class, SecurityConfiguration.class, JwtTokenService.class, ApiSecurityErrorWriter.class, LimitadorVentanaFija.class,
         ClienteController.class, CuentaController.class, UsuarioController.class, AutenticacionController.class,
         PagoController.class, NotificacionController.class, GlobalExceptionHandler.class,
-        ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class, UsuarioService.class,
+        ClienteServiceImpl.class, CatalogoService.class, CuentaService.class, AutorizacionService.class, UsuarioService.class,
         AutenticacionServiceImpl.class, PagoServiceImpl.class, PagoRegistroService.class, OtpPagoService.class, NotificacionService.class,
         GestoPagoPagosGateway.class, ResolutorDestinoPago.class, VerificadorAdeudo.class, ConciliacionPagoService.class,
         FirmaGestoPago.class, CifradoTokenConverter.class,
@@ -86,9 +86,9 @@ class PagosPostgresTest {
              "fechaNacimiento":"1990-01-01","curp":"PERA900101MDFRZN01","rfc":"PERA900101AB1",
              "sexo":"Femenino","nacionalidad":"Argentina","estadoCivil":"Union libre",
              "correoElectronico":"ana1@example.com","telefonoMovil":"5512345678",
-             "ocupacion":"Ingeniera","empresa":"Empresa","ingresoMensual":12000.50,
+             "ocupacion":"Ingeniería","empresa":"Empresa","ingresoMensual":12000.50,
              "domicilio":{"calle":"Reforma","numeroExterior":"10","colonia":"Centro",
-             "municipio":"Cuauhtemoc","estado":"Ciudad de Mexico","codigoPostal":"06000","pais":"Mexico"},
+             "municipio":"Cuauhtemoc","estado":"Ciudad de Mexico","codigoPostal":"06000","pais":"México"},
              "password":"Segura123!"}
             """;
 

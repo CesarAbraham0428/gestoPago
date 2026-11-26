@@ -69,6 +69,8 @@ class ClienteServiceRegistroTest {
     private final PasswordEncoder encoder = mock(PasswordEncoder.class);
     private final EntityManager em = mock(EntityManager.class);
     private final AutorizacionService autorizacion = mock(AutorizacionService.class);
+    // Por omisión todo valor está en el catálogo; cada prueba lo niega donde lo necesita.
+    private final CatalogoService catalogos = mock(CatalogoService.class, inv -> true);
     private ClienteServiceImpl service;
 
     @BeforeAll
@@ -84,7 +86,7 @@ class ClienteServiceRegistroTest {
     private ClienteServiceImpl servicio() {
         if (service == null) {
             service = new ClienteServiceImpl(clientes, domicilios, cuentas, usuarios, encoder, em, mapper,
-                    factory.getValidator(), autorizacion);
+                    factory.getValidator(), autorizacion, catalogos);
         }
         return service;
     }
@@ -97,7 +99,7 @@ class ClienteServiceRegistroTest {
     private static ClienteRequest solicitud(LocalDate nacimiento, String password) {
         return new ClienteRequest(" Ana ", " María ", " Pérez ", " Ruiz ", nacimiento, " pera900101mdfrzn01 ",
                 " pera900101ab1 ", Sexo.Femenino, " Mexicana ", EstadoCivil.Soltero, " Ana@Example.COM ",
-                "5512345678", "5587654321", " Ingeniera ", " Empresa ", new BigDecimal("12000.50"),
+                "5512345678", "5587654321", " Ingeniería ", " Empresa ", new BigDecimal("12000.50"),
                 domicilioRequest(), password);
     }
 
@@ -165,6 +167,37 @@ class ClienteServiceRegistroTest {
                 () -> servicio().registrar(solicitud(LocalDate.of(1990, 1, 1), "123")));
         assertThrows(ValidacionException.class, () -> servicio().registrar(solicitud(null, PASSWORD)));
         verify(clientes, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void registrarSoloAceptaNacionalidadPaisYOcupacionDelCatalogo() {
+        when(catalogos.existeNacionalidad("Mexicano")).thenReturn(false);
+        when(catalogos.existePais("Mexico")).thenReturn(false);
+        when(catalogos.existeOcupacion("Astronauta")).thenReturn(false);
+        ClienteRequest base = solicitud(LocalDate.of(1990, 1, 1), PASSWORD);
+        DomicilioRequest d = base.domicilio();
+        ClienteRequest otraNacionalidad = new ClienteRequest(base.primerNombre(), base.segundoNombre(),
+                base.apellidoPaterno(), base.apellidoMaterno(), base.fechaNacimiento(), base.curp(), base.rfc(),
+                base.sexo(), "Mexicano", base.estadoCivil(), base.correoElectronico(), base.telefonoMovil(),
+                base.telefonoAlternativo(), base.ocupacion(), base.empresa(), base.ingresoMensual(), d, PASSWORD);
+        ClienteRequest otraOcupacion = new ClienteRequest(base.primerNombre(), base.segundoNombre(),
+                base.apellidoPaterno(), base.apellidoMaterno(), base.fechaNacimiento(), base.curp(), base.rfc(),
+                base.sexo(), base.nacionalidad(), base.estadoCivil(), base.correoElectronico(), base.telefonoMovil(),
+                base.telefonoAlternativo(), "Astronauta", base.empresa(), base.ingresoMensual(), d, PASSWORD);
+        ClienteRequest otroPais = new ClienteRequest(base.primerNombre(), base.segundoNombre(),
+                base.apellidoPaterno(), base.apellidoMaterno(), base.fechaNacimiento(), base.curp(), base.rfc(),
+                base.sexo(), base.nacionalidad(), base.estadoCivil(), base.correoElectronico(),
+                base.telefonoMovil(), base.telefonoAlternativo(), base.ocupacion(), base.empresa(),
+                base.ingresoMensual(), new DomicilioRequest(d.calle(), d.numeroExterior(), d.numeroInterior(),
+                        d.colonia(), d.municipio(), d.estado(), d.codigoPostal(), "Mexico"), PASSWORD);
+
+        assertEquals("Elige una nacionalidad de la lista",
+                assertThrows(ValidacionException.class, () -> servicio().registrar(otraNacionalidad)).getMessage());
+        assertEquals("Elige una ocupación de la lista",
+                assertThrows(ValidacionException.class, () -> servicio().registrar(otraOcupacion)).getMessage());
+        assertEquals("Elige un país de la lista",
+                assertThrows(ValidacionException.class, () -> servicio().registrar(otroPais)).getMessage());
+        verify(domicilios, never()).save(any());
     }
 
     @Test
@@ -299,7 +332,7 @@ class ClienteServiceRegistroTest {
         cliente.setEstadoCivil(EstadoCivil.Soltero);
         cliente.setCorreoElectronico("ana@example.com");
         cliente.setTelefonoMovil("5512345678");
-        cliente.setOcupacion("Ingeniera");
+        cliente.setOcupacion("Ingeniería");
         cliente.setEmpresa("Empresa");
         cliente.setIngresoMensual(new BigDecimal("12000"));
         cliente.setActivo(activo);

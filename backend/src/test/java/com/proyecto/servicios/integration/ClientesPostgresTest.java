@@ -46,9 +46,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ClientesPostgresTest {
     @SpringBootConfiguration @EnableAutoConfiguration
     @Import({ConfigDB.class, FlywayConfig.class, SecurityConfiguration.class, JwtTokenService.class, ApiSecurityErrorWriter.class, LimitadorVentanaFija.class,
-        ClienteController.class, CuentaController.class, UsuarioController.class, AutenticacionController.class,
+        ClienteController.class, CatalogoController.class, CuentaController.class, UsuarioController.class, AutenticacionController.class,
         GlobalExceptionHandler.class,
-        ClienteServiceImpl.class, CuentaService.class, AutorizacionService.class,
+        ClienteServiceImpl.class, CatalogoService.class, CuentaService.class, AutorizacionService.class,
         UsuarioService.class, AutenticacionServiceImpl.class, OtpPagoService.class,
         CodigoVerificacionService.class, SesionService.class, NotificadorSesiones.class, TotpService.class, CifradoTokenConverter.class, RelojDePrueba.class,
         CodigosDePrueba.class})
@@ -104,6 +104,38 @@ class ClientesPostgresTest {
         assertEquals(1, jdbc.queryForObject("select count(*) from usuarios where cliente_id=?", Integer.class, id));
         assertTrue(numero(c).matches("[0-9]{18}"));
     }
+    @Test void catalogosSonPublicosYElRegistroSoloAceptaSusValores() throws Exception {
+        // Se leen los bytes: MockMvc decodificaría como ISO-8859-1 una respuesta JSON sin charset y rompería los acentos.
+        JsonNode datos = mapper.readTree(mvc.perform(get("/catalogos")).andExpect(status().isOk()).andReturn()
+            .getResponse().getContentAsByteArray()).get("datos");
+        assertAll(
+            () -> assertTrue(datos.get("paises").size() > 200),
+            () -> assertEquals(datos.get("paises").size(), datos.get("nacionalidades").size()),
+            () -> assertEquals("Afganistán", datos.get("paises").get(0).asText()),
+            () -> assertTrue(datos.get("nacionalidades").toString().contains("\"Mexicana\"")),
+            () -> assertTrue(datos.get("ocupaciones").toString().contains("\"Ingeniería\"")));
+
+        ObjectNode otroPais = registro("1");
+        ((ObjectNode) otroPais.get("domicilio")).put("pais", "Narnia");
+        ObjectNode otraNacionalidad = registro("1");
+        otraNacionalidad.put("nacionalidad", "Mexicano");
+        ObjectNode otraOcupacion = registro("1");
+        otraOcupacion.put("ocupacion", "Astronauta");
+        for (ObjectNode invalido : new ObjectNode[] {otroPais, otraNacionalidad, otraOcupacion}) {
+            mvc.perform(post("/clientes").contentType("application/json").content(invalido.toString()))
+                .andExpect(status().isBadRequest());
+        }
+        assertEquals(0, jdbc.queryForObject("select count(*) from clientes", Integer.class));
+
+        // La base también lo exige aunque se salte el servicio.
+        int id = crear(registro("1")).get("id").asInt();
+        assertThrows(DataIntegrityViolationException.class,
+            () -> jdbc.update("update domicilios set pais='Narnia' where cliente_id=?", id));
+        assertThrows(DataIntegrityViolationException.class,
+            () -> jdbc.update("update clientes set nacionalidad='Mexicano' where id=?", id));
+        assertThrows(DataIntegrityViolationException.class,
+            () -> jdbc.update("update clientes set ocupacion='Astronauta' where id=?", id));
+    }
     @Test void registroSinOcupacionNiDomicilioSeCompletaDespuesPorPatch() throws Exception {
         ObjectNode body = registro("1");
         body.remove("estadoCivil"); body.remove("ocupacion"); body.remove("empresa"); body.remove("ingresoMensual"); body.remove("domicilio");
@@ -120,14 +152,14 @@ class ClientesPostgresTest {
             .contentType("application/json").content(identificacion(c).toString()))
             .andExpect(status().isOk()).andExpect(jsonPath("datos.datos[0].domicilio").doesNotExist());
         JsonNode cambios = mapper.readTree("""
-                {"ocupacion":"Contadora","empresa":"Acme","ingresoMensual":9000,
+                {"ocupacion":"Contabilidad","empresa":"Acme","ingresoMensual":9000,
                  "domicilio":{"calle":"Reforma","numeroExterior":"10","colonia":"Centro","municipio":"Cuauhtemoc",
-                 "estado":"CDMX","codigoPostal":"06000","pais":"Mexico"}}
+                 "estado":"CDMX","codigoPostal":"06000","pais":"México"}}
                 """);
         mvc.perform(patch("/clientes").header("Authorization", token).contentType("application/json")
             .content(actualizacion(c, cambios).toString()))
             .andExpect(status().isOk()).andExpect(jsonPath("datos.domicilio.calle").value("Reforma"))
-            .andExpect(jsonPath("datos.ocupacion").value("Contadora"));
+            .andExpect(jsonPath("datos.ocupacion").value("Contabilidad"));
         assertEquals(1, jdbc.queryForObject("select count(*) from domicilios where cliente_id=?", Integer.class, id));
 
         // Un domicilio incompleto se rechaza y no crea nada.
@@ -634,9 +666,9 @@ class ClientesPostgresTest {
              "fechaNacimiento":"1990-01-01","curp":"PERA900101MDFRZN01","rfc":"PERA900101AB1",
              "sexo":"Femenino","nacionalidad":"Argentina","estadoCivil":"Union libre",
              "correoElectronico":"ana1@example.com","telefonoMovil":"5512345678",
-             "ocupacion":"Ingeniera","empresa":"Empresa","ingresoMensual":12000.50,
+             "ocupacion":"Ingeniería","empresa":"Empresa","ingresoMensual":12000.50,
              "domicilio":{"calle":"Reforma","numeroExterior":"10","colonia":"Centro",
-             "municipio":"Cuauhtemoc","estado":"Ciudad de Mexico","codigoPostal":"06000","pais":"Mexico"},
+             "municipio":"Cuauhtemoc","estado":"Ciudad de Mexico","codigoPostal":"06000","pais":"México"},
              "password":"Segura123!"}
             """ )).put("curp", "PERA900101MDFRZN0" + sufijo).put("rfc", "PERA900101AB" + sufijo)
             .put("correoElectronico", "ana" + sufijo + "@example.com").put("telefonoMovil", "551234567" + sufijo);

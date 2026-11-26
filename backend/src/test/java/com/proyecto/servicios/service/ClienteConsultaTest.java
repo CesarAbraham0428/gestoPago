@@ -65,7 +65,8 @@ class ClienteConsultaTest {
         when(cuentas.findByClienteIdInOrderByIdAsc(List.of(7, 8)))
                 .thenReturn(List.of(cuentaPrimera, cuentaSegunda, cuentaOtroCliente));
         ClienteServiceImpl service = new ClienteServiceImpl(clientes, domicilios, cuentas, usuarios,
-                mock(PasswordEncoder.class), mock(EntityManager.class), mapper, factory.getValidator(), autorizacion);
+                mock(PasswordEncoder.class), mock(EntityManager.class), mapper, factory.getValidator(), autorizacion,
+                mock(CatalogoService.class, inv -> true));
         ClienteConsultaRequest filtros = mapper.readValue("{\"pagina\":1,\"tamanio\":2}", ClienteConsultaRequest.class);
 
         var resultado = service.consultar(filtros, 9);
@@ -89,7 +90,7 @@ class ClienteConsultaTest {
                 () -> assertEquals("ana@example.com", cliente.correoElectronico()),
                 () -> assertEquals("5512345678", cliente.telefonoMovil()),
                 () -> assertEquals("5587654321", cliente.telefonoAlternativo()),
-                () -> assertEquals("Ingeniera", cliente.ocupacion()),
+                () -> assertEquals("Ingeniería", cliente.ocupacion()),
                 () -> assertEquals("Empresa", cliente.empresa()),
                 () -> assertEquals(new BigDecimal("12000.50"), cliente.ingresoMensual()),
                 () -> assertEquals("Cliente", cliente.rol().name()),
@@ -126,7 +127,7 @@ class ClienteConsultaTest {
                 {"primerNombre":"Ana","segundoNombre":"Maria","apellidoPaterno":"Perez",
                  "apellidoMaterno":"Ruiz","fechaNacimiento":"1990-01-01","curp":"PERA900101MDFRZN01",
                  "rfc":"PERA900101AB1","sexo":"Femenino","nacionalidad":"Mexicana","estadoCivil":"Soltero",
-                 "telefonoMovil":"5512345678","telefonoAlternativo":"5587654321","ocupacion":"Ingeniera",
+                 "telefonoMovil":"5512345678","telefonoAlternativo":"5587654321","ocupacion":"Ingeniería",
                  "empresa":"Empresa","ingresoMensual":12000.50}
                 """, Cliente.class);
         cliente.setId(id);
@@ -138,7 +139,7 @@ class ClienteConsultaTest {
     private Domicilio domicilio(Cliente cliente, String calle) throws Exception {
         Domicilio domicilio = mapper.readValue("""
                 {"id":20,"numeroExterior":"10","colonia":"Centro","municipio":"Cuauhtemoc",
-                 "estado":"CDMX","codigoPostal":"06000","pais":"Mexico"}
+                 "estado":"CDMX","codigoPostal":"06000","pais":"México"}
                 """, Domicilio.class);
         domicilio.setCalle(calle);
         domicilio.setCliente(cliente);
